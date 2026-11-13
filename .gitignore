@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+dist-electron/
+target/
+*.bin
+
+# Worktrees & Temporary Agent Environments
+.worktrees/
+.dewwie-temp/
+*.log
+
+# Local environment variables
+.env.local
+.env.*.local
+
+# OS files
+Thumbs.db
+.DS_Store
+*.tmp

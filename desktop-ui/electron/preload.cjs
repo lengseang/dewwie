@@ -1,0 +1,27 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('swarmherdNative', {
+  isNative: true,
+  wsPort: 7501,
+
+  pickFolder: () => ipcRenderer.invoke('project:pickFolder'),
+  getProjects: () => ipcRenderer.invoke('projects:get'),
+  addProject: (params) => ipcRenderer.invoke('projects:add', params),
+  removeProject: (projectId) => ipcRenderer.invoke('projects:remove', { id: projectId }),
+
+  getWorkspaces: () => ipcRenderer.invoke('workspaces:get'),
+  createSession: (params) => ipcRenderer.invoke('sessions:create', params),
+  createWorktree: (params) => ipcRenderer.invoke('workspaces:create', params),
+  getGitDiff: (params) => ipcRenderer.invoke('git:diff', params),
+  mergeWorktree: (params) => ipcRenderer.invoke('git:merge', params),
+  launchIde: (ide, targetPath) => ipcRenderer.invoke('ide:open', { ide, targetPath }),
+  getFilesTree: (params) => ipcRenderer.invoke('fs:tree', params || {}),
+  readFile: (params) => ipcRenderer.invoke('fs:read', params),
+  minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
+  maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
+  closeWindow: () => ipcRenderer.invoke('window:close'),
+
+  onAgentStatus: (callback) => {
+    ipcRenderer.on('agent:status', (_, data) => callback(data));
+  },
+});

@@ -1,0 +1,197 @@
+/**
+ * SwarmHerd Desktop Core Domain Types
+ * Unified interface between React UI and Rust Core Daemon (JSON-RPC & OSC 7501).
+ */
+
+export type AgentState = 'idle' | 'working' | 'blocked' | 'done' | 'error';
+
+export interface AgentStatus {
+  state: AgentState;
+  message: string;
+  timestamp: number;
+  step?: number;
+  totalSteps?: number;
+}
+
+export type PortStatus = 'allocated' | 'active' | 'free';
+
+export interface PortAllocation {
+  service: string;
+  port: number;
+  status: PortStatus;
+  url: string;
+  description?: string;
+}
+
+export type FileDiffStatus = 'added' | 'modified' | 'deleted';
+
+export interface DiffLine {
+  type: 'add' | 'delete' | 'context';
+  content: string;
+  oldLineNumber?: number;
+  newLineNumber?: number;
+}
+
+export interface DiffChunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  header: string;
+  lines: DiffLine[];
+}
+
+export interface DiffFile {
+  id: string;
+  path: string;
+  oldPath?: string;
+  status: FileDiffStatus;
+  additions: number;
+  deletions: number;
+  chunks: DiffChunk[];
+  rawDiff?: string;
+  isBinary?: boolean;
+}
+
+export interface WorkspaceMetrics {
+  cpuPercent: number;
+  memoryMb: number;
+}
+
+export interface DiffSummary {
+  filesChanged: number;
+  additions: number;
+  deletions: number;
+}
+
+export type SessionMode = 'local' | 'branch';
+
+export interface ProjectState {
+  id: string;
+  name: string;
+  rootPath: string;
+  isGitRepo: boolean;
+  createdAt: string;
+}
+
+export interface WorkspaceState {
+  id: string;
+  projectId?: string;
+  projectName?: string;
+  name: string;
+  sessionMode: SessionMode; // 'local' (in-place project folder) or 'branch' (isolated git worktree)
+  branch?: string;
+  baseBranch?: string;
+  worktreePath: string; // rootPath for local, or .worktrees/<branch> for branch
+  repository?: string;
+  parentId?: string; // Sub-agent hierarchy
+  agentType?: 'claude-code' | 'codex' | 'aider' | 'gemini' | 'custom' | 'shell';
+  agentStatus: AgentStatus;
+  metrics: WorkspaceMetrics;
+  ports: PortAllocation[];
+  diffSummary: DiffSummary;
+  createdAt: string;
+  lastActivity: string;
+  commitSha: string;
+  terminalSessionId: string;
+}
+
+export type ExternalEditor = 'cursor' | 'zed' | 'vscode';
+
+export type UIMode = 'build' | 'review';
+
+/**
+ * JSON-RPC 2.0 Specification Protocol Types
+ */
+export interface JsonRpcRequest<T = unknown> {
+  jsonrpc: '2.0';
+  id: string | number;
+  method: string;
+  params?: T;
+}
+
+export interface JsonRpcResponse<T = unknown> {
+  jsonrpc: '2.0';
+  id: string | number | null;
+  result?: T;
+  error?: {
+    code: number;
+    message: string;
+    data?: unknown;
+  };
+}
+
+export interface JsonRpcNotification<T = unknown> {
+  jsonrpc: '2.0';
+  method: string;
+  params?: T;
+}
+
+export interface PtyOutputNotificationParams {
+  workspace_id: string;
+  data: string;
+}
+
+export interface AgentStatusNotificationParams {
+  workspace_id: string;
+  state: AgentState;
+  message: string;
+  metadata?: Record<string, string>;
+  timestamp_ms: number;
+}
+
+export interface PtyExitedNotificationParams {
+  workspace_id: string;
+  exit_code: number;
+}
+
+export type RpcMessage = JsonRpcRequest | JsonRpcResponse | JsonRpcNotification;
+
+/**
+ * OSC 7501 Terminal Protocol Payload
+ * Format: \x1b]7501;state=<state>;msg=<message>\x07
+ */
+export interface Osc7501Payload {
+  state: AgentState;
+  msg: string;
+}
+
+export interface FileItem {
+  name: string;
+  type: 'file' | 'folder';
+  path: string;
+  size?: string;
+  children?: FileItem[];
+}
+
+declare global {
+  interface Window {
+    swarmherdNative?: {
+      isNative: boolean;
+      wsPort: number;
+      pickFolder: () => Promise<string | null>;
+      getProjects: () => Promise<ProjectState[]>;
+      addProject: (params: { path: string; name?: string }) => Promise<ProjectState>;
+      removeProject: (projectId: string) => Promise<boolean>;
+      getWorkspaces: () => Promise<WorkspaceState[]>;
+      createSession: (params: {
+        projectId?: string;
+        name: string;
+        sessionMode: SessionMode;
+        branch?: string;
+        baseBranch?: string;
+        agentType?: string;
+      }) => Promise<WorkspaceState>;
+      createWorktree: (params: { name?: string; branch: string; baseBranch?: string; repository?: string }) => Promise<WorkspaceState>;
+      getGitDiff: (params: { worktreePath?: string; baseBranch?: string; sessionMode?: SessionMode }) => Promise<{ rawPatch: string; numstat: string }>;
+      mergeWorktree: (params: { worktreePath?: string; branch: string; baseBranch?: string; commitMsg?: string }) => Promise<{ success: boolean; message: string }>;
+      launchIde: (ide: string, targetPath?: string) => Promise<boolean>;
+      getFilesTree: (params?: { targetPath?: string }) => Promise<FileItem[]>;
+      readFile: (params: { filePath: string; basePath?: string }) => Promise<{ content?: string; error?: string }>;
+      minimizeWindow: () => Promise<void>;
+      maximizeWindow: () => Promise<void>;
+      closeWindow: () => Promise<void>;
+      onAgentStatus: (callback: (data: { workspaceId: string; state: AgentState; message: string }) => void) => void;
+    };
+  }
+}

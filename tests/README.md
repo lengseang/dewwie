@@ -1,0 +1,67 @@
+# SwarmHerd Verification & Test Harness
+
+This directory contains the automated test suites, contract alignment verifications, and mock agent simulators for **SwarmHerd**.
+
+## Test Suite Inventory
+
+| Script | Purpose | Execution |
+|---|---|---|
+| `mock_agent.py` | Simulates an autonomous coding agent running in terminal PTY, emitting **OSC 7501** status sequences (`working`, `blocked`, `done`, `error`) and ANSI logs. | `python swarmherd/tests/mock_agent.py [--scenario standard\|quick\|fail\|infinite]` |
+| `mock_agent.sh` | Bash equivalent of the mock agent simulator for Linux/macOS environments. | `bash swarmherd/tests/mock_agent.sh` |
+| `test_worktree.py` | End-to-end Git worktree lifecycle test: base repo creation, branch worktree add, filesystem isolation verification, diff calculation (`--stat`, `--numstat`, untracked), clean merge, and teardown/prune. | `python swarmherd/tests/test_worktree.py` |
+| `test_worktree.ps1` | Native Windows PowerShell script verifying the Git worktree lifecycle. | `powershell -ExecutionPolicy Bypass -File swarmherd/tests/test_worktree.ps1` |
+| `test_osc_parser.py` | Unit tests for OSC 7501 sequence parsing with BEL (`\x07`) and ST (`\x1b\`), partial multi-chunk stream buffering, non-7501 passthrough, and malformed sequence tolerance. | `python swarmherd/tests/test_osc_parser.py` |
+| `test_port_broker.py` | Unit tests for PortBroker slot allocation, collision avoidance on already-bound TCP sockets, and `.env.local` injection formatting. | `python swarmherd/tests/test_port_broker.py` |
+| `test_rpc_contract.py` | Verifies JSON-RPC 2.0 schema alignment, method name consistency, enum matching (`AgentStatus`, `UIMode`), and port allocation keys between Rust daemon and React UI. | `python swarmherd/tests/test_rpc_contract.py` |
+| `run_all_tests.py` | Master test runner executing all 5 suites in sequence, displaying formatted execution tables, and providing exit codes for CI/CD gates. | `python swarmherd/tests/run_all_tests.py` |
+
+## Quick Start
+
+### Run Master Verification Suite
+```bash
+python swarmherd/tests/run_all_tests.py
+```
+
+### Run Mock Agent
+```bash
+# Standard 4-step scenario (working -> blocked -> approval -> done)
+python swarmherd/tests/mock_agent.py --delay 0.5
+
+# Quick verification mode (emits OSC sequences instantly)
+python swarmherd/tests/mock_agent.py --scenario quick
+
+# Failure simulation
+python swarmherd/tests/mock_agent.py --scenario fail
+```
+
+## Contract Alignment Summary
+
+### 1. Agent Status Protocol (OSC 7501)
+- **Escape Sequence**: `\x1b]7501;state=<state>;msg=<message><TERM>` where `<TERM>` is BEL (`\x07`) or ST (`\x1b\`).
+- **States**: `idle`, `working`, `blocked`, `done`, `error`.
+- **Rust Enum**: `AgentStatus` in `swarmherd/core-daemon/src/osc.rs`.
+- **React Type**: `AgentState` in `swarmherd/desktop-ui/src/types/index.ts`.
+- **Status**: **100% Aligned**.
+
+### 2. JSON-RPC 2.0 Methods
+- `workspace.list`: List all active/persisted workspaces.
+- `workspace.create`: Create new worktree branch and allocate port slot.
+- `workspace.get`: Get metadata for specific workspace.
+- `workspace.remove` / `workspace.delete`: Remove worktree and optionally delete branch.
+- `git.diff` / `workspace.diff`: Get structured diff summary (+additions, -deletions, patch, untracked).
+- `git.merge` / `workspace.merge`: Fast-forward, squash, or merge worktree branch into base.
+- `git.discard` / `workspace.discard`: Hard reset worktree changes and clean untracked files.
+- `pty.spawn`: Launch agent process inside isolated worktree.
+- `pty.write`: Deliver user input / stdin keystrokes to terminal.
+- `pty.resize`: Update terminal dimensions (cols, rows).
+- `pty.kill`: Terminate running PTY process.
+- `pty.scrollback`: Fetch historical terminal buffer from `scrollback.bin`.
+- `system.metrics`: Query CPU & RAM utilization.
+- `system.ping`: Health check.
+- **Status**: **100% Aligned with dual alias support**.
+
+### 3. Port Broker Allocations
+- **Base Ports**: Web (3000), Backend (8000), Vite (5173).
+- **Slot Formula**: `base_port + slot * 10` (or `+ slot` sequential probing).
+- **Injected `.env.local` Keys**: `PORT`, `BACKEND_PORT`, `VITE_PORT`, `NEXT_PUBLIC_PORT`, `NEXT_PUBLIC_API_URL`, `SWARMHERD_PORT_SLOT`.
+- **Status**: **100% Aligned**.
