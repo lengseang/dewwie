@@ -26,13 +26,16 @@ BOLD = "\033[1m"
 DIM = "\033[2m"
 RESET = "\033[0m"
 
+from pathlib import Path
+TESTS_DIR = Path(__file__).resolve().parent
+
 SUITES = [
-    ("OSC 7501 Parser Suite", ["python", "swarmherd/tests/test_osc_parser.py"]),
-    ("TCP Port Broker Suite", ["python", "swarmherd/tests/test_port_broker.py"]),
-    ("RPC & Protocol Contract Suite", ["python", "swarmherd/tests/test_rpc_contract.py"]),
-    ("Mock Agent Simulation", ["python", "swarmherd/tests/mock_agent.py", "--scenario", "quick"]),
-    ("Git Worktree Lifecycle Suite", ["python", "swarmherd/tests/test_worktree.py"]),
-    ("Comprehensive E2E Scenarios (A-E)", ["python", "swarmherd/tests/e2e_scenarios.py"]),
+    ("OSC 7501 Parser Suite", ["python", str(TESTS_DIR / "test_osc_parser.py")]),
+    ("TCP Port Broker Suite", ["python", str(TESTS_DIR / "test_port_broker.py")]),
+    ("RPC & Protocol Contract Suite", ["python", str(TESTS_DIR / "test_rpc_contract.py")]),
+    ("Mock Agent Simulation", ["python", str(TESTS_DIR / "mock_agent.py"), "--scenario", "quick"]),
+    ("Git Worktree Lifecycle Suite", ["python", str(TESTS_DIR / "test_worktree.py")]),
+    ("Comprehensive E2E Scenarios (A-E)", ["python", str(TESTS_DIR / "e2e_scenarios.py")]),
 ]
 
 def run_suite(name: str, cmd: List[str]) -> Tuple[bool, float, str]:
@@ -45,7 +48,7 @@ def run_suite(name: str, cmd: List[str]) -> Tuple[bool, float, str]:
 
 def main() -> int:
     print(f"\n{BOLD}{CYAN}======================================================================{RESET}")
-    print(f"{BOLD}{CYAN}           SWARMHERD END-TO-END VERIFICATION HARNESS                  {RESET}")
+    print(f"{BOLD}{CYAN}           DEWWIE END-TO-END VERIFICATION HARNESS                     {RESET}")
     print(f"{BOLD}{CYAN}======================================================================{RESET}\n")
 
     results = []
