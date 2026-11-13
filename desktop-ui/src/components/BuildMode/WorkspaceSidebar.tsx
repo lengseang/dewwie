@@ -181,7 +181,7 @@ export const WorkspaceSidebar: React.FC = () => {
 
               {/* Sessions Tree with Continuous Guide Line */}
               {!isCollapsed && (
-                <div className="relative ml-4 pl-3.5 border-l border-zinc-800/80 space-y-1 py-1">
+                <div className="relative ml-4 pl-3.5 space-y-1 py-1">
                   {filtered.map((ws) => {
                     const isActive = activeWorkspaceId === ws.id;
                     const isLocal = ws.sessionMode === 'local' || !ws.sessionMode;
@@ -196,10 +196,13 @@ export const WorkspaceSidebar: React.FC = () => {
                             : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
                         }`}
                       >
+                        {/* Vertical tree trunk through this item */}
+                        <span className="absolute -left-3.5 top-0 bottom-0 w-px bg-zinc-800/80" />
+
                         {/* Horizontal connector tick from vertical guide line */}
                         <span
                           className={`absolute -left-3.5 top-1/2 -translate-y-1/2 w-2.5 h-px ${
-                            isActive ? 'bg-zinc-500' : 'bg-zinc-800'
+                            isActive ? 'bg-blue-400' : 'bg-zinc-800/80'
                           }`}
                         />
 
@@ -228,7 +231,7 @@ export const WorkspaceSidebar: React.FC = () => {
                             </span>
                           )}
 
-                          {ws.id !== 'ws-main' && !isLocal && (
+                          {ws.id !== 'ws-local-proj-dewwie' && ws.id !== 'ws-local-proj-exbytelab' && !isLocal && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -245,7 +248,7 @@ export const WorkspaceSidebar: React.FC = () => {
                     );
                   })}
 
-                  {/* Branch Line Hook (Curving out at bottom) */}
+                  {/* Branch Line Hook (Curving out at bottom: ╰── + new session) */}
                   <div
                     onClick={() => {
                       setSelectedProjectId(proj.id);
@@ -253,7 +256,7 @@ export const WorkspaceSidebar: React.FC = () => {
                     }}
                     className="group relative flex items-center gap-2 px-2.5 py-1 text-xs font-mono text-zinc-600 hover:text-zinc-300 cursor-pointer transition-colors"
                   >
-                    <span className="absolute -left-3.5 top-0 w-3 h-3 border-b border-l border-zinc-800/80 rounded-bl-sm" />
+                    <span className="absolute -left-3.5 top-0 w-2.5 h-1/2 border-b border-l border-zinc-800/80 rounded-bl-sm" />
                     <span className="text-[11px] text-zinc-600 group-hover:text-zinc-400 select-none">
                       + new session
                     </span>

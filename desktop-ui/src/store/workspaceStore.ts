@@ -66,6 +66,13 @@ interface WorkspaceStore {
 }
 
 const INITIAL_PROJECTS: Record<string, ProjectState> = {
+  'proj-dewwie': {
+    id: 'proj-dewwie',
+    name: 'Dewwie',
+    rootPath: 'D:\\1111-Works\\Dewwie',
+    isGitRepo: true,
+    createdAt: new Date().toISOString(),
+  },
   'proj-exbytelab': {
     id: 'proj-exbytelab',
     name: 'exbytelab',
@@ -77,17 +84,17 @@ const INITIAL_PROJECTS: Record<string, ProjectState> = {
 
 // Clean initial primary workspace
 const INITIAL_WORKSPACES: Record<string, WorkspaceState> = {
-  'ws-main': {
-    id: 'ws-main',
-    projectId: 'proj-exbytelab',
-    projectName: 'exbytelab',
+  'ws-local-proj-dewwie': {
+    id: 'ws-local-proj-dewwie',
+    projectId: 'proj-dewwie',
+    projectName: 'Dewwie',
     name: 'Local Main Shell',
     sessionMode: 'local',
     branch: 'main',
     baseBranch: 'main',
-    repository: 'exbytelab',
+    repository: 'Dewwie',
     agentType: 'claude-code',
-    worktreePath: 'D:\\1111-Works\\exbytelab',
+    worktreePath: 'D:\\1111-Works\\Dewwie',
     agentStatus: {
       state: 'idle',
       message: 'Active PowerShell terminal ready',
@@ -101,7 +108,7 @@ const INITIAL_WORKSPACES: Record<string, WorkspaceState> = {
     createdAt: new Date().toISOString(),
     lastActivity: 'Just now',
     commitSha: 'HEAD',
-    terminalSessionId: 'pty-ws-main',
+    terminalSessionId: 'pty-ws-local-proj-dewwie',
   },
 };
 
@@ -110,10 +117,10 @@ const INITIAL_SCROLLBACKS: Record<string, string> = {};
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   projects: INITIAL_PROJECTS,
-  activeProjectId: 'proj-exbytelab',
+  activeProjectId: 'proj-dewwie',
   workspaces: INITIAL_WORKSPACES,
-  workspaceOrder: ['ws-main'],
-  activeWorkspaceId: 'ws-main',
+  workspaceOrder: ['ws-local-proj-dewwie'],
+  activeWorkspaceId: 'ws-local-proj-dewwie',
   mode: 'build',
   activeTab: 'terminal',
   isSplitView: false,
@@ -147,10 +154,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
             map[ws.id] = ws;
             order.push(ws.id);
           }
+          const currentActive = get().activeWorkspaceId;
+          const keepActive = (currentActive && map[currentActive]) ? currentActive : (order[0] || 'ws-local-proj-dewwie');
           set(() => ({
             workspaces: map,
             workspaceOrder: order,
-            activeWorkspaceId: order[0] || 'ws-main',
+            activeWorkspaceId: keepActive,
             daemonStatus: 'connected',
           }));
         }

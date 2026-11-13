@@ -45,11 +45,25 @@ function getProjects() {
     } catch (_) {}
   }
 
+  // Ensure Dewwie project exists
+  const dewwieRoot = 'D:\\1111-Works\\Dewwie';
+  const hasDewwie = list.some(p => p.rootPath.toLowerCase() === dewwieRoot.toLowerCase());
+  if (!hasDewwie && fs.existsSync(dewwieRoot)) {
+    list.unshift({
+      id: 'proj-dewwie',
+      name: 'Dewwie',
+      rootPath: dewwieRoot,
+      isGitRepo: fs.existsSync(path.join(dewwieRoot, '.git')),
+      createdAt: new Date().toISOString()
+    });
+    saveProjects(list);
+  }
+
   // Ensure default root project exists
   const defaultRoot = 'D:\\1111-Works\\exbytelab';
   const hasRoot = list.some(p => p.rootPath.toLowerCase() === defaultRoot.toLowerCase());
   if (!hasRoot && fs.existsSync(defaultRoot)) {
-    list.unshift({
+    list.push({
       id: 'proj-exbytelab',
       name: 'exbytelab',
       rootPath: defaultRoot,
@@ -344,12 +358,15 @@ const wss = new WebSocket.Server({ server });
 
 wss.on('connection', async (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const workspaceId = url.searchParams.get('workspaceId') || 'ws-main';
+  let workspaceId = url.searchParams.get('workspaceId') || '';
   const list = await getWorkspaces();
+  if ((!workspaceId || workspaceId === 'ws-main') && list.length > 0) {
+    workspaceId = list[0].id;
+  }
   const matched = list.find(w => w.id === workspaceId);
-  const cwd = matched ? matched.worktreePath : 'D:\\1111-Works\\exbytelab';
+  const cwd = matched ? matched.worktreePath : (list[0]?.worktreePath || 'D:\\1111-Works\\Dewwie');
 
-  console.log(`[WS] Client attached to workspace: ${workspaceId}`);
+  console.log(`[WS] Client attached to workspace: ${workspaceId} (${cwd})`);
   const session = getOrCreatePty(workspaceId, cwd);
 
   // Send scrollback history from disk to newly connected client

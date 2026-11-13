@@ -46,6 +46,7 @@ export const DualTerminalPane: React.FC = () => {
   // Helper: Setup real PTY WebSocket connection for an xterm instance
   const attachPty = useCallback((container: HTMLDivElement | null, workspaceId: string, isLeft: boolean) => {
     if (!container) return;
+    container.innerHTML = ''; // Ensure clean container with zero duplicate DOM artifacts
 
     const term = new Terminal({
       cursorBlink: true,
@@ -84,6 +85,7 @@ export const DualTerminalPane: React.FC = () => {
     term.loadAddon(fit);
     term.open(container);
     fit.fit();
+    term.focus();
 
     if (isLeft) {
       leftTermRef.current = term;
@@ -102,6 +104,7 @@ export const DualTerminalPane: React.FC = () => {
       console.log(`[PTY Client] Connected live to ${workspaceId}`);
       if (isLeft) setIsLiveConnected(true);
       fit.fit();
+      term.focus();
       // Send initial terminal geometry
       ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
     };
@@ -160,19 +163,31 @@ export const DualTerminalPane: React.FC = () => {
     }
 
     const handleResize = () => {
-      leftFitRef.current?.fit();
-      rightFitRef.current?.fit();
+      try {
+        leftFitRef.current?.fit();
+        rightFitRef.current?.fit();
+      } catch (_) {}
     };
+
+    const ro = new ResizeObserver(() => {
+      handleResize();
+    });
+
+    if (leftContainerRef.current) ro.observe(leftContainerRef.current);
+    if (rightContainerRef.current) ro.observe(rightContainerRef.current);
 
     window.addEventListener('resize', handleResize);
     return () => {
+      ro.disconnect();
       window.removeEventListener('resize', handleResize);
       leftWsRef.current?.close();
       rightWsRef.current?.close();
       leftTermRef.current?.dispose();
       rightTermRef.current?.dispose();
+      if (leftContainerRef.current) leftContainerRef.current.innerHTML = '';
+      if (rightContainerRef.current) rightContainerRef.current.innerHTML = '';
     };
-  }, [activeWorkspaceId, isSplitView, secondaryWs?.id, attachPty]);
+  }, [activeWorkspaceId, isSplitView, isSplitView ? secondaryWs?.id : null, attachPty]);
 
   const handleCopyLogs = () => {
     // Select all terminal buffer text and copy
@@ -189,7 +204,8 @@ export const DualTerminalPane: React.FC = () => {
   const handleRestartShell = () => {
     if (activeWorkspaceId) {
       leftWsRef.current?.close();
-      leftTermRef.current?.reset();
+      leftTermRef.current?.dispose();
+      if (leftContainerRef.current) leftContainerRef.current.innerHTML = '';
       attachPty(leftContainerRef.current, activeWorkspaceId, true);
     }
   };

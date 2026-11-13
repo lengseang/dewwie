@@ -62,7 +62,14 @@ func main() {
 	fmt.Printf("  %s• Storage:%s   Persistent Session Scrollback\n", green, reset)
 	fmt.Printf("\n%s▶ Launching Dewwie Desktop Software...%s\n\n", cyan, reset)
 
-	cmd := exec.Command("cmd.exe", "/c", "npx", "electron", ".")
+	// Fast direct binary execution path
+	electronBin := filepath.Join(desktopDir, "node_modules", "electron", "dist", "electron.exe")
+	var cmd *exec.Cmd
+	if _, err := os.Stat(electronBin); err == nil {
+		cmd = exec.Command(electronBin, ".")
+	} else {
+		cmd = exec.Command("cmd.exe", "/c", "npx", "electron", ".")
+	}
 	cmd.Dir = desktopDir
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
