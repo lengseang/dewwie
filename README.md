@@ -20,13 +20,38 @@
 
 ## 🌟 Key Capabilities
 
+- **⚡ Herdr Core (`hc`) Persistent Terminals**: Built on top of Herdr Core's rock-solid Rust engine (`hc.exe`). Terminals and coding agents run persistently in the background and stay alive even if the window closes, with instant re-attachment.
+- **👑 Autonomous Lead Agent Delegation**: Root session orchestrator with `👑 LEAD` badge that autonomously decomposes complex goals into subtasks, provisions isolated git worktrees, launches background workers, and collects completion diffs via `dewwie delegate "<task>"`.
+- **💬 Cross-Directory Inter-Agent Room Mesh**: Real-time communication mesh connecting agents across disparate root folders and branch worktrees using OSC 7502 escape sequences (`@all`, `@lead`, `@<worker>`).
 - **📁 Project & Session Tree**: Intuitive hierarchical worktree tree with continuous vertical branch guide lines (`├── •`, `└── •`) supporting both **Local (In-Place)** sessions and **Branch (Isolated Git Worktree)** sessions.
-- **⚡ 100% Native ConPTY Terminals**: Direct real-time terminal streaming over WinPTY/ConPTY with full ANSI color support, resize negotiation, and zero intermediate prompt bloat.
-- **🔄 Side-by-Side Multi-Agent Split**: Multi-tab agent switching (`Claude Code`, `OpenAI Codex`, etc.) and side-by-side split terminal view (`[⊞ Split View]`).
-- **🌿 Integrated Git Diff Inspector**: Live uncommitted diff review (`git diff HEAD`) for local sessions and base-to-branch comparisons (`git diff <base>..<branch>`) with unified and split diff views.
-- **🗂️ Built-in File Explorer**: Real-time project file tree with quick open actions for Cursor, Zed, and VS Code.
-- **📡 OSC 7501 Protocol Integration**: Live background agent telemetry monitoring (`\x1b]7501;state=<state>;msg=<message>\x07`) with visual status pings.
+- **🎨 Unified Single 36px Compact Bar**: Zero-clutter minimal header combining tabs, status dots, view switcher pills (`Terminal`, `Room`, `Files`, `Diff`), action buttons (`Split View`, `Restart`, `Copy`, `Clear`), external IDE triggers (`Cursor`, `Zed`), and collapsible sidebars (`Ctrl+B` / `Ctrl+Alt+B`).
+- **💾 100% Zero-Loss State Persistence**: Automatically persists active workspace, tabs, split state, and sidebar states across app restarts in `~/.swarmherd/workspace_state.json`.
+- **🤖 Built-in Agent Templates**: Ready-to-run templates in `~/.config/herdr-core/templates/` (`dewwie-lead`, `dewwie-worker`, `dewwie-reviewer`).
 - **🔒 Dynamic Port Allocation**: Automatic non-colliding port offset management (`PORT=5174+N`) injected into `.env.local` for parallel full-stack agent worktrees.
+
+---
+
+## 🛠️ CLI Reference (Autonomous Orchestration)
+
+Dewwie provides a unified CLI (`dewwie`) and Herdr Core bridge (`hc`):
+
+```bash
+# Autonomous Lead Delegation
+dewwie delegate "Implement Stripe payment flow"     # Auto-creates worktree, dynamic port & launches worker agent
+dewwie wait feat/task-implement-stripe             # Awaits agent completion and prints git diff summary
+
+# Inter-Agent Room Mesh
+dewwie room send "Database migration complete" --target @lead
+dewwie room list                                   # View recent mesh message stream
+dewwie room agents                                 # List all agents currently active in the mesh
+dewwie room lead "Local Main Shell"                # Inspect or promote session to 👑 LEAD
+
+# Worktree & Session Management
+dewwie ls                                          # List all active worktrees, ports, and agent states
+dewwie spawn feat/user-auth --repo exbytelab       # Manual worktree provisioning
+dewwie diff feat/user-auth                         # Inspect git diff against main
+dewwie open feat/user-auth --ide cursor            # Open worktree in Cursor / Zed / VS Code
+```
 
 ---
 
