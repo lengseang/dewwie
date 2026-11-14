@@ -13,6 +13,7 @@ const SWARMHERD_DIR = path.join(os.homedir(), '.swarmherd');
 const SESSIONS_DIR = path.join(SWARMHERD_DIR, 'sessions');
 const WORKSPACES_FILE = path.join(SWARMHERD_DIR, 'workspaces.json');
 const PROJECTS_FILE = path.join(SWARMHERD_DIR, 'projects.json');
+const ROOM_MESSAGES_FILE = path.join(SWARMHERD_DIR, 'room_messages.json');
 
 // Ensure storage directories exist
 fs.mkdirSync(SESSIONS_DIR, { recursive: true });
@@ -248,12 +249,53 @@ function saveWorkspaces(list) {
   fs.writeFileSync(WORKSPACES_FILE, JSON.stringify(list, null, 2), 'utf-8');
 }
 
-// Helper: Parse OSC 7501 escape sequence: \x1b]7501;state=<state>;msg=<msg>\x07
+// -------------------------------------------------------------
+// Inter-Agent Room & Swarm Mesh Communication
+// -------------------------------------------------------------
+function getRoomMessages(roomId) {
+  let list = [];
+  if (fs.existsSync(ROOM_MESSAGES_FILE)) {
+    try {
+      list = JSON.parse(fs.readFileSync(ROOM_MESSAGES_FILE, 'utf-8'));
+    } catch (_) {}
+  }
+  if (!roomId || roomId === 'all') return list;
+  return list.filter(m => !m.roomId || m.roomId === roomId);
+}
+
+function saveRoomMessage(message) {
+  const list = getRoomMessages();
+  list.push(message);
+  if (list.length > 1000) list.splice(0, list.length - 1000);
+  fs.writeFileSync(ROOM_MESSAGES_FILE, JSON.stringify(list, null, 2), 'utf-8');
+
+  // Broadcast to Electron window
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('room:message', message);
+  }
+
+  // Also broadcast to connected WebSocket clients as JSON frame
+  const frame = JSON.stringify({ type: 'room:message', data: message });
+  for (const session of activePtys.values()) {
+    for (const ws of session.subscribers) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(frame);
+      }
+    }
+  }
+
+  return message;
+}
+
+// Helper: Parse OSC escape sequences:
+// OSC 7501: \x1b]7501;state=<state>;msg=<msg>\x07
+// OSC 7502: \x1b]7502;to=<target>;from=<sender>;type=<type>;msg=<content>\x07
 function parseOsc(chunk, workspaceId) {
-  const oscRegex = /\x1b\]7501;([^\x07\x1b]+)(?:\x07|\x1b\\)/g;
-  let match;
-  while ((match = oscRegex.exec(chunk)) !== null) {
-    const params = match[1];
+  // 1. Status: OSC 7501
+  const osc7501Regex = /\x1b\]7501;([^\x07\x1b]+)(?:\x07|\x1b\\)/g;
+  let match7501;
+  while ((match7501 = osc7501Regex.exec(chunk)) !== null) {
+    const params = match7501[1];
     let state = 'idle';
     let msg = '';
     for (const part of params.split(';')) {
@@ -262,6 +304,42 @@ function parseOsc(chunk, workspaceId) {
       if (k === 'msg') msg = v || '';
     }
     broadcastAgentStatus(workspaceId, state, msg);
+  }
+
+  // 2. Inter-Agent Communication: OSC 7502
+  const osc7502Regex = /\x1b\]7502;([^\x07\x1b]+)(?:\x07|\x1b\\)/g;
+  let match7502;
+  while ((match7502 = osc7502Regex.exec(chunk)) !== null) {
+    const params = match7502[1];
+    let to = '@all';
+    let from = workspaceId;
+    let type = 'chat';
+    let msg = '';
+    for (const part of params.split(';')) {
+      const idx = part.indexOf('=');
+      if (idx > -1) {
+        const k = part.substring(0, idx);
+        const v = part.substring(idx + 1);
+        if (k === 'to') to = v || '@all';
+        if (k === 'from') from = v || workspaceId;
+        if (k === 'type') type = v || 'chat';
+        if (k === 'msg') msg = v || '';
+      }
+    }
+
+    const newMsg = {
+      id: `msg-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+      roomId: 'general',
+      fromSessionId: workspaceId,
+      fromSessionName: from,
+      fromRole: workspaceId.includes('main') || workspaceId.includes('lead') ? 'lead' : 'worker',
+      target: to,
+      type: type,
+      content: msg,
+      timestamp: Date.now(),
+    };
+
+    saveRoomMessage(newMsg);
   }
 }
 
@@ -669,6 +747,57 @@ ipcMain.handle('ide:open', (_, { ide, targetPath }) => {
   const p = targetPath || 'D:\\1111-Works\\exbytelab';
   spawn('cmd', ['/C', bin, p], { detached: true, stdio: 'ignore' });
   return true;
+});
+
+// Room & Inter-Agent IPC
+ipcMain.handle('room:getMessages', (_, { roomId }) => {
+  return getRoomMessages(roomId);
+});
+
+ipcMain.handle('room:postMessage', async (_, data) => {
+  const list = await getWorkspaces();
+  const senderWs = list.find(w => w.id === data.fromSessionId);
+  const msgObj = {
+    id: `msg-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+    roomId: data.roomId || 'general',
+    fromSessionId: data.fromSessionId || 'human',
+    fromSessionName: data.fromSessionName || senderWs?.name || 'User',
+    fromRole: data.fromRole || (senderWs?.agentRole || 'worker'),
+    target: data.target || '@all',
+    type: data.type || 'chat',
+    content: data.content || '',
+    timestamp: Date.now(),
+  };
+
+  saveRoomMessage(msgObj);
+
+  // If target mentions a specific session, also inject an unobtrusive banner into that session's PTY!
+  if (data.target && data.target.startsWith('@') && data.target !== '@all') {
+    const targetName = data.target.replace('@', '').toLowerCase();
+    const targetWs = list.find(w => 
+      w.name.toLowerCase() === targetName || 
+      w.branch?.toLowerCase() === targetName ||
+      w.id.toLowerCase() === targetName
+    );
+    if (targetWs && activePtys.has(targetWs.id)) {
+      const ptySess = activePtys.get(targetWs.id);
+      const banner = `\r\n\x1b[36m[Dewwie Room Message from ${msgObj.fromSessionName} (${msgObj.fromRole})]:\x1b[0m ${msgObj.content}\r\n`;
+      ptySess.ptyProcess.write(banner);
+    }
+  }
+
+  return msgObj;
+});
+
+ipcMain.handle('session:setRole', async (_, { sessionId, role }) => {
+  const list = await getWorkspaces();
+  const ws = list.find(w => w.id === sessionId);
+  if (ws) {
+    ws.agentRole = role;
+    saveWorkspaces(list);
+    return true;
+  }
+  return false;
 });
 
 app.whenReady().then(createWindow);

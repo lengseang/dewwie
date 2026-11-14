@@ -74,6 +74,30 @@ export interface ProjectState {
   createdAt: string;
 }
 
+export type AgentRole = 'lead' | 'worker' | 'reviewer';
+
+export type RoomMessageType = 'chat' | 'task_delegate' | 'status_update' | 'review_request' | 'system';
+
+export interface RoomMessage {
+  id: string;
+  roomId: string;
+  fromSessionId: string;
+  fromSessionName: string;
+  fromRole: AgentRole;
+  target: string; // e.g. '@all', '@lead', '@feat-native-pty'
+  type: RoomMessageType;
+  content: string;
+  timestamp: number;
+}
+
+export interface AgentRoomState {
+  id: string;
+  projectId: string;
+  name: string;
+  leadSessionId: string | null;
+  messages: RoomMessage[];
+}
+
 export interface WorkspaceState {
   id: string;
   projectId?: string;
@@ -85,6 +109,7 @@ export interface WorkspaceState {
   worktreePath: string; // rootPath for local, or .worktrees/<branch> for branch
   repository?: string;
   parentId?: string; // Sub-agent hierarchy
+  agentRole?: AgentRole; // 'lead' | 'worker' | 'reviewer'
   agentType?: 'claude-code' | 'codex' | 'aider' | 'gemini' | 'custom' | 'shell';
   agentStatus: AgentStatus;
   metrics: WorkspaceMetrics;
@@ -192,6 +217,18 @@ declare global {
       maximizeWindow: () => Promise<void>;
       closeWindow: () => Promise<void>;
       onAgentStatus: (callback: (data: { workspaceId: string; state: AgentState; message: string }) => void) => void;
+      getRoomMessages: (params?: { roomId?: string }) => Promise<RoomMessage[]>;
+      postRoomMessage: (params: {
+        roomId?: string;
+        fromSessionId: string;
+        fromSessionName: string;
+        fromRole?: AgentRole;
+        target?: string;
+        type?: RoomMessageType;
+        content: string;
+      }) => Promise<RoomMessage>;
+      onRoomMessage: (callback: (data: RoomMessage) => void) => void;
+      setSessionRole: (params: { sessionId: string; role: AgentRole }) => Promise<boolean>;
     };
   }
 }

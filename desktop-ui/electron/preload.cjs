@@ -24,4 +24,10 @@ contextBridge.exposeInMainWorld('swarmherdNative', {
   onAgentStatus: (callback) => {
     ipcRenderer.on('agent:status', (_, data) => callback(data));
   },
+  getRoomMessages: (params) => ipcRenderer.invoke('room:getMessages', params || {}),
+  postRoomMessage: (params) => ipcRenderer.invoke('room:postMessage', params),
+  onRoomMessage: (callback) => {
+    ipcRenderer.on('room:message', (_, data) => callback(data));
+  },
+  setSessionRole: (params) => ipcRenderer.invoke('session:setRole', params),
 });

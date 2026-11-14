@@ -272,12 +272,81 @@ def cmd_diff(args):
     subprocess.run(["git", "-C", cwd, "diff", "main"], check=False)
     print()
 
+ROOM_MESSAGES_PATH = Path.home() / ".swarmherd" / "room_messages.json"
+
+def cmd_room(args):
+    action = args.room_action
+    if action == "send":
+        content = args.message
+        target = args.target or "@all"
+        current_ws = os.environ.get("SWARMHERD_WORKSPACE", "cli-agent")
+        msg_obj = {
+            "id": f"msg-{int(__import__('time').time() * 1000)}",
+            "roomId": "general",
+            "fromSessionId": current_ws,
+            "fromSessionName": current_ws,
+            "fromRole": "lead" if "main" in current_ws or "lead" in current_ws else "worker",
+            "target": target,
+            "type": "chat",
+            "content": content,
+            "timestamp": int(__import__("time").time() * 1000)
+        }
+        # Save to room_messages.json
+        msgs = []
+        if ROOM_MESSAGES_PATH.exists():
+            try:
+                with open(ROOM_MESSAGES_PATH, "r", encoding="utf-8") as f:
+                    msgs = json.load(f)
+            except Exception:
+                pass
+        msgs.append(msg_obj)
+        try:
+            with open(ROOM_MESSAGES_PATH, "w", encoding="utf-8") as f:
+                json.dump(msgs[-1000:], f, indent=2)
+        except Exception:
+            pass
+        # Emit OSC 7502 so running PTY captures it live
+        sys.stdout.write(f"\033]7502;to={target};from={msg_obj['fromSessionName']};type=chat;msg={content}\007")
+        sys.stdout.flush()
+        print(f"{GREEN}✔ Message posted to Room -> {target}: {content}{RESET}")
+    elif action == "list" or not action:
+        msgs = []
+        if ROOM_MESSAGES_PATH.exists():
+            try:
+                with open(ROOM_MESSAGES_PATH, "r", encoding="utf-8") as f:
+                    msgs = json.load(f)
+            except Exception:
+                pass
+        print(f"\n{CYAN}=== Dewwie Multi-Agent Room Stream (Last 10) ==={RESET}\n")
+        if not msgs:
+            print("  (Room empty. Use 'dewwie room send \"hello\"' to post)")
+        for m in msgs[-10:]:
+            print(f"  {BOLD}[{m.get('fromSessionName', 'Agent')}]{RESET} -> {CYAN}{m.get('target', '@all')}{RESET} ({m.get('type', 'chat')}): {m.get('content', '')}")
+        print()
+    elif action == "agents":
+        workspaces = load_local_workspaces()
+        print(f"\n{CYAN}=== Dewwie Active Agents in Room ==={RESET}\n")
+        for w in workspaces:
+            role = w.get("agentRole", "worker")
+            role_badge = f"{YELLOW}👑 LEAD{RESET}" if role == "lead" else f"{BLUE}AGENT{RESET}"
+            print(f"  • {BOLD}{w.get('name', w.get('id'))}{RESET} [{role_badge}] ({w.get('branch', 'local')}) - {w.get('agentStatus', {}).get('state', 'idle')}")
+        print()
+
 def main():
     parser = argparse.ArgumentParser(prog="dewwie", description="Dewwie - Autonomous AI Agent IDE & Terminal Workspace")
     subparsers = parser.add_subparsers(dest="subcommand", help="Sub-commands")
     
     # ls
     subparsers.add_parser("ls", help="List active agent worktrees & statuses")
+    
+    # room
+    p_room = subparsers.add_parser("room", help="Inter-Agent Room & Swarm Mesh Communication")
+    p_room_subs = p_room.add_subparsers(dest="room_action")
+    p_room_send = p_room_subs.add_parser("send", help="Send message to room or specific agent")
+    p_room_send.add_argument("message", help="Message body")
+    p_room_send.add_argument("--target", "-t", default="@all", help="Target agent (@lead, @feat-name, @all)")
+    p_room_subs.add_parser("list", help="List recent room messages")
+    p_room_subs.add_parser("agents", help="List agents currently active in the room")
     
     # spawn
     p_spawn = subparsers.add_parser("spawn", help="Spawn new agent session or worktree")
@@ -312,6 +381,8 @@ def main():
         cmd_open(args)
     elif args.subcommand == "diff":
         cmd_diff(args)
+    elif args.subcommand == "room":
+        cmd_room(args)
 
 if __name__ == "__main__":
     main()

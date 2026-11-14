@@ -1,28 +1,14 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import {
-  Trash2,
-  Copy,
-  Check,
-  Columns2,
-  Terminal as TerminalIcon,
-  RefreshCw,
-  X,
-} from 'lucide-react';
 
 export const DualTerminalPane: React.FC = () => {
   const {
     activeWorkspaceId,
-    activeProjectId,
     workspaces,
-    projects,
     isSplitView,
-    toggleSplitView,
-    setActiveWorkspace,
-    deleteWorkspace,
   } = useWorkspaceStore();
 
   const leftContainerRef = useRef<HTMLDivElement>(null);
@@ -33,9 +19,6 @@ export const DualTerminalPane: React.FC = () => {
   const rightTermRef = useRef<Terminal | null>(null);
   const leftFitRef = useRef<FitAddon | null>(null);
   const rightFitRef = useRef<FitAddon | null>(null);
-
-  const [copied, setCopied] = useState(false);
-  const [isLiveConnected, setIsLiveConnected] = useState(false);
 
   const activeWs = activeWorkspaceId ? workspaces[activeWorkspaceId] : null;
 
@@ -102,7 +85,6 @@ export const DualTerminalPane: React.FC = () => {
 
     ws.onopen = () => {
       console.log(`[PTY Client] Connected live to ${workspaceId}`);
-      if (isLeft) setIsLiveConnected(true);
       fit.fit();
       term.focus();
       // Send initial terminal geometry
@@ -119,11 +101,10 @@ export const DualTerminalPane: React.FC = () => {
 
     ws.onerror = () => {
       console.warn(`[PTY Client] WebSocket error for ${workspaceId}.`);
-      if (isLeft) setIsLiveConnected(false);
     };
 
     ws.onclose = () => {
-      if (isLeft) setIsLiveConnected(false);
+      console.log(`[PTY Client] Connection closed for ${workspaceId}.`);
     };
 
     // Forward raw keyboard data to real PTY stdin
@@ -196,8 +177,6 @@ export const DualTerminalPane: React.FC = () => {
     if (selection) {
       navigator.clipboard.writeText(selection);
       leftTermRef.current?.clearSelection();
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
     }
   };
 
@@ -210,6 +189,22 @@ export const DualTerminalPane: React.FC = () => {
     }
   };
 
+  // Listen for terminal actions triggered from unified top bar
+  useEffect(() => {
+    const handleAction = (e: Event) => {
+      const custom = e as CustomEvent<{ action: string }>;
+      if (custom.detail?.action === 'restart') {
+        handleRestartShell();
+      } else if (custom.detail?.action === 'copy') {
+        handleCopyLogs();
+      } else if (custom.detail?.action === 'clear') {
+        leftTermRef.current?.clear();
+      }
+    };
+    window.addEventListener('dewwie:terminal-action', handleAction);
+    return () => window.removeEventListener('dewwie:terminal-action', handleAction);
+  }, [handleRestartShell, handleCopyLogs]);
+
   if (!activeWs) {
     return (
       <div className="flex-1 h-full flex items-center justify-center bg-zinc-950 text-zinc-600 font-mono text-xs">
@@ -218,119 +213,25 @@ export const DualTerminalPane: React.FC = () => {
     );
   }
 
-  const projectSessions = Object.values(workspaces).filter(
-    (w) => !activeProjectId || w.projectId === activeProjectId || w.repository === projects[activeProjectId]?.name
-  );
-
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#09090b] text-zinc-100 overflow-hidden relative select-none font-mono">
-      {/* Minimal Precision Terminal Header Strip */}
-      <div className="h-8 px-2 border-b border-zinc-800/80 bg-zinc-950 flex items-center justify-between gap-2 shrink-0">
-        {/* Terminal Tabs */}
-        <div className="flex items-center gap-1 min-w-0 overflow-x-auto no-scrollbar">
-          {projectSessions.map((ws) => {
-            const isActive = activeWs.id === ws.id;
-            const isLocal = ws.sessionMode === 'local' || !ws.sessionMode;
-
-            return (
-              <div
-                key={ws.id}
-                onClick={() => setActiveWorkspace(ws.id)}
-                className={`group flex items-center gap-2 px-2.5 py-1 rounded text-xs cursor-pointer transition-all shrink-0 ${
-                  isActive
-                    ? 'bg-zinc-900 text-zinc-100 font-semibold border border-zinc-800 shadow-xs'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40 border border-transparent'
-                }`}
-              >
-                <TerminalIcon className={`w-3 h-3 ${isActive ? 'text-blue-400' : 'text-zinc-600'}`} />
-                <span className="truncate max-w-[140px]">{ws.name}</span>
-
-                {isActive && (
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                      isLiveConnected ? 'bg-emerald-400' : 'bg-blue-400'
-                    }`}
-                  />
-                )}
-
-                {ws.id !== 'ws-main' && !isLocal && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteWorkspace(ws.id);
-                    }}
-                    title="Close session"
-                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-rose-400 transition-opacity"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Minimal Terminal Actions */}
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={toggleSplitView}
-            title={isSplitView ? 'Single View' : 'Split Terminals Side-by-Side'}
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
-              isSplitView
-                ? 'bg-zinc-800 text-zinc-200 border border-zinc-700'
-                : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 border border-zinc-800/60'
-            }`}
-          >
-            <Columns2 className="w-3 h-3" />
-            <span className="hidden sm:inline">{isSplitView ? 'Split (Dual)' : 'Split View'}</span>
-          </button>
-
-          <button
-            onClick={handleRestartShell}
-            title="Restart Shell Process"
-            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-          >
-            <RefreshCw className="w-3 h-3" />
-          </button>
-
-          <button
-            onClick={handleCopyLogs}
-            title="Copy Buffer"
-            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-          >
-            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-          </button>
-
-          <button
-            onClick={() => leftTermRef.current?.clear()}
-            title="Clear Terminal Buffer"
-            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        </div>
+    <div className="flex-1 flex h-full overflow-hidden bg-[#09090b]">
+      {/* Left Pane (Primary Agent PTY) */}
+      <div
+        onClick={() => leftTermRef.current?.focus()}
+        className="flex-1 h-full bg-[#09090b] relative overflow-hidden cursor-text"
+      >
+        <div ref={leftContainerRef} className="w-full h-full" />
       </div>
 
-      {/* Full-Height Terminal Viewports (Single or Side-by-Side Dual Panes) */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Pane (Primary Agent PTY) */}
+      {/* Right Pane (Secondary Agent PTY in Split View) */}
+      {isSplitView && secondaryWs && (
         <div
-          onClick={() => leftTermRef.current?.focus()}
-          className="flex-1 h-full bg-[#09090b] relative overflow-hidden cursor-text"
+          onClick={() => rightTermRef.current?.focus()}
+          className="flex-1 h-full bg-[#09090b] border-l border-zinc-800/80 relative overflow-hidden cursor-text"
         >
-          <div ref={leftContainerRef} className="w-full h-full" />
+          <div ref={rightContainerRef} className="w-full h-full" />
         </div>
-
-        {/* Right Pane (Secondary Agent PTY in Split View) */}
-        {isSplitView && secondaryWs && (
-          <div
-            onClick={() => rightTermRef.current?.focus()}
-            className="flex-1 h-full bg-[#09090b] border-l border-zinc-800/80 relative overflow-hidden cursor-text"
-          >
-            <div ref={rightContainerRef} className="w-full h-full" />
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 };

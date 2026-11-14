@@ -8,6 +8,9 @@ import {
   UIMode,
   ExternalEditor,
   AgentState,
+  RoomMessage,
+  RoomMessageType,
+  AgentRole,
 } from '../types';
 
 interface WorkspaceStore {
@@ -17,7 +20,7 @@ interface WorkspaceStore {
   workspaceOrder: string[];
   activeWorkspaceId: string | null;
   mode: UIMode;
-  activeTab: 'terminal' | 'files' | 'changes';
+  activeTab: 'terminal' | 'room' | 'files' | 'changes';
   isSplitView: boolean;
   activeSpaceIndex: number;
   terminalScrollbacks: Record<string, string>;
@@ -25,9 +28,26 @@ interface WorkspaceStore {
   daemonStatus: 'connected' | 'connecting' | 'disconnected';
   lastError: string | null;
 
+  // VS Code-style Sidebar Navigation State
+  sidebarOpen: boolean;
+  rightPanelOpen: boolean;
+  rightPanelView: 'room' | 'files' | 'changes';
+  setSidebarOpen: (open: boolean) => void;
+  toggleSidebar: () => void;
+  setRightPanelOpen: (open: boolean) => void;
+  toggleRightPanel: () => void;
+  setRightPanelView: (view: 'room' | 'files' | 'changes') => void;
+
+  // Inter-Agent Room & Mesh
+  roomMessages: RoomMessage[];
+  leadSessionId: string | null;
+  postRoomMessage: (params: { content: string; target?: string; type?: RoomMessageType }) => Promise<void>;
+  fetchRoomMessages: () => Promise<void>;
+  setSessionRole: (sessionId: string, role: AgentRole) => Promise<void>;
+
   // Actions
   setMode: (mode: UIMode) => void;
-  setActiveTab: (tab: 'terminal' | 'files' | 'changes') => void;
+  setActiveTab: (tab: 'terminal' | 'room' | 'files' | 'changes') => void;
   toggleSplitView: () => void;
   setActiveSpaceIndex: (idx: number) => void;
   setActiveWorkspace: (id: string) => void;
@@ -130,6 +150,68 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   daemonStatus: 'connected',
   lastError: null,
 
+  // Layout toggles
+  sidebarOpen: true,
+  rightPanelOpen: false,
+  rightPanelView: 'room',
+  setSidebarOpen: (open) => set({ sidebarOpen: open }),
+  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+  setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
+  toggleRightPanel: () => set((s) => ({ rightPanelOpen: !s.rightPanelOpen })),
+  setRightPanelView: (view) => set({ rightPanelView: view, rightPanelOpen: true }),
+
+  // Room & Inter-Agent Mesh
+  roomMessages: [],
+  leadSessionId: 'ws-local-proj-dewwie',
+
+  postRoomMessage: async ({ content, target = '@all', type = 'chat' }) => {
+    const activeWs = get().activeWorkspaceId ? get().workspaces[get().activeWorkspaceId!] : null;
+    const msgData = {
+      roomId: 'general',
+      fromSessionId: activeWs?.id || 'human',
+      fromSessionName: activeWs?.name || 'User',
+      fromRole: (activeWs?.agentRole || 'worker') as AgentRole,
+      target,
+      type,
+      content,
+    };
+    if (typeof window !== 'undefined' && window.swarmherdNative?.postRoomMessage) {
+      const saved = await window.swarmherdNative.postRoomMessage(msgData);
+      set((state) => ({ roomMessages: [...state.roomMessages, saved] }));
+    } else {
+      const localMsg: RoomMessage = {
+        ...msgData,
+        id: `msg-${Date.now()}`,
+        timestamp: Date.now(),
+      };
+      set((state) => ({ roomMessages: [...state.roomMessages, localMsg] }));
+    }
+  },
+
+  fetchRoomMessages: async () => {
+    if (typeof window !== 'undefined' && window.swarmherdNative?.getRoomMessages) {
+      const msgs = await window.swarmherdNative.getRoomMessages();
+      if (Array.isArray(msgs)) set({ roomMessages: msgs });
+    }
+  },
+
+  setSessionRole: async (sessionId: string, role: AgentRole) => {
+    if (typeof window !== 'undefined' && window.swarmherdNative?.setSessionRole) {
+      await window.swarmherdNative.setSessionRole({ sessionId, role });
+    }
+    set((state) => {
+      const ws = state.workspaces[sessionId];
+      if (!ws) return state;
+      return {
+        workspaces: {
+          ...state.workspaces,
+          [sessionId]: { ...ws, agentRole: role },
+        },
+        leadSessionId: role === 'lead' ? sessionId : (state.leadSessionId === sessionId ? null : state.leadSessionId),
+      };
+    });
+  },
+
   initNativeSync: async () => {
     if (typeof window !== 'undefined' && window.swarmherdNative) {
       try {
@@ -164,9 +246,26 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
           }));
         }
 
+        // 3. Fetch room messages
+        if (window.swarmherdNative.getRoomMessages) {
+          const msgs = await window.swarmherdNative.getRoomMessages();
+          if (Array.isArray(msgs)) {
+            set({ roomMessages: msgs });
+          }
+        }
+
+        // 4. Register live listeners
         window.swarmherdNative.onAgentStatus(({ workspaceId, state, message }) => {
           get().updateWorkspaceStatus(workspaceId, { state, message });
         });
+
+        if (window.swarmherdNative.onRoomMessage) {
+          window.swarmherdNative.onRoomMessage((msg) => {
+            set((state) => ({
+              roomMessages: [...state.roomMessages, msg],
+            }));
+          });
+        }
       } catch (e) {
         console.error('[Store] Failed to initialize native sync:', e);
       }
@@ -283,7 +382,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ mode });
   },
 
-  setActiveTab: (activeTab: 'terminal' | 'files' | 'changes') => {
+  setActiveTab: (activeTab: 'terminal' | 'room' | 'files' | 'changes') => {
     set({ activeTab });
   },
 
