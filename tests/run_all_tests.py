@@ -36,6 +36,7 @@ SUITES = [
     ("Mock Agent Simulation", ["python", str(TESTS_DIR / "mock_agent.py"), "--scenario", "quick"]),
     ("Git Worktree Lifecycle Suite", ["python", str(TESTS_DIR / "test_worktree.py")]),
     ("Inter-Agent Room & Mesh Persistence", ["python", str(TESTS_DIR / "test_room_mesh.py")]),
+    ("Herdr Core (hc) Bridge Suite", ["python", str(TESTS_DIR / "test_hc_bridge.py")]),
     ("Comprehensive E2E Scenarios (A-E)", ["python", str(TESTS_DIR / "e2e_scenarios.py")]),
 ]
 

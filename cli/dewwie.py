@@ -20,6 +20,8 @@ import subprocess
 import socket
 from pathlib import Path
 
+__version__ = "0.1.1"
+
 DAEMON_HOST = "127.0.0.1"
 DAEMON_PORT = 7500
 REGISTRY_PATH = Path.home() / ".swarmherd" / "workspaces.json"
