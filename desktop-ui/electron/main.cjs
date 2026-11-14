@@ -373,10 +373,28 @@ function getOrCreatePty(workspaceId, cwd) {
   fs.mkdirSync(sessionDir, { recursive: true });
   const scrollbackPath = path.join(sessionDir, 'scrollback.bin');
 
-  const shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
-  const shellArgs = process.platform === 'win32' ? ['-NoLogo'] : [];
+  const hcBin = path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'herdr-core', 'hc.exe');
+  const hasHc = fs.existsSync(hcBin);
 
-  console.log(`[PTY] Spawning real shell '${shell}' for ${workspaceId} in: ${workDir}`);
+  let shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
+  let shellArgs = process.platform === 'win32' ? ['-NoLogo'] : [];
+
+  if (hasHc) {
+    try {
+      const safeId = workspaceId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      // Ensure persistent background terminal in herdr-core
+      spawn(hcBin, ['run', '--bg', '--name', safeId, '--cwd', workDir, 'powershell.exe'], { stdio: 'ignore' });
+      shell = hcBin;
+      shellArgs = ['attach', safeId];
+      console.log(`[PTY] Bridged workspace ${workspaceId} to persistent Herdr terminal: ${safeId}`);
+    } catch (err) {
+      console.warn(`[PTY] Herdr bridge fallback to direct powershell: ${err}`);
+      shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
+      shellArgs = process.platform === 'win32' ? ['-NoLogo'] : [];
+    }
+  } else {
+    console.log(`[PTY] Spawning direct shell '${shell}' for ${workspaceId} in: ${workDir}`);
+  }
 
   const ptyProcess = pty.spawn(shell, shellArgs, {
     name: 'xterm-256color',
