@@ -14,6 +14,7 @@ const SESSIONS_DIR = path.join(SWARMHERD_DIR, 'sessions');
 const WORKSPACES_FILE = path.join(SWARMHERD_DIR, 'workspaces.json');
 const PROJECTS_FILE = path.join(SWARMHERD_DIR, 'projects.json');
 const ROOM_MESSAGES_FILE = path.join(SWARMHERD_DIR, 'room_messages.json');
+const WORKSPACE_STATE_FILE = path.join(SWARMHERD_DIR, 'workspace_state.json');
 
 // Ensure storage directories exist
 fs.mkdirSync(SESSIONS_DIR, { recursive: true });
@@ -787,6 +788,47 @@ ipcMain.handle('room:postMessage', async (_, data) => {
   }
 
   return msgObj;
+});
+
+// -------------------------------------------------------------
+// Workspace & Layout State Persistence (Zero-Loss Restore)
+// -------------------------------------------------------------
+function getWorkspaceState() {
+  if (fs.existsSync(WORKSPACE_STATE_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(WORKSPACE_STATE_FILE, 'utf-8'));
+    } catch (_) {}
+  }
+  return {
+    activeProjectId: 'proj-dewwie',
+    activeWorkspaceId: 'ws-local-proj-dewwie',
+    activeTab: 'terminal',
+    isSplitView: false,
+    sidebarOpen: true,
+    rightPanelOpen: false,
+    rightPanelView: 'room',
+    leadSessionId: null,
+  };
+}
+
+function saveWorkspaceState(state) {
+  try {
+    const current = getWorkspaceState();
+    const updated = { ...current, ...state, lastSaved: Date.now() };
+    fs.writeFileSync(WORKSPACE_STATE_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+    return updated;
+  } catch (err) {
+    console.error('Error saving workspace state:', err);
+    return null;
+  }
+}
+
+ipcMain.handle('workspace:getState', () => {
+  return getWorkspaceState();
+});
+
+ipcMain.handle('workspace:saveState', (_, state) => {
+  return saveWorkspaceState(state);
 });
 
 ipcMain.handle('session:setRole', async (_, { sessionId, role }) => {

@@ -331,6 +331,32 @@ def cmd_room(args):
             role_badge = f"{YELLOW}👑 LEAD{RESET}" if role == "lead" else f"{BLUE}AGENT{RESET}"
             print(f"  • {BOLD}{w.get('name', w.get('id'))}{RESET} [{role_badge}] ({w.get('branch', 'local')}) - {w.get('agentStatus', {}).get('state', 'idle')}")
         print()
+    elif action == "lead":
+        workspaces = load_local_workspaces()
+        target = getattr(args, "target", None)
+        if not target:
+            lead = next((w for w in workspaces if w.get("agentRole") == "lead"), None)
+            if lead:
+                print(f"\n{YELLOW}👑 Current Lead Agent:{RESET} {BOLD}{lead.get('name', lead.get('id'))}{RESET} ({lead.get('worktreePath', '.')})\n")
+            else:
+                print(f"\n{CYAN}No session currently explicitly designated as Lead. Defaulting to main root session.{RESET}\n")
+        else:
+            found = False
+            for w in workspaces:
+                if w.get("id") == target or w.get("name") == target or w.get("branch") == target:
+                    w["agentRole"] = "lead"
+                    found = True
+                elif w.get("agentRole") == "lead":
+                    w["agentRole"] = "worker"
+            if found:
+                try:
+                    with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
+                        json.dump(workspaces, f, indent=2)
+                except Exception as e:
+                    print(f"{RED}Error saving: {e}{RESET}")
+                print(f"\n{GREEN}✔ Promoted session '{target}' to 👑 LEAD Agent.{RESET}\n")
+            else:
+                print(f"\n{RED}Session '{target}' not found.{RESET}\n")
 
 def main():
     parser = argparse.ArgumentParser(prog="dewwie", description="Dewwie - Autonomous AI Agent IDE & Terminal Workspace")
@@ -347,6 +373,8 @@ def main():
     p_room_send.add_argument("--target", "-t", default="@all", help="Target agent (@lead, @feat-name, @all)")
     p_room_subs.add_parser("list", help="List recent room messages")
     p_room_subs.add_parser("agents", help="List agents currently active in the room")
+    p_room_lead = p_room_subs.add_parser("lead", help="Inspect or promote session to Lead Agent")
+    p_room_lead.add_argument("target", nargs="?", default=None, help="Target session name or ID to promote to Lead")
     
     # spawn
     p_spawn = subparsers.add_parser("spawn", help="Spawn new agent session or worktree")

@@ -13,6 +13,7 @@ import {
   FolderPlus,
   Terminal,
   Bot,
+  Crown,
 } from 'lucide-react';
 
 export const WorkspaceSidebar: React.FC = () => {
@@ -26,6 +27,8 @@ export const WorkspaceSidebar: React.FC = () => {
     addProject,
     createSession,
     deleteWorkspace,
+    leadSessionId,
+    setSessionRole,
   } = useWorkspaceStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -185,6 +188,7 @@ export const WorkspaceSidebar: React.FC = () => {
                   {filtered.map((ws) => {
                     const isActive = activeWorkspaceId === ws.id;
                     const isLocal = ws.sessionMode === 'local' || !ws.sessionMode;
+                    const isLead = ws.agentRole === 'lead' || ws.id === leadSessionId;
 
                     return (
                       <div
@@ -222,8 +226,24 @@ export const WorkspaceSidebar: React.FC = () => {
                           <span className="truncate">{ws.name}</span>
                         </div>
 
-                        {/* Right: Diff & delete */}
-                        <div className="flex items-center gap-1 shrink-0">
+                        {/* Right: Lead Crown, Diff & delete */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Lead Agent Role Badge / Promotion Toggle */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSessionRole(ws.id, isLead ? 'worker' : 'lead');
+                            }}
+                            title={isLead ? 'Lead Agent (click to demote)' : 'Promote to Lead Agent'}
+                            className={`p-0.5 rounded transition-all ${
+                              isLead
+                                ? 'text-amber-400 opacity-100 hover:text-amber-300'
+                                : 'opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-amber-400'
+                            }`}
+                          >
+                            <Crown className="w-3 h-3" />
+                          </button>
+
                           {ws.diffSummary && (ws.diffSummary.additions > 0 || ws.diffSummary.deletions > 0) && (
                             <span className="text-[9px] font-mono text-zinc-500">
                               <span className="text-emerald-500">+{ws.diffSummary.additions}</span>{' '}

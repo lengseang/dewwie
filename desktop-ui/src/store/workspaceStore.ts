@@ -44,6 +44,7 @@ interface WorkspaceStore {
   postRoomMessage: (params: { content: string; target?: string; type?: RoomMessageType }) => Promise<void>;
   fetchRoomMessages: () => Promise<void>;
   setSessionRole: (sessionId: string, role: AgentRole) => Promise<void>;
+  persistState: () => void;
 
   // Actions
   setMode: (mode: UIMode) => void;
@@ -154,15 +155,46 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   sidebarOpen: true,
   rightPanelOpen: false,
   rightPanelView: 'room',
-  setSidebarOpen: (open) => set({ sidebarOpen: open }),
-  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
-  setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
-  toggleRightPanel: () => set((s) => ({ rightPanelOpen: !s.rightPanelOpen })),
-  setRightPanelView: (view) => set({ rightPanelView: view, rightPanelOpen: true }),
+  setSidebarOpen: (open) => {
+    set({ sidebarOpen: open });
+    get().persistState();
+  },
+  toggleSidebar: () => {
+    set((s) => ({ sidebarOpen: !s.sidebarOpen }));
+    get().persistState();
+  },
+  setRightPanelOpen: (open) => {
+    set({ rightPanelOpen: open });
+    get().persistState();
+  },
+  toggleRightPanel: () => {
+    set((s) => ({ rightPanelOpen: !s.rightPanelOpen }));
+    get().persistState();
+  },
+  setRightPanelView: (view) => {
+    set({ rightPanelView: view, rightPanelOpen: true });
+    get().persistState();
+  },
 
   // Room & Inter-Agent Mesh
   roomMessages: [],
   leadSessionId: 'ws-local-proj-dewwie',
+
+  persistState: () => {
+    if (typeof window !== 'undefined' && window.swarmherdNative?.saveWorkspaceState) {
+      const s = get();
+      window.swarmherdNative.saveWorkspaceState({
+        activeProjectId: s.activeProjectId,
+        activeWorkspaceId: s.activeWorkspaceId,
+        activeTab: s.activeTab,
+        isSplitView: s.isSplitView,
+        sidebarOpen: s.sidebarOpen,
+        rightPanelOpen: s.rightPanelOpen,
+        rightPanelView: s.rightPanelView,
+        leadSessionId: s.leadSessionId,
+      });
+    }
+  },
 
   postRoomMessage: async ({ content, target = '@all', type = 'chat' }) => {
     const activeWs = get().activeWorkspaceId ? get().workspaces[get().activeWorkspaceId!] : null;
@@ -210,6 +242,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         leadSessionId: role === 'lead' ? sessionId : (state.leadSessionId === sessionId ? null : state.leadSessionId),
       };
     });
+    get().persistState();
   },
 
   initNativeSync: async () => {
@@ -254,7 +287,33 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
           }
         }
 
-        // 4. Register live listeners
+        // 4. Restore persisted UI & Workspace state (Zero-Loss session restore)
+        if (window.swarmherdNative.getWorkspaceState) {
+          const savedState = await window.swarmherdNative.getWorkspaceState();
+          if (savedState) {
+            set((state) => {
+              const validProject = savedState.activeProjectId && state.projects[savedState.activeProjectId]
+                ? savedState.activeProjectId
+                : state.activeProjectId;
+              const validWs = savedState.activeWorkspaceId && state.workspaces[savedState.activeWorkspaceId]
+                ? savedState.activeWorkspaceId
+                : state.activeWorkspaceId;
+
+              return {
+                activeProjectId: validProject,
+                activeWorkspaceId: validWs,
+                activeTab: savedState.activeTab || state.activeTab,
+                isSplitView: typeof savedState.isSplitView === 'boolean' ? savedState.isSplitView : state.isSplitView,
+                sidebarOpen: typeof savedState.sidebarOpen === 'boolean' ? savedState.sidebarOpen : state.sidebarOpen,
+                rightPanelOpen: typeof savedState.rightPanelOpen === 'boolean' ? savedState.rightPanelOpen : state.rightPanelOpen,
+                rightPanelView: savedState.rightPanelView || state.rightPanelView,
+                leadSessionId: savedState.leadSessionId || state.leadSessionId,
+              };
+            });
+          }
+        }
+
+        // 5. Register live listeners
         window.swarmherdNative.onAgentStatus(({ workspaceId, state, message }) => {
           get().updateWorkspaceStatus(workspaceId, { state, message });
         });
@@ -275,6 +334,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setActiveProject: (id: string) => {
     if (get().projects[id]) {
       set({ activeProjectId: id });
+      get().persistState();
     }
   },
 
@@ -384,10 +444,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   setActiveTab: (activeTab: 'terminal' | 'room' | 'files' | 'changes') => {
     set({ activeTab });
+    get().persistState();
   },
 
   toggleSplitView: () => {
     set((state) => ({ isSplitView: !state.isSplitView }));
+    get().persistState();
   },
 
   setActiveSpaceIndex: (idx: number) => {
@@ -397,6 +459,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setActiveWorkspace: (id: string) => {
     if (get().workspaces[id]) {
       set({ activeWorkspaceId: id });
+      get().persistState();
     }
   },
 

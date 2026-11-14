@@ -189,6 +189,18 @@ export interface FileItem {
   children?: FileItem[];
 }
 
+export interface WorkspacePersistedState {
+  activeProjectId?: string | null;
+  activeWorkspaceId?: string | null;
+  activeTab?: 'terminal' | 'room' | 'files' | 'changes';
+  isSplitView?: boolean;
+  sidebarOpen?: boolean;
+  rightPanelOpen?: boolean;
+  rightPanelView?: 'room' | 'files' | 'changes';
+  leadSessionId?: string | null;
+  lastSaved?: number;
+}
+
 declare global {
   interface Window {
     swarmherdNative?: {
@@ -229,6 +241,8 @@ declare global {
       }) => Promise<RoomMessage>;
       onRoomMessage: (callback: (data: RoomMessage) => void) => void;
       setSessionRole: (params: { sessionId: string; role: AgentRole }) => Promise<boolean>;
+      getWorkspaceState: () => Promise<WorkspacePersistedState>;
+      saveWorkspaceState: (state: WorkspacePersistedState) => Promise<WorkspacePersistedState>;
     };
   }
 }

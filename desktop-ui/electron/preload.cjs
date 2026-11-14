@@ -30,4 +30,6 @@ contextBridge.exposeInMainWorld('swarmherdNative', {
     ipcRenderer.on('room:message', (_, data) => callback(data));
   },
   setSessionRole: (params) => ipcRenderer.invoke('session:setRole', params),
+  getWorkspaceState: () => ipcRenderer.invoke('workspace:getState'),
+  saveWorkspaceState: (state) => ipcRenderer.invoke('workspace:saveState', state),
 });
