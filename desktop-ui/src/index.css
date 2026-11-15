@@ -35,37 +35,6 @@
   }
 }
 
-/* OSC Agent status subtle ping animations */
-@keyframes status-pulse-cyan {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.4;
-    transform: scale(0.9);
-  }
-}
-
-@keyframes status-pulse-amber {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.4;
-    transform: scale(0.9);
-  }
-}
-
-.agent-working-dot {
-  animation: status-pulse-cyan 1.6s ease-in-out infinite;
-}
-
-.agent-blocked-dot {
-  animation: status-pulse-amber 1.2s ease-in-out infinite;
-}
-
 /* xterm container styling */
 .xterm {
   padding: 16px;

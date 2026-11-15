@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
-import { Sparkles, Bot, GitBranch, FolderGit2, X, Terminal, ArrowRight } from 'lucide-react';
+import { Plus, Bot, GitBranch, FolderGit2, X, Terminal, ArrowRight } from 'lucide-react';
 
 interface DelegateTaskModalProps {
   isOpen: boolean;
@@ -62,20 +62,20 @@ export const DelegateTaskModal: React.FC<DelegateTaskModalProps> = ({ isOpen, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs font-mono select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs font-mono select-none">
       <div
-        className="w-full max-w-lg bg-[#09090b] border border-zinc-800 rounded-lg shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-lg bg-[#09090b] border border-zinc-800 rounded-lg shadow-2xl overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
       >
         {/* Header */}
-        <div className="h-11 px-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
+        <div className="h-10 px-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-semibold text-zinc-100 uppercase tracking-wider">
-              Autonomous Lead Delegation
+            <Plus className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+              Delegate Task
             </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-500">
               Herdr Engine
             </span>
           </div>
@@ -90,7 +90,7 @@ export const DelegateTaskModal: React.FC<DelegateTaskModalProps> = ({ isOpen, on
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {error && (
-            <div className="px-3 py-2 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+            <div className="px-3 py-2 rounded bg-rose-950/40 border border-rose-900/60 text-rose-400 text-xs">
               {error}
             </div>
           )}
@@ -110,10 +110,10 @@ export const DelegateTaskModal: React.FC<DelegateTaskModalProps> = ({ isOpen, on
                   handleSubmit();
                 }
               }}
-              placeholder="e.g. Implement resilient retry loop with exponential backoff for database queries and add unit test"
+              placeholder="e.g. Implement resilient retry loop with exponential backoff for database queries"
               rows={3}
               autoFocus
-              className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40 resize-none font-mono"
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-700 resize-none font-mono"
             />
           </div>
 
@@ -157,12 +157,12 @@ export const DelegateTaskModal: React.FC<DelegateTaskModalProps> = ({ isOpen, on
           <div className="p-2.5 bg-zinc-950 rounded border border-zinc-900 text-[11px] space-y-1 text-zinc-400">
             <div className="flex items-center justify-between text-zinc-500 text-[10px]">
               <span>ISOLATION PLAN</span>
-              <span className="text-emerald-400/80">Herdr Core Managed</span>
+              <span className="text-zinc-500 font-mono">Managed</span>
             </div>
             <div className="flex items-center gap-1.5 text-zinc-300">
               <GitBranch className="w-3 h-3 text-zinc-500 shrink-0" />
               <span className="text-zinc-500">Branch:</span>
-              <span className="font-mono text-zinc-200 truncate">{previewBranch}</span>
+              <span className="font-mono text-zinc-300 truncate">{previewBranch}</span>
             </div>
             <div className="flex items-center gap-1.5 text-zinc-300">
               <Terminal className="w-3 h-3 text-zinc-500 shrink-0" />
@@ -184,16 +184,16 @@ export const DelegateTaskModal: React.FC<DelegateTaskModalProps> = ({ isOpen, on
             <button
               type="submit"
               disabled={isSubmitting || !task.trim()}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none transition-all shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-medium bg-zinc-100 text-zinc-950 hover:bg-white active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none transition-all"
             >
               {isSubmitting ? (
                 <>
-                  <span className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                  <span>Provisioning Worktree...</span>
+                  <span className="w-3 h-3 border-2 border-zinc-400 border-t-zinc-950 rounded-full animate-spin" />
+                  <span>Provisioning...</span>
                 </>
               ) : (
                 <>
-                  <span>Delegate to Herdr Agent</span>
+                  <span>Delegate Task</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}

@@ -206,7 +206,7 @@ export const WorkspaceSidebar: React.FC = () => {
                         {/* Horizontal connector tick from vertical guide line */}
                         <span
                           className={`absolute -left-3.5 top-1/2 -translate-y-1/2 w-2.5 h-px ${
-                            isActive ? 'bg-blue-400' : 'bg-zinc-800/80'
+                            isActive ? 'bg-zinc-400' : 'bg-zinc-800/80'
                           }`}
                         />
 
@@ -215,18 +215,16 @@ export const WorkspaceSidebar: React.FC = () => {
                           <span
                             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                               ws.agentStatus?.state === 'blocked'
-                                ? 'bg-amber-400 agent-blocked-dot'
-                                : ws.agentStatus?.state === 'working'
-                                ? 'bg-blue-400 agent-working-dot'
+                                ? 'bg-rose-500'
                                 : isActive
-                                ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]'
+                                ? 'bg-zinc-300'
                                 : 'bg-zinc-600 group-hover:bg-zinc-400'
                             }`}
                           />
                           <span className="truncate">{ws.name}</span>
                         </div>
 
-                        {/* Right: Lead Crown, Diff & delete */}
+                        {/* Right: Lead, Diff & delete */}
                         <div className="flex items-center gap-1.5 shrink-0">
                           {/* Lead Agent Role Badge / Promotion Toggle */}
                           <button
@@ -235,13 +233,13 @@ export const WorkspaceSidebar: React.FC = () => {
                               setSessionRole(ws.id, isLead ? 'worker' : 'lead');
                             }}
                             title={isLead ? 'Lead Agent (click to demote)' : 'Promote to Lead Agent'}
-                            className={`p-0.5 rounded transition-all ${
+                            className={`px-1 py-0.2 rounded text-[9px] uppercase font-mono transition-colors ${
                               isLead
-                                ? 'text-amber-400 opacity-100 hover:text-amber-300'
-                                : 'opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-amber-400'
+                                ? 'text-zinc-200 bg-zinc-800 border border-zinc-700'
+                                : 'opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-300'
                             }`}
                           >
-                            <Crown className="w-3 h-3" />
+                            {isLead ? 'Lead' : 'Make Lead'}
                           </button>
 
                           {ws.diffSummary && (ws.diffSummary.additions > 0 || ws.diffSummary.deletions > 0) && (

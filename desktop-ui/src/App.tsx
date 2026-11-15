@@ -23,10 +23,9 @@ import {
   Columns2,
   RefreshCw,
   Trash2,
-  Crown,
   X,
   Radio,
-  Sparkles,
+  Plus,
 } from 'lucide-react';
 import { ExternalEditor } from './types';
 
@@ -161,19 +160,15 @@ export const App: React.FC = () => {
                   <div
                     key={ws.id}
                     onClick={() => setActiveWorkspace(ws.id)}
-                    className={`group flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs cursor-pointer transition-all shrink-0 ${
+                    className={`group flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs cursor-pointer transition-colors shrink-0 ${
                       isActive
                         ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800 shadow-xs'
                         : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40 border border-transparent'
                     }`}
                   >
-                    {isLead ? (
-                      <Crown className="w-3 h-3 text-amber-400 shrink-0" />
-                    ) : (
-                      <TerminalIcon
-                        className={`w-3 h-3 shrink-0 ${isActive ? 'text-blue-400' : 'text-zinc-600'}`}
-                      />
-                    )}
+                    <TerminalIcon
+                      className={`w-3 h-3 shrink-0 ${isActive ? 'text-zinc-300' : 'text-zinc-600'}`}
+                    />
 
                     <span className="truncate max-w-[120px]">{ws.name}</span>
 
@@ -181,12 +176,10 @@ export const App: React.FC = () => {
                     <span
                       className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                         ws.agentStatus?.state === 'blocked'
-                          ? 'bg-amber-400 agent-blocked-dot'
-                          : ws.agentStatus?.state === 'working'
-                          ? 'bg-blue-400 agent-working-dot'
+                          ? 'bg-rose-500'
                           : isActive
-                          ? 'bg-emerald-400'
-                          : 'bg-zinc-700'
+                          ? 'bg-zinc-300'
+                          : 'bg-zinc-600'
                       }`}
                     />
 
@@ -211,10 +204,10 @@ export const App: React.FC = () => {
             {/* Autonomous Lead Delegation Button */}
             <button
               onClick={() => setIsDelegateModalOpen(true)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 active:scale-[0.98] transition-all shrink-0 ml-1"
-              title="Autonomous Lead Delegation (Herdr Core)"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 border border-zinc-800 active:scale-[0.98] transition-colors shrink-0 ml-1"
+              title="Delegate Task (Herdr Core)"
             >
-              <Sparkles className="w-3 h-3 text-emerald-400" />
+              <Plus className="w-3 h-3 text-zinc-400" />
               <span>+ Delegate</span>
             </button>
           </div>
@@ -245,10 +238,10 @@ export const App: React.FC = () => {
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                <MessageSquare className="w-3 h-3 text-blue-400" />
+                <MessageSquare className="w-3 h-3 text-zinc-400" />
                 <span>Room</span>
                 {roomMessages.length > 0 && (
-                  <span className="px-1 py-0.2 text-[9px] rounded bg-blue-500/20 text-blue-300">
+                  <span className="px-1 py-0.2 text-[9px] rounded bg-zinc-800 text-zinc-400 border border-zinc-700/60 font-mono">
                     {roomMessages.length}
                   </span>
                 )}
@@ -396,7 +389,7 @@ export const App: React.FC = () => {
                         : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    <MessageSquare className="w-3 h-3 text-blue-400" />
+                    <MessageSquare className="w-3 h-3 text-zinc-400" />
                     <span>Agent Room</span>
                   </button>
 
@@ -459,13 +452,12 @@ export const App: React.FC = () => {
             <span className="text-zinc-700">|</span>
             <span className="text-zinc-400">• {projectSessions.length} agents</span>
             {leadSessionId && (
-              <span className="text-amber-400 inline-flex items-center gap-1">
-                <Crown className="w-2.5 h-2.5" />
+              <span className="text-zinc-400 font-medium">
                 Lead: {workspaces[leadSessionId]?.name || 'Local'}
               </span>
             )}
             {blockedCount > 0 && (
-              <span className="text-amber-400 font-bold">· {blockedCount} needs you</span>
+              <span className="text-rose-400 font-medium">· {blockedCount} blocked</span>
             )}
           </div>
 
@@ -478,10 +470,10 @@ export const App: React.FC = () => {
 
           {/* Right: Telemetry & Daemon */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
-                  daemonStatus === 'connected' ? 'bg-emerald-400' : 'bg-rose-400'
+                  daemonStatus === 'connected' ? 'bg-zinc-400' : 'bg-rose-500'
                 }`}
               />
               <span className="text-zinc-400">

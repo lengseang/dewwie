@@ -1,6 +1,6 @@
 [package]
 name = "swarmherd-core-daemon"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 authors = ["SwarmHerd Team"]
 description = "High-performance persistent daemon managing PTY sessions, Git worktrees, dynamic port routing, and OSC 7501 event streams"
