@@ -751,12 +751,16 @@ ipcMain.handle('git:diff', async (_, { worktreePath, baseBranch, sessionMode }) 
   };
 });
 
-ipcMain.handle('git:merge', async (_, { worktreePath, branch, baseBranch, commitMsg }) => {
-  const baseDir = 'D:\\1111-Works\\exbytelab';
+ipcMain.handle('git:merge', async (_, { worktreePath, branch, baseBranch, commitMsg, repo }) => {
+  const baseDir = (repo === 'Dewwie' || (worktreePath && worktreePath.includes('Dewwie'))) 
+    ? 'D:\\1111-Works\\Dewwie' 
+    : 'D:\\1111-Works\\exbytelab';
   await execGit(['checkout', baseBranch || 'main'], baseDir);
   const mergeRes = await execGit(['merge', '--no-ff', branch, '-m', commitMsg || `Merge ${branch}`], baseDir);
-  if (mergeRes.code === 0 && worktreePath) {
-    await execGit(['worktree', 'remove', worktreePath], baseDir);
+  if (mergeRes.code === 0 && worktreePath && fs.existsSync(worktreePath)) {
+    try {
+      await execGit(['worktree', 'remove', worktreePath], baseDir);
+    } catch (_) {}
   }
   return { success: mergeRes.code === 0, message: mergeRes.stdout || mergeRes.stderr };
 });
@@ -858,6 +862,121 @@ ipcMain.handle('session:setRole', async (_, { sessionId, role }) => {
     return true;
   }
   return false;
+});
+
+// -------------------------------------------------------------
+// Autonomous Lead Task Delegation
+// -------------------------------------------------------------
+ipcMain.handle('task:delegate', async (_, { task, agent, repo, baseBranch }) => {
+  const repository = repo || 'exbytelab';
+  const cleanTask = (task || '').trim();
+  const slug = cleanTask.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').substring(0, 24) || 'task';
+  const branch = `feat/${slug}-${Math.floor(Date.now() / 1000) % 10000}`;
+  const safeFolder = branch.replace(/[\/\\]/g, '-');
+  const baseDir = repository === 'Dewwie' ? 'D:\\1111-Works\\Dewwie' : 'D:\\1111-Works\\exbytelab';
+  const worktreePath = path.join(baseDir, '.worktrees', safeFolder);
+
+  // 1. Git worktree creation
+  await execGit(['worktree', 'add', '-b', branch, worktreePath, baseBranch || 'main'], baseDir);
+
+  // 2. Allocate dynamic port
+  const list = await getWorkspaces();
+  const assignedPort = 5174 + list.length;
+  try {
+    fs.mkdirSync(worktreePath, { recursive: true });
+    fs.writeFileSync(path.join(worktreePath, '.env.local'), `PORT=${assignedPort}\nAPI_PORT=${assignedPort + 3000}\n`, 'utf-8');
+  } catch (_) {}
+
+  // 3. Launch in herdr-core if available
+  const hcBin = path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'herdr-core', 'hc.exe');
+  let hcId = null;
+  if (fs.existsSync(hcBin)) {
+    try {
+      spawn(hcBin, ['run', '--bg', '--name', branch, '--cwd', worktreePath, agent || 'dewwie-worker', cleanTask], { stdio: 'ignore' });
+      hcId = branch;
+    } catch (_) {}
+  }
+
+  // 4. Register new workspace
+  const newWs = {
+    id: `ws-${Date.now().toString(36)}`,
+    repository,
+    name: branch,
+    sessionMode: 'branch',
+    branch,
+    baseBranch: baseBranch || 'main',
+    worktreePath,
+    agentRole: 'worker',
+    agentType: agent || 'dewwie-worker',
+    agentStatus: {
+      state: 'working',
+      message: `Autonomous task: ${cleanTask.substring(0, 40)}...`,
+      timestamp: Date.now()
+    },
+    metrics: { cpuPercent: 0.5, memoryMb: 45 },
+    ports: [{ service: 'App Dev', port: assignedPort, status: 'allocated', url: `http://localhost:${assignedPort}` }],
+    diffSummary: { filesChanged: 0, additions: 0, deletions: 0 },
+    createdAt: new Date().toISOString(),
+    lastActivity: 'Just now',
+    commitSha: 'HEAD',
+    terminalSessionId: hcId || `pty-${branch}`
+  };
+
+  list.push(newWs);
+  saveWorkspaces(list);
+
+  // 5. Broadcast task_delegate message to Room Mesh
+  const msgObj = {
+    id: `msg-del-${Date.now().toString(36)}`,
+    roomId: 'general',
+    fromSessionId: 'lead',
+    fromSessionName: 'Local Main Shell',
+    fromRole: 'lead',
+    target: `@${branch}`,
+    type: 'task_delegate',
+    content: `Task delegated to @${branch}: ${cleanTask}`,
+    timestamp: Date.now()
+  };
+  saveRoomMessage(msgObj);
+
+  return newWs;
+});
+
+// -------------------------------------------------------------
+// Quality Gate: Worktree Automated Test Runner
+// -------------------------------------------------------------
+ipcMain.handle('worktree:runTests', async (_, { worktreePath, repo }) => {
+  const targetDir = worktreePath || (repo === 'Dewwie' ? 'D:\\1111-Works\\Dewwie' : 'D:\\1111-Works\\exbytelab');
+  return new Promise((resolve) => {
+    // Check whether tests/run_all_tests.py, package.json test, or cargo test applies
+    let cmd = 'npm';
+    let args = ['test', '--', '--run'];
+    if (fs.existsSync(path.join(targetDir, 'tests', 'run_all_tests.py'))) {
+      cmd = 'python';
+      args = [path.join(targetDir, 'tests', 'run_all_tests.py')];
+    } else if (fs.existsSync(path.join(targetDir, 'Cargo.toml'))) {
+      cmd = 'cargo';
+      args = ['test'];
+    }
+
+    const testProc = spawn(cmd, args, { cwd: targetDir, shell: true });
+    let stdout = '';
+    let stderr = '';
+
+    testProc.stdout.on('data', (d) => { stdout += d.toString(); });
+    testProc.stderr.on('data', (d) => { stderr += d.toString(); });
+
+    testProc.on('close', (code) => {
+      resolve({
+        success: code === 0,
+        output: (stdout + '\n' + stderr).trim() || `Tests completed with exit code ${code}`
+      });
+    });
+
+    testProc.on('error', (err) => {
+      resolve({ success: false, output: `Execution error: ${err.message}` });
+    });
+  });
 });
 
 app.whenReady().then(createWindow);

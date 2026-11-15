@@ -90,14 +90,20 @@ Double-click `dewwie.exe` or execute from PowerShell / Terminal:
 Dewwie provides a fast command-line interface for headless management:
 
 ```powershell
+# Autonomous Lead Delegation: Decompose goal, provision worktree, and launch Herdr agent
+.\dewwie.exe delegate "Implement resilient retry loop with exponential backoff for database"
+
+# Await agent completion and display git diff summary
+.\dewwie.exe wait <session-id-or-branch>
+
 # List all active sessions, branches, agents, and allocated ports
 .\dewwie.exe ls
 
-# Spawn a local in-place session without creating git branches
-.\dewwie.exe spawn "my-local-task" --local --agent claude-code
+# Live Agent Room Mesh: send broadcast or direct messages
+.\dewwie.exe room send "@all" "Status check: report your active tasks and test progress"
 
 # Spawn an isolated git worktree branch with dynamic port allocation
-.\dewwie.exe spawn feat-payment-api --agent claude-code
+.\dewwie.exe spawn feat-payment-api --agent dewwie-worker
 
 # Inspect live git diff
 .\dewwie.exe diff feat-payment-api

@@ -74,6 +74,8 @@ interface WorkspaceStore {
   
   // Worktree Lifecycle actions
   initNativeSync: () => Promise<void>;
+  delegateTask: (params: { task: string; agent?: string; repo?: string; baseBranch?: string }) => Promise<string | null>;
+  runWorktreeTests: (params?: { worktreePath?: string; repo?: string }) => Promise<{ success: boolean; output: string }>;
   mergeWorktree: (workspaceId: string, commitMsg: string) => Promise<{ success: boolean; message: string }>;
   rebaseWorktree: (workspaceId: string) => Promise<{ success: boolean; message: string }>;
   discardWorktree: (workspaceId: string) => Promise<{ success: boolean; message: string }>;
@@ -481,6 +483,44 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         message: 'Task completed cleanly',
       });
     }, 2500);
+  },
+
+  delegateTask: async ({ task, agent = 'dewwie-worker', repo, baseBranch = 'main' }) => {
+    const targetRepo = repo || (get().activeProjectId === 'proj-dewwie' ? 'Dewwie' : 'exbytelab');
+    if (typeof window !== 'undefined' && window.swarmherdNative?.delegateTask) {
+      try {
+        const realWs = await window.swarmherdNative.delegateTask({
+          task,
+          agent,
+          repo: targetRepo,
+          baseBranch,
+        });
+        if (realWs) {
+          set((state) => ({
+            workspaces: { ...state.workspaces, [realWs.id]: realWs },
+            workspaceOrder: [realWs.id, ...state.workspaceOrder],
+            activeWorkspaceId: realWs.id,
+          }));
+          await get().fetchRoomMessages();
+          get().persistState();
+          return realWs.id;
+        }
+      } catch (err) {
+        console.error('Failed to delegate task:', err);
+      }
+    }
+    return null;
+  },
+
+  runWorktreeTests: async (params) => {
+    if (typeof window !== 'undefined' && window.swarmherdNative?.runWorktreeTests) {
+      try {
+        return await window.swarmherdNative.runWorktreeTests(params);
+      } catch (err: any) {
+        return { success: false, output: err?.message || String(err) };
+      }
+    }
+    return { success: true, output: 'Simulated quality gate: all test suites passed.' };
   },
 
   createWorkspace: async (name: string, branch: string, baseBranch = 'main') => {

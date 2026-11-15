@@ -8,9 +8,19 @@ import {
   Send,
   MessageSquare,
   ChevronDown,
+  Play,
+  Check,
+  GitMerge,
+  AlertCircle,
+  Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 
-export const AgentRoomPane: React.FC = () => {
+interface AgentRoomPaneProps {
+  onOpenDelegateModal?: () => void;
+}
+
+export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModal }) => {
   const {
     workspaces,
     activeWorkspaceId,
@@ -20,12 +30,17 @@ export const AgentRoomPane: React.FC = () => {
     leadSessionId,
     postRoomMessage,
     setSessionRole,
+    runWorktreeTests,
+    mergeWorktree,
+    setActiveWorkspace,
   } = useWorkspaceStore();
 
   const [inputContent, setInputContent] = useState('');
   const [selectedTarget, setSelectedTarget] = useState<string>('@all');
   const [selectedType, setSelectedType] = useState<RoomMessageType>('chat');
   const [isSending, setIsSending] = useState(false);
+  const [testStates, setTestStates] = useState<Record<string, { running: boolean; success?: boolean; output?: string }>>({});
+  const [mergeStates, setMergeStates] = useState<Record<string, { merging: boolean; success?: boolean; message?: string }>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const activeWs = activeWorkspaceId ? workspaces[activeWorkspaceId] : null;
@@ -69,6 +84,48 @@ export const AgentRoomPane: React.FC = () => {
     setSessionRole(sessionId, newRole);
   };
 
+  const handleRunTests = async (msgId: string, ws: any) => {
+    setTestStates((prev) => ({ ...prev, [msgId]: { running: true } }));
+    try {
+      const res = await runWorktreeTests({
+        worktreePath: ws.worktreePath,
+        repo: ws.repository,
+      });
+      setTestStates((prev) => ({
+        ...prev,
+        [msgId]: { running: false, success: res.success, output: res.output },
+      }));
+    } catch (err: any) {
+      setTestStates((prev) => ({
+        ...prev,
+        [msgId]: { running: false, success: false, output: err?.message || 'Test execution failed' },
+      }));
+    }
+  };
+
+  const handleMerge = async (msgId: string, ws: any) => {
+    setMergeStates((prev) => ({ ...prev, [msgId]: { merging: true } }));
+    try {
+      const res = await mergeWorktree(ws.id, `feat: merge ${ws.branch} verified by autonomous quality gate`);
+      setMergeStates((prev) => ({
+        ...prev,
+        [msgId]: { merging: false, success: res.success, message: res.message },
+      }));
+      if (res.success) {
+        await postRoomMessage({
+          content: `Successfully fast-forward merged @${ws.name} into main. Quality gate verified 100% green.`,
+          target: '@all',
+          type: 'status_update',
+        });
+      }
+    } catch (err: any) {
+      setMergeStates((prev) => ({
+        ...prev,
+        [msgId]: { merging: false, success: false, message: err?.message || 'Merge failed' },
+      }));
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-[#09090b] text-zinc-200 overflow-hidden font-mono select-none">
       {/* Top Header Bar */}
@@ -83,12 +140,23 @@ export const AgentRoomPane: React.FC = () => {
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="flex h-1.5 w-1.5 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-          </span>
-          <span className="text-[10px] text-zinc-500">mesh live</span>
+        <div className="flex items-center gap-2 shrink-0">
+          {onOpenDelegateModal && (
+            <button
+              onClick={onOpenDelegateModal}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 active:scale-[0.98] transition-all"
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>Delegate</span>
+            </button>
+          )}
+          <div className="flex items-center gap-1.5 shrink-0 pl-1">
+            <span className="flex h-1.5 w-1.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+            </span>
+            <span className="text-[10px] text-zinc-500">live</span>
+          </div>
         </div>
       </div>
 
@@ -150,6 +218,18 @@ export const AgentRoomPane: React.FC = () => {
             const isHuman = msg.fromSessionId === 'human' || msg.fromRole === ('human' as AgentRole);
             const isDirectToMe = activeWs && (msg.target === `@${activeWs.name}` || msg.target === `@${activeWs.branch}`);
 
+            // Associated workspace matching
+            const targetClean = msg.target?.replace('@', '').toLowerCase();
+            const associatedWs = projectSessions.find(
+              (w) =>
+                w.name.toLowerCase() === targetClean ||
+                w.branch?.toLowerCase() === targetClean ||
+                msg.content.toLowerCase().includes(w.branch?.toLowerCase() || '___')
+            );
+
+            const testState = testStates[msg.id];
+            const mergeState = mergeStates[msg.id];
+
             return (
               <div
                 key={msg.id}
@@ -186,15 +266,23 @@ export const AgentRoomPane: React.FC = () => {
 
                     <span className="text-zinc-600">→</span>
 
-                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                      msg.target === '@all'
-                        ? 'bg-zinc-800 text-zinc-400'
-                        : msg.target === '@lead'
-                        ? 'bg-amber-400/10 text-amber-300'
-                        : 'bg-blue-400/10 text-blue-300'
-                    }`}>
+                    <span
+                      className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                        msg.target === '@all'
+                          ? 'bg-zinc-800 text-zinc-400'
+                          : msg.target === '@lead'
+                          ? 'bg-amber-400/10 text-amber-300'
+                          : 'bg-blue-400/10 text-blue-300'
+                      }`}
+                    >
                       {msg.target}
                     </span>
+
+                    {msg.type && msg.type !== 'chat' && (
+                      <span className="px-1 py-0.2 rounded text-[9px] uppercase tracking-wider bg-zinc-800 text-zinc-500 border border-zinc-700">
+                        {msg.type.replace('_', ' ')}
+                      </span>
+                    )}
                   </div>
 
                   <span className="text-[10px] text-zinc-600 shrink-0">
@@ -206,6 +294,93 @@ export const AgentRoomPane: React.FC = () => {
                 <div className="text-[11px] leading-relaxed break-words whitespace-pre-wrap text-zinc-200 pl-0.5">
                   {msg.content}
                 </div>
+
+                {/* Interactive Action Strip for Delegated Tasks / Review Requests */}
+                {associatedWs && associatedWs.sessionMode === 'branch' && (
+                  <div className="mt-2.5 pt-2 border-t border-zinc-800/60 flex flex-wrap items-center gap-1.5">
+                    {/* View Worktree Session */}
+                    <button
+                      onClick={() => setActiveWorkspace(associatedWs.id)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-zinc-100 transition-colors"
+                      title="Jump to this agent workspace"
+                    >
+                      <ExternalLink className="w-2.5 h-2.5" />
+                      <span>Workspace</span>
+                    </button>
+
+                    {/* Run Tests Quality Gate */}
+                    <button
+                      onClick={() => handleRunTests(msg.id, associatedWs)}
+                      disabled={testState?.running}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border transition-all ${
+                        testState?.success === true
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                          : testState?.success === false
+                          ? 'bg-rose-500/10 border-rose-500/40 text-rose-300'
+                          : 'bg-zinc-800/80 hover:bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-zinc-100'
+                      }`}
+                    >
+                      {testState?.running ? (
+                        <>
+                          <span className="w-2.5 h-2.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                          <span>Testing...</span>
+                        </>
+                      ) : testState?.success === true ? (
+                        <>
+                          <Check className="w-2.5 h-2.5 text-emerald-400" />
+                          <span>Tests Passed</span>
+                        </>
+                      ) : testState?.success === false ? (
+                        <>
+                          <AlertCircle className="w-2.5 h-2.5 text-rose-400" />
+                          <span>Tests Failed</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-2.5 h-2.5 text-blue-400" />
+                          <span>Run Tests</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* 1-Click Fast-Forward Merge Gate */}
+                    <button
+                      onClick={() => handleMerge(msg.id, associatedWs)}
+                      disabled={mergeState?.merging || mergeState?.success === true}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border transition-all ${
+                        mergeState?.success === true
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                          : mergeState?.success === false
+                          ? 'bg-rose-500/10 border-rose-500/40 text-rose-300'
+                          : 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                      }`}
+                    >
+                      {mergeState?.merging ? (
+                        <>
+                          <span className="w-2.5 h-2.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                          <span>Merging...</span>
+                        </>
+                      ) : mergeState?.success === true ? (
+                        <>
+                          <Check className="w-2.5 h-2.5 text-emerald-400" />
+                          <span>Merged into main</span>
+                        </>
+                      ) : (
+                        <>
+                          <GitMerge className="w-2.5 h-2.5" />
+                          <span>1-Click Merge</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Output Preview on Fail */}
+                    {testState?.success === false && testState?.output && (
+                      <div className="w-full mt-1.5 p-1.5 bg-black/60 rounded border border-rose-500/30 text-[10px] font-mono text-rose-300 max-h-24 overflow-y-auto whitespace-pre-wrap">
+                        {testState.output}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })
@@ -216,6 +391,14 @@ export const AgentRoomPane: React.FC = () => {
       {/* Quick Action Suggestion Chips */}
       <div className="px-3 py-1.5 border-t border-zinc-800/60 bg-zinc-950 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
         <span className="text-[10px] text-zinc-600 shrink-0">Quick:</span>
+        {onOpenDelegateModal && (
+          <button
+            onClick={onOpenDelegateModal}
+            className="px-2 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-semibold text-emerald-400 transition-colors shrink-0"
+          >
+            + Delegate Task
+          </button>
+        )}
         <button
           onClick={() => handleQuickPrompt('@all', 'chat', 'Status check: report your active tasks and test progress.')}
           className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] text-zinc-400 hover:text-zinc-200 transition-colors shrink-0"

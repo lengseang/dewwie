@@ -243,6 +243,16 @@ declare global {
       setSessionRole: (params: { sessionId: string; role: AgentRole }) => Promise<boolean>;
       getWorkspaceState: () => Promise<WorkspacePersistedState>;
       saveWorkspaceState: (state: WorkspacePersistedState) => Promise<WorkspacePersistedState>;
+      delegateTask: (params: {
+        task: string;
+        agent?: string;
+        repo?: string;
+        baseBranch?: string;
+      }) => Promise<WorkspaceState>;
+      runWorktreeTests: (params?: {
+        worktreePath?: string;
+        repo?: string;
+      }) => Promise<{ success: boolean; output: string }>;
     };
   }
 }

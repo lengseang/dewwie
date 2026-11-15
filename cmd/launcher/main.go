@@ -87,6 +87,9 @@ func printHelp() {
 USAGE:
   dewwie.exe                     Launch Standalone Native Desktop Application
   dewwie.exe ls                  List active worktrees, agents, and ports
+  dewwie.exe delegate "<task>"   Autonomously decompose & delegate task to Herdr agent in isolated worktree
+  dewwie.exe wait <session>       Await background agent completion and inspect diff
+  dewwie.exe room [subcommand]   Live Agent Room Mesh (send/listen/status)
   dewwie.exe spawn <name>        Spawn a new isolated agent worktree or local session
   dewwie.exe open <name>         Open worktree in external IDE (Cursor/Zed/VS Code)
   dewwie.exe diff <name>         View code changes against main

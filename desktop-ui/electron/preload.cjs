@@ -32,4 +32,6 @@ contextBridge.exposeInMainWorld('swarmherdNative', {
   setSessionRole: (params) => ipcRenderer.invoke('session:setRole', params),
   getWorkspaceState: () => ipcRenderer.invoke('workspace:getState'),
   saveWorkspaceState: (state) => ipcRenderer.invoke('workspace:saveState', state),
+  delegateTask: (params) => ipcRenderer.invoke('task:delegate', params),
+  runWorktreeTests: (params) => ipcRenderer.invoke('worktree:runTests', params || {}),
 });

@@ -6,6 +6,7 @@ import { AgentRoomPane } from './components/AgentRoomPane';
 import { ExplorerPane } from './components/ExplorerPane';
 import { DiffViewer } from './components/ReviewMode/DiffViewer';
 import { MergeBar } from './components/ReviewMode/MergeBar';
+import { DelegateTaskModal } from './components/DelegateTaskModal';
 import {
   Terminal as TerminalIcon,
   MessageSquare,
@@ -25,6 +26,7 @@ import {
   Crown,
   X,
   Radio,
+  Sparkles,
 } from 'lucide-react';
 import { ExternalEditor } from './types';
 
@@ -55,6 +57,7 @@ export const App: React.FC = () => {
 
   const [launchingEditor, setLaunchingEditor] = useState<string | null>(null);
   const [copiedAction, setCopiedAction] = useState(false);
+  const [isDelegateModalOpen, setIsDelegateModalOpen] = useState(false);
 
   const isNative = typeof window !== 'undefined' && !!window.swarmherdNative?.isNative;
 
@@ -204,6 +207,16 @@ export const App: React.FC = () => {
                 );
               })}
             </div>
+
+            {/* Autonomous Lead Delegation Button */}
+            <button
+              onClick={() => setIsDelegateModalOpen(true)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 active:scale-[0.98] transition-all shrink-0 ml-1"
+              title="Autonomous Lead Delegation (Herdr Core)"
+            >
+              <Sparkles className="w-3 h-3 text-emerald-400" />
+              <span>+ Delegate</span>
+            </button>
           </div>
 
           {/* Right: View Pills + Actions + Right Sidebar Toggle */}
@@ -359,7 +372,7 @@ export const App: React.FC = () => {
           {/* Main Stage (Terminal or Full-Page Views) */}
           <div className="flex-1 flex h-full overflow-hidden">
             {activeTab === 'terminal' && <DualTerminalPane />}
-            {activeTab === 'room' && <AgentRoomPane />}
+            {activeTab === 'room' && <AgentRoomPane onOpenDelegateModal={() => setIsDelegateModalOpen(true)} />}
             {activeTab === 'files' && <ExplorerPane />}
             {activeTab === 'changes' && (
               <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -423,7 +436,7 @@ export const App: React.FC = () => {
 
               {/* Right Panel Content View */}
               <div className="flex-1 flex flex-col h-full overflow-hidden">
-                {rightPanelView === 'room' && <AgentRoomPane />}
+                {rightPanelView === 'room' && <AgentRoomPane onOpenDelegateModal={() => setIsDelegateModalOpen(true)} />}
                 {rightPanelView === 'files' && <ExplorerPane sidebarOnly />}
                 {rightPanelView === 'changes' && (
                   <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -478,6 +491,12 @@ export const App: React.FC = () => {
           </div>
         </footer>
       </div>
+
+      {/* Autonomous Lead Delegation Modal */}
+      <DelegateTaskModal
+        isOpen={isDelegateModalOpen}
+        onClose={() => setIsDelegateModalOpen(false)}
+      />
     </div>
   );
 };
