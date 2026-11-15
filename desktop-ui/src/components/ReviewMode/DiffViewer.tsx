@@ -176,20 +176,18 @@ export const DiffViewer: React.FC = () => {
           <GitCompare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
           {activeWs.sessionMode === 'local' ? (
             <>
-              <span className="px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 font-semibold text-[10px]">LOCAL</span>
-              <span className="text-zinc-400">Uncommitted changes in</span>
+              <span className="px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 font-bold text-[9px]">LOCAL</span>
               <span className="font-semibold text-zinc-200">{activeWs.projectName || activeWs.repository}</span>
             </>
           ) : (
             <>
-              <span className="text-zinc-500">Compare</span>
               <span className="font-semibold text-zinc-200">{activeWs.branch}</span>
               <span className="text-zinc-600">&rarr;</span>
               <span className="text-zinc-400">{activeWs.baseBranch || 'main'}</span>
             </>
           )}
-          <span className="text-[10px] text-zinc-500 ml-2">
-            ({currentDiffs.length} files changed)
+          <span className="text-[10px] text-zinc-500 ml-1">
+            ({currentDiffs.length})
           </span>
         </div>
 

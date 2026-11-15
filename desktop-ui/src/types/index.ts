@@ -206,6 +206,7 @@ declare global {
     swarmherdNative?: {
       isNative: boolean;
       wsPort: number;
+      getWsPort?: () => Promise<number>;
       pickFolder: () => Promise<string | null>;
       getProjects: () => Promise<ProjectState[]>;
       addProject: (params: { path: string; name?: string }) => Promise<ProjectState>;
@@ -219,6 +220,8 @@ declare global {
         baseBranch?: string;
         agentType?: string;
       }) => Promise<WorkspaceState>;
+      deleteSession?: (sessionId: string) => Promise<boolean>;
+      renameSession?: (sessionId: string, newName: string) => Promise<boolean>;
       createWorktree: (params: { name?: string; branch: string; baseBranch?: string; repository?: string }) => Promise<WorkspaceState>;
       getGitDiff: (params: { worktreePath?: string; baseBranch?: string; sessionMode?: SessionMode }) => Promise<{ rawPatch: string; numstat: string }>;
       mergeWorktree: (params: { worktreePath?: string; branch: string; baseBranch?: string; commitMsg?: string }) => Promise<{ success: boolean; message: string }>;

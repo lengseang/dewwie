@@ -62,10 +62,23 @@ func main() {
 	fmt.Printf("  %s• Storage:%s   Persistent Session Scrollback\n", green, reset)
 	fmt.Printf("\n%s▶ Launching Dewwie Desktop Software...%s\n\n", cyan, reset)
 
-	// Fast direct binary execution path
-	electronBin := filepath.Join(desktopDir, "node_modules", "electron", "dist", "electron.exe")
+	// Fast direct binary execution path with robust multi-location fallback
+	candidatePaths := []string{
+		filepath.Join(desktopDir, "node_modules", "electron", "dist", "electron.exe"),
+		filepath.Join(`D:\1111-Works\Dewwie\desktop-ui`, "node_modules", "electron", "dist", "electron.exe"),
+		filepath.Join(`D:\1111-Works\exbytelab\desktop-ui`, "node_modules", "electron", "dist", "electron.exe"),
+	}
+
+	var electronBin string
+	for _, p := range candidatePaths {
+		if _, err := os.Stat(p); err == nil {
+			electronBin = p
+			break
+		}
+	}
+
 	var cmd *exec.Cmd
-	if _, err := os.Stat(electronBin); err == nil {
+	if electronBin != "" {
 		cmd = exec.Command(electronBin, ".")
 	} else {
 		cmd = exec.Command("cmd.exe", "/c", "npx", "electron", ".")
@@ -73,6 +86,7 @@ func main() {
 	cmd.Dir = desktopDir
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {

@@ -23,7 +23,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "0.1.9"
+__version__ = "0.1.10"
 
 try:
     import hc_bridge

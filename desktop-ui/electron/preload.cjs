@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('swarmherdNative', {
   isNative: true,
   wsPort: 7501,
+  getWsPort: () => ipcRenderer.invoke('app:getWsPort'),
 
   pickFolder: () => ipcRenderer.invoke('project:pickFolder'),
   getProjects: () => ipcRenderer.invoke('projects:get'),

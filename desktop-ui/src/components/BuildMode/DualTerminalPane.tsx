@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -31,7 +31,7 @@ export const DualTerminalPane: React.FC = () => {
   const secondaryWs = allList.find((w) => w.id !== activeWorkspaceId) || allList[0];
 
   // Helper: Setup real PTY WebSocket connection for an xterm instance
-  const attachPty = useCallback((container: HTMLDivElement | null, workspaceId: string, isLeft: boolean) => {
+  const attachPty = useCallback(async (container: HTMLDivElement | null, workspaceId: string, isLeft: boolean) => {
     if (!container) return;
     container.innerHTML = ''; // Ensure clean container with zero duplicate DOM artifacts
 
@@ -82,8 +82,17 @@ export const DualTerminalPane: React.FC = () => {
       rightFitRef.current = fit;
     }
 
-    // Connect to native PTY WebSocket server (Port 7501)
-    const wsUrl = `ws://127.0.0.1:7501?workspaceId=${encodeURIComponent(workspaceId)}`;
+    let targetPort = 7501;
+    if (typeof window !== 'undefined' && window.swarmherdNative?.getWsPort) {
+      try {
+        targetPort = await window.swarmherdNative.getWsPort();
+      } catch (_) {}
+    } else if (typeof window !== 'undefined' && window.swarmherdNative?.wsPort) {
+      targetPort = window.swarmherdNative.wsPort;
+    }
+
+    // Connect to native PTY WebSocket server
+    const wsUrl = `ws://127.0.0.1:${targetPort}?workspaceId=${encodeURIComponent(workspaceId)}`;
     const ws = new WebSocket(wsUrl);
     ws.binaryType = 'arraybuffer';
 

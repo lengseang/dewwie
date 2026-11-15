@@ -10,7 +10,7 @@ import { DelegateTaskModal } from './components/DelegateTaskModal';
 import { AgentMenuDropdown } from './components/AgentMenuDropdown';
 import { SettingsModal } from './components/SettingsModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
-import { getAgentIcon, TerminalAgentIcon } from './components/AgentIcons';
+import { getAgentIcon } from './components/AgentIcons';
 import {
   MessageSquare,
   FolderTree,
@@ -31,7 +31,6 @@ import {
   Palette,
   FolderOpen,
   Command,
-  Settings,
 } from 'lucide-react';
 import { ExternalEditor } from './types';
 
@@ -62,7 +61,6 @@ export const App: React.FC = () => {
     rightPanelView,
     setRightPanelView,
     roomMessages,
-    leadSessionId,
     setActiveWorkspace,
     deleteWorkspace,
     initNativeSync,
@@ -261,7 +259,6 @@ export const App: React.FC = () => {
             <div className="flex items-center gap-1 min-w-0 overflow-x-auto no-scrollbar">
               {projectSessions.map((ws, idx) => {
                 const isActive = activeWs?.id === ws.id;
-                const isLocal = ws.sessionMode === 'local' || !ws.sessionMode;
 
                 return (
                   <div
@@ -490,38 +487,44 @@ export const App: React.FC = () => {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setRightPanelView('room')}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
+                    title="Agent Swarm Room Mesh (Ctrl+2)"
+                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] transition-colors ${
                       rightPanelView === 'room'
                         ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800 shadow-xs'
                         : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    <MessageSquare className="w-3 h-3 text-zinc-400" />
-                    <span>Room</span>
+                    <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
+                    {roomMessages.length > 0 && (
+                      <span className="text-[10px] font-mono text-zinc-400">{roomMessages.length}</span>
+                    )}
                   </button>
 
                   <button
                     onClick={() => setRightPanelView('files')}
+                    title="Project File Tree (Ctrl+3)"
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
                       rightPanelView === 'files'
                         ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800 shadow-xs'
                         : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    <FolderTree className="w-3 h-3" />
-                    <span>Files</span>
+                    <FolderTree className="w-3.5 h-3.5" />
                   </button>
 
                   <button
                     onClick={() => setRightPanelView('changes')}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
+                    title="Git Changes & Diff (Ctrl+4)"
+                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] transition-colors ${
                       rightPanelView === 'changes'
                         ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800 shadow-xs'
                         : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    <GitCompare className="w-3 h-3" />
-                    <span>Diff</span>
+                    <GitCompare className="w-3.5 h-3.5" />
+                    {totalFilesChanged > 0 && (
+                      <span className="text-[10px] font-mono text-zinc-400">{totalFilesChanged}</span>
+                    )}
                   </button>
                 </div>
 
@@ -530,7 +533,7 @@ export const App: React.FC = () => {
                   title="Close right panel (Ctrl+Alt+B)"
                   className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
 

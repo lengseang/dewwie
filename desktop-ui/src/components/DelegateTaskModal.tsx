@@ -14,7 +14,7 @@ export const DelegateTaskModal: React.FC<DelegateTaskModalProps> = ({ isOpen, on
   const [task, setTask] = useState('');
   const [agent, setAgent] = useState('dewwie-worker');
   const [repo, setRepo] = useState(currentProject?.name === 'Dewwie' ? 'Dewwie' : 'exbytelab');
-  const [baseBranch, setBaseBranch] = useState('main');
+  const baseBranch = 'main';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

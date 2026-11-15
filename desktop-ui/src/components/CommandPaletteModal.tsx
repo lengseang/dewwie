@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
-import { Terminal, FolderOpen, Settings, Palette, Columns2, Trash2, X, Play, ShieldAlert, Cpu } from 'lucide-react';
+import { Terminal, FolderOpen, Settings, Palette, Columns2, Trash2, X, Play } from 'lucide-react';
 
 interface CommandPaletteModalProps {
   isOpen: boolean;
@@ -30,11 +30,8 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     setActiveWorkspace,
     createSession,
     toggleSplitView,
-    theme,
     setTheme,
     setRightPanelView,
-    rightPanelOpen,
-    toggleRightPanel,
     pickAndOpenFolder,
     deleteWorkspace,
     renameWorkspace,

@@ -41,7 +41,6 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
   const [mergeStates, setMergeStates] = useState<Record<string, { merging: boolean; success?: boolean; message?: string }>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const activeWs = activeWorkspaceId ? workspaces[activeWorkspaceId] : null;
   const currentProject = activeProjectId ? projects[activeProjectId] : null;
 
   // Filter sessions belonging to active project

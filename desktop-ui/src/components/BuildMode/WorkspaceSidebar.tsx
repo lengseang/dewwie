@@ -2,22 +2,18 @@ import React, { useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { SessionMode } from '../../types';
 import {
-  FolderGit2,
-  Folder,
   ChevronDown,
   ChevronRight,
   Plus,
   Trash2,
   X,
   FolderPlus,
-  Terminal,
-  Bot,
   Settings,
   RotateCw,
-  AlertCircle,
-  HelpCircle,
-  CheckCircle2,
   Command,
+  Terminal,
+  FolderGit2,
+  Bot,
 } from 'lucide-react';
 
 interface WorkspaceSidebarProps {
@@ -40,9 +36,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     createSession,
     deleteWorkspace,
     leadSessionId,
-    setSessionRole,
     sidebarWidth,
-    pickAndOpenFolder,
   } = useWorkspaceStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -246,9 +240,8 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
               {/* Sessions Tree with Hollow Circles (○) & Clean Guide Lines */}
               {!isCollapsed && (
                 <div className={isNarrow ? 'flex flex-col items-center gap-2 py-1' : 'relative ml-4 pl-3.5 space-y-1 py-0.5'}>
-                  {projectSessions.map((ws, sIdx) => {
+                  {projectSessions.map((ws) => {
                     const isActive = activeWorkspaceId === ws.id;
-                    const isLocal = ws.sessionMode === 'local' || !ws.sessionMode;
                     const isLead = ws.agentRole === 'lead' || ws.id === leadSessionId;
 
                     if (isNarrow) {
@@ -377,8 +370,8 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             const isActive = activeWorkspaceId === s.id;
             const state = s.agentStatus?.state;
             const isWorking = state === 'working';
-            const isBlocked = state === 'blocked';
-            const isError = state === 'error' || state === 'failed';
+            const isError = state === 'blocked' && !!s.agentStatus?.message?.toLowerCase().includes('err');
+            const isBlocked = state === 'blocked' && !isError;
             const isDone = state === 'done';
 
             return (

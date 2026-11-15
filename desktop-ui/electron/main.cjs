@@ -8,16 +8,52 @@ const WebSocket = require('ws');
 const pty = require('node-pty');
 
 // Configuration
-const WS_PORT = 7501;
+let currentWsPort = 7501;
 const SWARMHERD_DIR = path.join(os.homedir(), '.swarmherd');
 const SESSIONS_DIR = path.join(SWARMHERD_DIR, 'sessions');
 const WORKSPACES_FILE = path.join(SWARMHERD_DIR, 'workspaces.json');
 const PROJECTS_FILE = path.join(SWARMHERD_DIR, 'projects.json');
 const ROOM_MESSAGES_FILE = path.join(SWARMHERD_DIR, 'room_messages.json');
 const WORKSPACE_STATE_FILE = path.join(SWARMHERD_DIR, 'workspace_state.json');
+const LOG_FILE = path.join(SWARMHERD_DIR, 'dewwie.log');
 
 // Ensure storage directories exist
 fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+
+function logToFile(msg, err) {
+  const line = `[${new Date().toISOString()}] ${msg} ${err ? (err.stack || err.message || err) : ''}\n`;
+  try {
+    fs.appendFileSync(LOG_FILE, line, 'utf-8');
+  } catch (_) {}
+}
+
+process.on('uncaughtException', (err) => {
+  logToFile('Uncaught Exception:', err);
+  console.error('[Dewwie Error]', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logToFile('Unhandled Rejection:', reason);
+  console.error('[Dewwie Rejection]', reason);
+});
+
+// Single Instance Lock: Prevents port collisions and corrupted workspace states
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  console.log('[Dewwie] Another instance is already running. Quitting secondary process.');
+  app.quit();
+  process.exit(0);
+}
+
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
+// In-Memory Master Cache to prevent async race condition wipes
+let workspacesCache = null;
 
 // Active PTY sessions map: workspaceId -> { ptyProcess, scrollbackFile, subscribers: Set }
 const activePtys = new Map();
@@ -113,13 +149,39 @@ function removeProject(id) {
 // -------------------------------------------------------------
 // Sessions & Workspaces Management (Local vs Branch)
 // -------------------------------------------------------------
-async function getWorkspaces() {
+function saveWorkspaces(list) {
+  workspacesCache = list;
+  const tmpPath = `${WORKSPACES_FILE}.${Date.now()}.tmp`;
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(list, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, WORKSPACES_FILE);
+  } catch (err) {
+    try {
+      fs.writeFileSync(WORKSPACES_FILE, JSON.stringify(list, null, 2), 'utf-8');
+    } catch (_) {}
+  }
+}
+
+async function getWorkspaces(forceRefresh = false) {
+  if (workspacesCache && !forceRefresh) {
+    return workspacesCache;
+  }
+
   const projects = getProjects();
   let saved = [];
   if (fs.existsSync(WORKSPACES_FILE)) {
     try {
       saved = JSON.parse(fs.readFileSync(WORKSPACES_FILE, 'utf-8'));
     } catch (_) {}
+  }
+
+  // Preserve in-memory created sessions so they are never lost
+  if (workspacesCache && Array.isArray(workspacesCache)) {
+    for (const cached of workspacesCache) {
+      if (!saved.some(s => s.id === cached.id)) {
+        saved.push(cached);
+      }
+    }
   }
 
   const allSessions = [];
@@ -244,10 +306,6 @@ async function getWorkspaces() {
 
   saveWorkspaces(allSessions);
   return allSessions;
-}
-
-function saveWorkspaces(list) {
-  fs.writeFileSync(WORKSPACES_FILE, JSON.stringify(list, null, 2), 'utf-8');
 }
 
 // -------------------------------------------------------------
@@ -499,8 +557,22 @@ wss.on('connection', async (ws, req) => {
   });
 });
 
-server.listen(WS_PORT, '127.0.0.1', () => {
-  console.log(`[SWARMHERD] Native PTY & WebSocket server live on 127.0.0.1:${WS_PORT}`);
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    currentWsPort++;
+    if (currentWsPort <= 7515) {
+      console.warn(`[SWARMHERD] Port ${currentWsPort - 1} occupied, retrying on 127.0.0.1:${currentWsPort}...`);
+      server.listen(currentWsPort, '127.0.0.1');
+    } else {
+      console.error('[SWARMHERD] All fallback ports 7501-7515 occupied.');
+    }
+  } else {
+    console.error('[SWARMHERD WS Server Error]', err);
+  }
+});
+
+server.listen(currentWsPort, '127.0.0.1', () => {
+  console.log(`[SWARMHERD] Native PTY & WebSocket server live on 127.0.0.1:${currentWsPort}`);
 });
 
 // -------------------------------------------------------------
@@ -530,20 +602,30 @@ function createWindow() {
     ...(fs.existsSync(path.join(__dirname, '../public/icon.png')) ? { icon: path.join(__dirname, '../public/icon.png') } : {}),
   });
 
-  // Real scanDir helper
   const distIndex = path.join(__dirname, '../dist/index.html');
-  const req = http.get('http://127.0.0.1:5173', (res) => {
-    if (res.statusCode < 400) {
-      mainWindow.loadURL('http://127.0.0.1:5173');
-    } else if (fs.existsSync(distIndex)) {
-      mainWindow.loadFile(distIndex);
-    }
-  });
-  req.on('error', () => {
+  const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
+
+  if (isDev) {
+    const req = http.get('http://127.0.0.1:5173', (res) => {
+      if (res.statusCode < 400) {
+        mainWindow.loadURL('http://127.0.0.1:5173');
+      } else if (fs.existsSync(distIndex)) {
+        mainWindow.loadFile(distIndex);
+      }
+    });
+    req.on('error', () => {
+      if (fs.existsSync(distIndex)) {
+        mainWindow.loadFile(distIndex);
+      }
+    });
+  } else {
+    // Production launch: Prioritize compiled bundle instantly
     if (fs.existsSync(distIndex)) {
       mainWindow.loadFile(distIndex);
+    } else {
+      mainWindow.loadURL('http://127.0.0.1:5173');
     }
-  });
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -639,6 +721,7 @@ ipcMain.handle('projects:add', (_, params) => addProject(params));
 ipcMain.handle('projects:remove', (_, { id }) => removeProject(id));
 
 // IPC Handlers: Workspaces & Sessions
+ipcMain.handle('app:getWsPort', () => currentWsPort);
 ipcMain.handle('workspaces:get', () => getWorkspaces());
 
 ipcMain.handle('sessions:create', async (_, { projectId, name, sessionMode, branch, baseBranch, agentType }) => {
