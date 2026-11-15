@@ -463,9 +463,14 @@ wss.on('connection', async (ws, req) => {
   if (fs.existsSync(session.scrollbackPath)) {
     try {
       const history = fs.readFileSync(session.scrollbackPath);
-      // Send last 64KB if huge
-      const sliceStart = Math.max(0, history.length - 64 * 1024);
-      ws.send(history.subarray(sliceStart));
+      if (history.length === 0) {
+        const agentBanner = `\x1b[38;5;244mDewwie PTY [${matched?.agentType || 'shell'}] • ${cwd}\x1b[0m\r\n`;
+        ws.send(agentBanner);
+      } else {
+        // Send last 64KB if huge
+        const sliceStart = Math.max(0, history.length - 64 * 1024);
+        ws.send(history.subarray(sliceStart));
+      }
     } catch (e) {
       console.error('Error reading scrollback:', e);
     }
@@ -713,6 +718,18 @@ ipcMain.handle('sessions:delete', async (_, { sessionId }) => {
     activePtys.delete(sessionId);
   }
   return true;
+});
+
+ipcMain.handle('sessions:rename', async (_, { sessionId, newName }) => {
+  if (!sessionId || !newName) return false;
+  const list = await getWorkspaces();
+  const ws = list.find(w => w.id === sessionId);
+  if (ws) {
+    ws.name = newName.trim();
+    saveWorkspaces(list);
+    return true;
+  }
+  return false;
 });
 
 ipcMain.handle('workspaces:create', async (_, { name, branch, baseBranch, repository }) => {

@@ -37,6 +37,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     toggleRightPanel,
     pickAndOpenFolder,
     deleteWorkspace,
+    renameWorkspace,
   } = useWorkspaceStore();
 
   const [input, setInput] = useState('');
@@ -202,6 +203,22 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       category: 'session',
       action: () => {
         window.dispatchEvent(new CustomEvent('dewwie:terminal-action', { detail: { action: 'clear' } }));
+        onClose();
+      },
+    },
+    {
+      id: 'cmd-rename',
+      prefix: ':rename',
+      title: ':rename <name>',
+      description: 'Rename active terminal workspace tab (e.g. :rename Server)',
+      icon: <Terminal className="w-3.5 h-3.5 text-zinc-300" />,
+      category: 'session',
+      action: async () => {
+        const parts = input.trim().split(/\s+/);
+        const newName = parts.slice(1).join(' ');
+        if (activeWorkspaceId && newName) {
+          await renameWorkspace(activeWorkspaceId, newName);
+        }
         onClose();
       },
     },

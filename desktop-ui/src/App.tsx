@@ -73,6 +73,7 @@ export const App: React.FC = () => {
     rightPanelWidth,
     setRightPanelWidth,
     pickAndOpenFolder,
+    renameWorkspace,
   } = useWorkspaceStore();
 
   const [launchingEditor, setLaunchingEditor] = useState<string | null>(null);
@@ -81,6 +82,8 @@ export const App: React.FC = () => {
   const [isAgentMenuOpen, setIsAgentMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingTabName, setEditingTabName] = useState('');
 
   // Resize drag states
   const [isResizingLeft, setIsResizingLeft] = useState(false);
@@ -264,7 +267,12 @@ export const App: React.FC = () => {
                   <div
                     key={ws.id}
                     onClick={() => setActiveWorkspace(ws.id)}
-                    title={`${ws.name} (${ws.agentType || 'terminal'})${ws.branch ? ` • ${ws.branch}` : ''}`}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      setEditingTabId(ws.id);
+                      setEditingTabName(ws.name);
+                    }}
+                    title={`${ws.name} (${ws.agentType || 'terminal'})${ws.branch ? ` • ${ws.branch}` : ''} - Double click to rename`}
                     className={`group flex items-center gap-1.5 px-2 py-0.5 rounded text-xs cursor-pointer transition-colors shrink-0 ${
                       isActive
                         ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-700 shadow-xs'
@@ -272,7 +280,31 @@ export const App: React.FC = () => {
                     }`}
                   >
                     {getAgentIcon(ws.agentType, 'w-3.5 h-3.5 shrink-0')}
-                    <span className="font-mono text-[11px] font-medium">{idx + 1}</span>
+
+                    {editingTabId === ws.id ? (
+                      <input
+                        autoFocus
+                        value={editingTabName}
+                        onChange={(e) => setEditingTabName(e.target.value)}
+                        onBlur={() => {
+                          if (editingTabName.trim()) renameWorkspace(ws.id, editingTabName);
+                          setEditingTabId(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            if (editingTabName.trim()) renameWorkspace(ws.id, editingTabName);
+                            setEditingTabId(null);
+                          } else if (e.key === 'Escape') {
+                            setEditingTabId(null);
+                          }
+                        }}
+                        className="w-20 px-1 py-0 bg-zinc-950 border border-zinc-600 rounded text-[11px] font-mono text-zinc-100 focus:outline-none"
+                      />
+                    ) : (
+                      <span className="font-mono text-[11px] font-medium max-w-[120px] truncate">
+                        {ws.name.toLowerCase().startsWith('terminal') || ws.name.toLowerCase().startsWith(ws.agentType?.toLowerCase() || '') ? idx + 1 : ws.name}
+                      </span>
+                    )}
 
                     {/* Subtle Status Indicator */}
                     <span
@@ -529,6 +561,15 @@ export const App: React.FC = () => {
             {blockedCount > 0 && (
               <span className="text-rose-400 font-medium">· {blockedCount} blocked</span>
             )}
+          </div>
+
+          {/* Center: Linux / tmux Hotkey Cheatline */}
+          <div className="hidden lg:flex items-center gap-3 text-[9px] text-zinc-600 font-mono">
+            <span><kbd className="text-zinc-400 font-semibold">^P</kbd> cmd</span>
+            <span><kbd className="text-zinc-400 font-semibold">^B</kbd> rail</span>
+            <span><kbd className="text-zinc-400 font-semibold">^⌥B</kbd> panel</span>
+            <span><kbd className="text-zinc-400 font-semibold">^O</kbd> dir</span>
+            <span><kbd className="text-zinc-400 font-semibold">^,</kbd> config</span>
           </div>
 
           {/* Right: Telemetry & Port */}

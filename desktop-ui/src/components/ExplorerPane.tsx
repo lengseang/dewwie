@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Copy,
   Check,
+  X,
 } from 'lucide-react';
 
 const FALLBACK_TREE: FileItem[] = [
@@ -240,25 +241,57 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean }> = ({ sidebarOnly 
         </div>
 
         {/* Tree List */}
-        <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
+        <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5 min-h-[140px]">
           {tree.map((node) => renderNode(node))}
         </div>
 
-        {/* DevSwarm Bottom Sections (Outline & Timeline) */}
-        <div className="border-t border-zinc-800/80 bg-zinc-950 text-xs text-zinc-500 select-none shrink-0">
-          <div className="px-3 py-1.5 border-b border-zinc-900 flex items-center justify-between hover:text-zinc-300 cursor-pointer">
-            <div className="flex items-center gap-1.5">
-              <ChevronRight className="w-3 h-3" />
-              <span className="text-[10px] uppercase font-semibold tracking-wider">OUTLINE</span>
+        {/* Inline Quick File Preview Drawer in Inspector */}
+        {selectedFilePath && (
+          <div className="h-64 border-t border-zinc-800/80 bg-[#09090b] flex flex-col shrink-0 font-mono select-text">
+            {/* Quick Viewer Header */}
+            <div className="h-7 px-2.5 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between text-[11px] text-zinc-300 shrink-0 select-none">
+              <div className="flex items-center gap-1.5 truncate">
+                <FileCode className="w-3 h-3 text-zinc-400 shrink-0" />
+                <span className="truncate font-semibold text-zinc-200">{selectedFilePath.split('/').pop()}</span>
+                <span className="text-[10px] text-zinc-600 font-mono">
+                  ({fileContent.split('\n').length}L)
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleCopyCode}
+                  title="Copy file text"
+                  className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+                >
+                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                </button>
+                <button
+                  onClick={() => launchEditor('cursor')}
+                  title="Open in Cursor IDE"
+                  className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => setSelectedFilePath('')}
+                  title="Close preview"
+                  className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-zinc-900 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Viewer Body */}
+            <div className="flex-1 overflow-auto p-2 text-[11px] leading-relaxed text-zinc-300 bg-[#09090b]">
+              {isLoadingFile ? (
+                <div className="text-zinc-600 text-xs">Loading file...</div>
+              ) : (
+                <pre className="font-mono whitespace-pre text-zinc-300 selection:bg-zinc-800">{fileContent}</pre>
+              )}
             </div>
           </div>
-          <div className="px-3 py-1.5 flex items-center justify-between hover:text-zinc-300 cursor-pointer">
-            <div className="flex items-center gap-1.5">
-              <ChevronRight className="w-3 h-3" />
-              <span className="text-[10px] uppercase font-semibold tracking-wider">TIMELINE</span>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     );
   }

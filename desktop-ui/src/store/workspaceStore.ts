@@ -72,6 +72,7 @@ interface WorkspaceStore {
   }) => Promise<string>;
   createWorkspace: (name: string, branch: string, baseBranch?: string, repository?: string, parentId?: string) => Promise<string>;
   deleteWorkspace: (id: string) => Promise<void>;
+  renameWorkspace: (id: string, newName: string) => Promise<void>;
   updateWorkspaceStatus: (id: string, status: Partial<AgentStatus>) => void;
   updateWorkspaceMetrics: (id: string, metrics: { cpuPercent: number; memoryMb: number }) => void;
   appendTerminalChunk: (workspaceId: string, chunk: string) => void;
@@ -672,6 +673,27 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         workspaces: remainingWorkspaces,
         workspaceOrder: remainingOrder,
         activeWorkspaceId: newActive,
+      };
+    });
+    get().persistState();
+  },
+
+  renameWorkspace: async (id: string, newName: string) => {
+    const clean = newName.trim();
+    if (!clean) return;
+    if (typeof window !== 'undefined' && window.swarmherdNative?.renameSession) {
+      try {
+        await window.swarmherdNative.renameSession(id, clean);
+      } catch (_) {}
+    }
+    set((state) => {
+      const ws = state.workspaces[id];
+      if (!ws) return state;
+      return {
+        workspaces: {
+          ...state.workspaces,
+          [id]: { ...ws, name: clean },
+        },
       };
     });
     get().persistState();

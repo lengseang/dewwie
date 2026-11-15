@@ -11,6 +11,10 @@ export const DualTerminalPane: React.FC = () => {
     isSplitView,
   } = useWorkspaceStore();
 
+  const [splitRatio, setSplitRatio] = useState(50);
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+
   const leftContainerRef = useRef<HTMLDivElement>(null);
   const rightContainerRef = useRef<HTMLDivElement>(null);
   const leftWsRef = useRef<WebSocket | null>(null);
@@ -205,6 +209,43 @@ export const DualTerminalPane: React.FC = () => {
     return () => window.removeEventListener('dewwie:terminal-action', handleAction);
   }, [handleRestartShell, handleCopyLogs]);
 
+  // Terminal drag splitter listener
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingSplit || !splitContainerRef.current) return;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      const relativeX = e.clientX - rect.left;
+      const percentage = Math.max(20, Math.min(80, (relativeX / rect.width) * 100));
+      setSplitRatio(percentage);
+      try {
+        leftFitRef.current?.fit();
+        rightFitRef.current?.fit();
+      } catch (_) {}
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingSplit(false);
+      try {
+        leftFitRef.current?.fit();
+        rightFitRef.current?.fit();
+      } catch (_) {}
+    };
+
+    if (isDraggingSplit) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+    };
+  }, [isDraggingSplit]);
+
   if (!activeWs) {
     return (
       <div className="flex-1 h-full flex items-center justify-center bg-zinc-950 text-zinc-600 font-mono text-xs">
@@ -214,20 +255,41 @@ export const DualTerminalPane: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex h-full overflow-hidden bg-[#09090b]">
+    <div ref={splitContainerRef} className="flex-1 flex h-full overflow-hidden bg-[#09090b] relative">
       {/* Left Pane (Primary Agent PTY) */}
       <div
         onClick={() => leftTermRef.current?.focus()}
-        className="flex-1 h-full bg-[#09090b] relative overflow-hidden cursor-text"
+        style={{ width: isSplitView && secondaryWs ? `${splitRatio}%` : '100%' }}
+        className="h-full bg-[#09090b] relative overflow-hidden cursor-text shrink-0"
       >
         <div ref={leftContainerRef} className="w-full h-full" />
       </div>
+
+      {/* Draggable Terminal Split Resizer */}
+      {isSplitView && secondaryWs && (
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsDraggingSplit(true);
+          }}
+          onDoubleClick={() => {
+            setSplitRatio(50);
+            setTimeout(() => {
+              leftFitRef.current?.fit();
+              rightFitRef.current?.fit();
+            }, 50);
+          }}
+          title="Drag to resize split terminals (double-click to reset 50/50)"
+          className="w-1 hover:w-1.5 bg-zinc-800/80 hover:bg-zinc-500 active:bg-zinc-300 cursor-col-resize z-20 shrink-0 transition-colors"
+        />
+      )}
 
       {/* Right Pane (Secondary Agent PTY in Split View) */}
       {isSplitView && secondaryWs && (
         <div
           onClick={() => rightTermRef.current?.focus()}
-          className="flex-1 h-full bg-[#09090b] border-l border-zinc-800/80 relative overflow-hidden cursor-text"
+          style={{ width: `${100 - splitRatio}%` }}
+          className="h-full bg-[#09090b] relative overflow-hidden cursor-text shrink-0"
         >
           <div ref={rightContainerRef} className="w-full h-full" />
         </div>

@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('swarmherdNative', {
 
   getWorkspaces: () => ipcRenderer.invoke('workspaces:get'),
   createSession: (params) => ipcRenderer.invoke('sessions:create', params),
+  renameSession: (sessionId, newName) => ipcRenderer.invoke('sessions:rename', { sessionId, newName }),
   deleteSession: (sessionId) => ipcRenderer.invoke('sessions:delete', { sessionId }),
   createWorktree: (params) => ipcRenderer.invoke('workspaces:create', params),
   getGitDiff: (params) => ipcRenderer.invoke('git:diff', params),
