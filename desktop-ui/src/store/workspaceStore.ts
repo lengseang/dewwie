@@ -32,6 +32,13 @@ interface WorkspaceStore {
   sidebarOpen: boolean;
   rightPanelOpen: boolean;
   rightPanelView: 'room' | 'files' | 'changes';
+  sidebarWidth: number;
+  rightPanelWidth: number;
+  setSidebarWidth: (width: number) => void;
+  setRightPanelWidth: (width: number) => void;
+  theme: 'zinc' | 'oled' | 'slate' | 'tokyo' | 'monokai';
+  setTheme: (theme: string) => void;
+  pickAndOpenFolder: () => Promise<string | null>;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
   setRightPanelOpen: (open: boolean) => void;
@@ -153,10 +160,29 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   daemonStatus: 'connected',
   lastError: null,
 
-  // Layout toggles
+  // Layout toggles & Resizing
   sidebarOpen: true,
   rightPanelOpen: false,
   rightPanelView: 'room',
+  sidebarWidth: 240,
+  rightPanelWidth: 320,
+  setSidebarWidth: (w) => set({ sidebarWidth: Math.max(160, Math.min(480, w)) }),
+  setRightPanelWidth: (w) => set({ rightPanelWidth: Math.max(220, Math.min(600, w)) }),
+  theme: (typeof window !== 'undefined' && (localStorage.getItem('dewwie_theme') as any)) || 'zinc',
+  setTheme: (theme) => {
+    if (typeof window !== 'undefined') localStorage.setItem('dewwie_theme', theme);
+    set({ theme: theme as any });
+  },
+  pickAndOpenFolder: async () => {
+    if (typeof window !== 'undefined' && window.swarmherdNative?.pickFolder) {
+      const folder = await window.swarmherdNative.pickFolder();
+      if (folder) {
+        const proj = await get().addProject(folder);
+        return proj ? proj.id : null;
+      }
+    }
+    return null;
+  },
   setSidebarOpen: (open) => {
     set({ sidebarOpen: open });
     get().persistState();

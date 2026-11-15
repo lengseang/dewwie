@@ -94,9 +94,9 @@ export const WorkspaceSidebar: React.FC = () => {
   };
 
   return (
-    <aside className="w-64 h-full flex flex-col bg-[#09090b] border-r border-zinc-800/80 text-zinc-300 select-none shrink-0 font-mono">
+    <aside className="w-full h-full flex flex-col bg-zinc-950/90 border-r border-zinc-800/80 text-zinc-300 select-none shrink-0 font-mono">
       {/* Header */}
-      <div className="h-10 px-3 border-b border-zinc-800/80 flex items-center justify-between gap-2 shrink-0">
+      <div className="h-9 px-3 border-b border-zinc-800/80 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2">
           <img src="/logo.png" alt="Dewwie" className="w-4 h-4 rounded object-contain shrink-0" />
           <span className="text-xs font-bold tracking-wider text-zinc-200 uppercase">
@@ -113,17 +113,29 @@ export const WorkspaceSidebar: React.FC = () => {
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 text-[11px] transition-colors"
         >
           <Plus className="w-3 h-3" />
-          <span>New Agent</span>
+          <span>New</span>
         </button>
       </div>
 
-      {/* Filter */}
-      <div className="p-2 border-b border-zinc-800/60 shrink-0">
+      {/* Directory & Filter */}
+      <div className="p-2 border-b border-zinc-800/60 shrink-0 space-y-1.5">
+        <button
+          onClick={handlePickFolder}
+          title="Open Any Directory from your PC (Ctrl+O)"
+          className="w-full px-2.5 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <FolderPlus className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="font-medium text-xs">Open Directory</span>
+          </div>
+          <span className="text-[10px] text-zinc-600">Ctrl+O</span>
+        </button>
+
         <div className="relative">
           <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600" />
           <input
             type="text"
-            placeholder="Filter workspaces..."
+            placeholder="Filter..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-7 pr-2.5 py-1 bg-zinc-900/60 border border-zinc-800 rounded text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-700 transition-colors"

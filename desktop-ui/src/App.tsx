@@ -7,15 +7,16 @@ import { ExplorerPane } from './components/ExplorerPane';
 import { DiffViewer } from './components/ReviewMode/DiffViewer';
 import { MergeBar } from './components/ReviewMode/MergeBar';
 import { DelegateTaskModal } from './components/DelegateTaskModal';
+import { AgentMenuDropdown } from './components/AgentMenuDropdown';
+import { SettingsModal } from './components/SettingsModal';
+import { getAgentIcon, TerminalAgentIcon } from './components/AgentIcons';
 import {
-  Terminal as TerminalIcon,
   MessageSquare,
   FolderTree,
   GitCompare,
   Code2,
-  Zap,
-  Check,
   Copy,
+  Check,
   PanelRightClose,
   PanelRight,
   PanelLeftClose,
@@ -26,8 +27,18 @@ import {
   X,
   Radio,
   Plus,
+  Palette,
+  FolderOpen,
 } from 'lucide-react';
 import { ExternalEditor } from './types';
+
+const THEME_STYLES: Record<string, { bg: string; navBg: string; border: string }> = {
+  zinc: { bg: 'bg-[#09090b]', navBg: 'bg-zinc-950', border: 'border-zinc-800/80' },
+  oled: { bg: 'bg-[#000000]', navBg: 'bg-[#0a0a0a]', border: 'border-zinc-900' },
+  slate: { bg: 'bg-[#0b0f19]', navBg: 'bg-[#0f172a]', border: 'border-slate-800' },
+  tokyo: { bg: 'bg-[#1a1b26]', navBg: 'bg-[#16161e]', border: 'border-indigo-950' },
+  monokai: { bg: 'bg-[#19181a]', navBg: 'bg-[#221f22]', border: 'border-stone-800' },
+};
 
 export const App: React.FC = () => {
   const {
@@ -52,11 +63,24 @@ export const App: React.FC = () => {
     setActiveWorkspace,
     deleteWorkspace,
     initNativeSync,
+    createSession,
+    theme,
+    sidebarWidth,
+    setSidebarWidth,
+    rightPanelWidth,
+    setRightPanelWidth,
+    pickAndOpenFolder,
   } = useWorkspaceStore();
 
   const [launchingEditor, setLaunchingEditor] = useState<string | null>(null);
   const [copiedAction, setCopiedAction] = useState(false);
   const [isDelegateModalOpen, setIsDelegateModalOpen] = useState(false);
+  const [isAgentMenuOpen, setIsAgentMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Resize drag states
+  const [isResizingLeft, setIsResizingLeft] = useState(false);
+  const [isResizingRight, setIsResizingRight] = useState(false);
 
   const isNative = typeof window !== 'undefined' && !!window.swarmherdNative?.isNative;
 
@@ -64,8 +88,38 @@ export const App: React.FC = () => {
     initNativeSync();
   }, [initNativeSync]);
 
+  // Window resize mouse drag listener
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizingLeft) {
+        setSidebarWidth(e.clientX);
+      } else if (isResizingRight) {
+        setRightPanelWidth(window.innerWidth - e.clientX);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingLeft(false);
+      setIsResizingRight(false);
+    };
+
+    if (isResizingLeft || isResizingRight) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+    };
+  }, [isResizingLeft, isResizingRight, setSidebarWidth, setRightPanelWidth]);
+
   const activeWs = activeWorkspaceId ? workspaces[activeWorkspaceId] : null;
-  const currentProject = activeProjectId ? projects[activeProjectId] : null;
+  const currentProject = activeProjectId ? projects[activeProjectId] : Object.values(projects)[0];
 
   // Filter project sessions
   const projectSessions = Object.values(workspaces).filter(
@@ -95,12 +149,18 @@ export const App: React.FC = () => {
       } else if (isCmdOrCtrl && e.altKey && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
         toggleRightPanel();
+      } else if (isCmdOrCtrl && (e.key === 'o' || e.key === 'O')) {
+        e.preventDefault();
+        pickAndOpenFolder();
+      } else if (isCmdOrCtrl && e.key === ',') {
+        e.preventDefault();
+        setIsSettingsOpen(true);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setActiveTab, toggleSidebar, toggleRightPanel, setRightPanelView]);
+  }, [setActiveTab, toggleSidebar, toggleRightPanel, setRightPanelView, pickAndOpenFolder]);
 
   const handleLaunch = async (editor: ExternalEditor) => {
     setLaunchingEditor(editor);
@@ -119,24 +179,51 @@ export const App: React.FC = () => {
     window.dispatchEvent(new CustomEvent('dewwie:terminal-action', { detail: { action } }));
   };
 
-  const allWorkspacesList = Object.values(workspaces);
+  const handleSpawnAgent = async (agentType: string, isWorktree = false) => {
+    if (isWorktree) {
+      setIsDelegateModalOpen(true);
+      return;
+    }
+    await createSession({
+      projectId: activeProjectId || currentProject?.id,
+      name: `${agentType} ${projectSessions.length + 1}`,
+      sessionMode: 'local', // Default is local folder-based session!
+      agentType,
+    });
+  };
+
+  const currentTheme = THEME_STYLES[theme] || THEME_STYLES.zinc;
   const totalFilesChanged = activeWs?.diffSummary?.filesChanged || 0;
-  const blockedCount = allWorkspacesList.filter((w) => w.agentStatus?.state === 'blocked').length;
+  const blockedCount = Object.values(workspaces).filter((w) => w.agentStatus?.state === 'blocked').length;
 
   return (
-    <div className="flex h-screen w-screen bg-[#09090b] text-zinc-100 overflow-hidden font-sans select-none antialiased">
-      {/* 1. Left Hierarchical Navigation Sidebar (Toggle Expand / Minimize like VS Code) */}
-      {sidebarOpen && <WorkspaceSidebar />}
+    <div className={`flex h-screen w-screen ${currentTheme.bg} text-zinc-100 overflow-hidden font-sans select-none antialiased`}>
+      {/* 1. Left Hierarchical Navigation Sidebar with Drag-Resize Handle */}
+      {sidebarOpen && (
+        <div className="relative flex shrink-0" style={{ width: `${sidebarWidth}px` }}>
+          <WorkspaceSidebar />
+          {/* Left Edge Resize Splitter */}
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsResizingLeft(true);
+            }}
+            onDoubleClick={toggleSidebar}
+            title="Drag to resize sidebar (double-click to collapse)"
+            className="absolute -right-1 top-0 bottom-0 w-2 cursor-col-resize hover:bg-zinc-600 active:bg-zinc-400 z-30 transition-colors"
+          />
+        </div>
+      )}
 
       {/* 2. Main Center Workspace Stage */}
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-        {/* Compact Single Unified Top Bar (Combined Tabs, Toggles, and Actions into 1 Row) */}
+        {/* Compact Single Unified Top Bar */}
         <header
-          className={`h-9 px-2 bg-zinc-950 border-b border-zinc-800/80 flex items-center justify-between gap-2 shrink-0 z-20 font-mono ${
+          className={`h-9 px-2 ${currentTheme.navBg} border-b ${currentTheme.border} flex items-center justify-between gap-2 shrink-0 z-20 font-mono ${
             isNative ? 'pr-36' : ''
           }`}
         >
-          {/* Left: Left Sidebar Toggle + Compact Session Tabs */}
+          {/* Left: Left Sidebar Toggle + Herdr-Style Agent Navigation Tabs */}
           <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
             {/* Left Sidebar Toggle Button */}
             <button
@@ -149,32 +236,29 @@ export const App: React.FC = () => {
 
             <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
 
-            {/* Precision Session Tabs Strip */}
+            {/* Herdr-Style Agent Navigation Tabs Strip */}
             <div className="flex items-center gap-1 min-w-0 overflow-x-auto no-scrollbar">
-              {projectSessions.map((ws) => {
+              {projectSessions.map((ws, idx) => {
                 const isActive = activeWs?.id === ws.id;
-                const isLead = ws.agentRole === 'lead' || ws.id === leadSessionId;
                 const isLocal = ws.sessionMode === 'local' || !ws.sessionMode;
 
                 return (
                   <div
                     key={ws.id}
                     onClick={() => setActiveWorkspace(ws.id)}
-                    className={`group flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs cursor-pointer transition-colors shrink-0 ${
+                    title={`${ws.name} (${ws.agentType || 'terminal'})${ws.branch ? ` • ${ws.branch}` : ''}`}
+                    className={`group flex items-center gap-1.5 px-2 py-0.5 rounded text-xs cursor-pointer transition-colors shrink-0 ${
                       isActive
-                        ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800 shadow-xs'
-                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40 border border-transparent'
+                        ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-700 shadow-xs'
+                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/60 border border-transparent'
                     }`}
                   >
-                    <TerminalIcon
-                      className={`w-3 h-3 shrink-0 ${isActive ? 'text-zinc-300' : 'text-zinc-600'}`}
-                    />
+                    {getAgentIcon(ws.agentType, 'w-3.5 h-3.5 shrink-0')}
+                    <span className="font-mono text-[11px] font-medium">{idx + 1}</span>
 
-                    <span className="truncate max-w-[120px]">{ws.name}</span>
-
-                    {/* Status Dot */}
+                    {/* Subtle Status Indicator */}
                     <span
-                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      className={`w-1 h-1 rounded-full shrink-0 ${
                         ws.agentStatus?.state === 'blocked'
                           ? 'bg-rose-500'
                           : isActive
@@ -199,82 +283,94 @@ export const App: React.FC = () => {
                   </div>
                 );
               })}
+
+              {/* Herdr Agent Dropdown Trigger (+) */}
+              <div className="relative shrink-0">
+                <button
+                  onClick={() => setIsAgentMenuOpen(!isAgentMenuOpen)}
+                  title="Start an Agent (Ctrl+Shift+T)"
+                  className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+                <AgentMenuDropdown
+                  isOpen={isAgentMenuOpen}
+                  onClose={() => setIsAgentMenuOpen(false)}
+                  onSelectAgent={(agentType, isWorktree) => handleSpawnAgent(agentType, isWorktree)}
+                  onNewSpace={() => handleSpawnAgent('terminal')}
+                  onOpenDirectory={pickAndOpenFolder}
+                  isGitRepo={currentProject?.isGitRepo}
+                />
+              </div>
             </div>
 
-            {/* Autonomous Lead Delegation Button */}
+            {/* Quick Open Directory Button */}
             <button
-              onClick={() => setIsDelegateModalOpen(true)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 border border-zinc-800 active:scale-[0.98] transition-colors shrink-0 ml-1"
-              title="Delegate Task (Herdr Core)"
+              onClick={pickAndOpenFolder}
+              title="Open Directory (Ctrl+O)"
+              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors shrink-0"
             >
-              <Plus className="w-3 h-3 text-zinc-400" />
-              <span>+ Delegate</span>
+              <FolderOpen className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {/* Right: View Pills + Actions + Right Sidebar Toggle */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* View Mode Switcher Pills */}
+          {/* Right: Ultra-Compact Icon Toolbar */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* View Mode Switcher Pills (Icon Only with Native Tooltips) */}
             <div className="flex items-center bg-zinc-900/80 p-0.5 rounded border border-zinc-800 text-xs">
               <button
                 onClick={() => setActiveTab('terminal')}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
+                title="Terminal (Ctrl+1)"
+                className={`p-1 rounded transition-colors ${
                   activeTab === 'terminal'
-                    ? 'bg-zinc-800 text-zinc-100 font-medium shadow-xs'
+                    ? 'bg-zinc-800 text-zinc-100 shadow-xs'
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                <TerminalIcon className="w-3 h-3" />
-                <span>Terminal</span>
+                <TerminalAgentIcon className="w-3.5 h-3.5" />
               </button>
 
               <button
-                onClick={() => {
-                  setRightPanelView('room');
-                }}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
+                onClick={() => setRightPanelView('room')}
+                title="Agent Room Mesh (Ctrl+2)"
+                className={`p-1 rounded transition-colors relative flex items-center ${
                   rightPanelOpen && rightPanelView === 'room'
-                    ? 'bg-zinc-800 text-zinc-100 font-medium shadow-xs'
+                    ? 'bg-zinc-800 text-zinc-100 shadow-xs'
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                <MessageSquare className="w-3 h-3 text-zinc-400" />
-                <span>Room</span>
+                <MessageSquare className="w-3.5 h-3.5" />
                 {roomMessages.length > 0 && (
-                  <span className="px-1 py-0.2 text-[9px] rounded bg-zinc-800 text-zinc-400 border border-zinc-700/60 font-mono">
+                  <span className="ml-1 px-1 py-0.2 text-[9px] rounded bg-zinc-800 text-zinc-400 font-mono">
                     {roomMessages.length}
                   </span>
                 )}
               </button>
 
               <button
-                onClick={() => {
-                  setRightPanelView('files');
-                }}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
+                onClick={() => setRightPanelView('files')}
+                title="Files Explorer (Ctrl+3)"
+                className={`p-1 rounded transition-colors ${
                   rightPanelOpen && rightPanelView === 'files'
-                    ? 'bg-zinc-800 text-zinc-100 font-medium shadow-xs'
+                    ? 'bg-zinc-800 text-zinc-100 shadow-xs'
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                <FolderTree className="w-3 h-3" />
-                <span>Files</span>
+                <FolderTree className="w-3.5 h-3.5" />
               </button>
 
               <button
-                onClick={() => {
-                  setRightPanelView('changes');
-                }}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
+                onClick={() => setRightPanelView('changes')}
+                title="Git Diff (Ctrl+4)"
+                className={`p-1 rounded transition-colors relative flex items-center ${
                   rightPanelOpen && rightPanelView === 'changes'
-                    ? 'bg-zinc-800 text-zinc-100 font-medium shadow-xs'
+                    ? 'bg-zinc-800 text-zinc-100 shadow-xs'
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                <GitCompare className="w-3 h-3" />
-                <span>Diff</span>
+                <GitCompare className="w-3.5 h-3.5" />
                 {totalFilesChanged > 0 && (
-                  <span className="px-1 py-0.2 text-[9px] rounded bg-zinc-700 text-zinc-200">
+                  <span className="ml-1 px-1 py-0.2 text-[9px] rounded bg-zinc-800 text-zinc-300 font-mono">
                     {totalFilesChanged}
                   </span>
                 )}
@@ -287,13 +383,13 @@ export const App: React.FC = () => {
             <button
               onClick={toggleSplitView}
               title={isSplitView ? 'Single View' : 'Split Terminals Side-by-Side'}
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] transition-colors ${
+              className={`p-1 rounded transition-colors ${
                 isSplitView
                   ? 'bg-zinc-800 text-zinc-200 border border-zinc-700'
                   : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900'
               }`}
             >
-              <Columns2 className="w-3 h-3" />
+              <Columns2 className="w-3.5 h-3.5" />
             </button>
 
             <button
@@ -301,7 +397,7 @@ export const App: React.FC = () => {
               title="Restart Shell Process"
               className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
             >
-              <RefreshCw className="w-3 h-3" />
+              <RefreshCw className="w-3.5 h-3.5" />
             </button>
 
             <button
@@ -309,7 +405,7 @@ export const App: React.FC = () => {
               title="Copy Terminal Logs"
               className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
             >
-              {copiedAction ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+              {copiedAction ? <Check className="w-3.5 h-3.5 text-zinc-200" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
 
             <button
@@ -317,35 +413,31 @@ export const App: React.FC = () => {
               title="Clear Terminal Buffer"
               className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
             >
-              <Trash2 className="w-3 h-3" />
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
 
             <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
 
-            {/* External IDE Launchers */}
+            {/* Quick External IDE Button */}
             <button
               onClick={() => handleLaunch('cursor')}
-              disabled={!!launchingEditor}
-              title="Open in Cursor IDE"
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
+              disabled={launchingEditor === 'cursor'}
+              title="Open in External IDE (Cursor / Zed)"
+              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
             >
-              <Code2 className="w-3 h-3" />
-              <span>Cursor</span>
+              <Code2 className="w-3.5 h-3.5" />
             </button>
 
+            {/* Settings & Themes Button */}
             <button
-              onClick={() => handleLaunch('zed')}
-              disabled={!!launchingEditor}
-              title="Open in Zed"
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
+              onClick={() => setIsSettingsOpen(true)}
+              title="Preferences & Themes (Ctrl+,)"
+              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
             >
-              <Zap className="w-3 h-3" />
-              <span>Zed</span>
+              <Palette className="w-3.5 h-3.5" />
             </button>
 
-            <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
-
-            {/* Right Navigation Sidebar Toggle Button */}
+            {/* Right Panel Toggle Button */}
             <button
               onClick={toggleRightPanel}
               title={rightPanelOpen ? 'Collapse Right Panel (Ctrl+Alt+B)' : 'Expand Right Panel (Ctrl+Alt+B)'}
@@ -375,9 +467,23 @@ export const App: React.FC = () => {
             )}
           </div>
 
-          {/* Right Navigation Inspector Sidebar (Toggle Expand / Minimize like VS Code) */}
+          {/* Right Navigation Inspector Sidebar with Drag-Resize Handle */}
           {rightPanelOpen && activeTab === 'terminal' && (
-            <aside className="w-80 md:w-92 h-full border-l border-zinc-800/80 bg-zinc-950 flex flex-col shrink-0 font-mono">
+            <aside
+              className="relative h-full border-l border-zinc-800/80 bg-zinc-950 flex flex-col shrink-0 font-mono"
+              style={{ width: `${rightPanelWidth}px` }}
+            >
+              {/* Left Edge Resize Splitter for Right Panel */}
+              <div
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsResizingRight(true);
+                }}
+                onDoubleClick={toggleRightPanel}
+                title="Drag to resize panel (double-click to collapse)"
+                className="absolute -left-1 top-0 bottom-0 w-2 cursor-col-resize hover:bg-zinc-600 active:bg-zinc-400 z-30 transition-colors"
+              />
+
               {/* Right Panel Header Tabs */}
               <div className="h-8 px-2 border-b border-zinc-800/80 bg-zinc-950 flex items-center justify-between gap-1 shrink-0">
                 <div className="flex items-center gap-1">
@@ -385,19 +491,19 @@ export const App: React.FC = () => {
                     onClick={() => setRightPanelView('room')}
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
                       rightPanelView === 'room'
-                        ? 'bg-zinc-900 text-zinc-100 font-semibold border border-zinc-800 shadow-xs'
+                        ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800 shadow-xs'
                         : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
                     <MessageSquare className="w-3 h-3 text-zinc-400" />
-                    <span>Agent Room</span>
+                    <span>Room</span>
                   </button>
 
                   <button
                     onClick={() => setRightPanelView('files')}
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
                       rightPanelView === 'files'
-                        ? 'bg-zinc-900 text-zinc-100 font-semibold border border-zinc-800 shadow-xs'
+                        ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800 shadow-xs'
                         : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
@@ -409,12 +515,12 @@ export const App: React.FC = () => {
                     onClick={() => setRightPanelView('changes')}
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
                       rightPanelView === 'changes'
-                        ? 'bg-zinc-900 text-zinc-100 font-semibold border border-zinc-800 shadow-xs'
+                        ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800 shadow-xs'
                         : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
                     <GitCompare className="w-3 h-3" />
-                    <span>Changes</span>
+                    <span>Diff</span>
                   </button>
                 </div>
 
@@ -445,31 +551,23 @@ export const App: React.FC = () => {
         {/* Minimal Footer Status Bar */}
         <footer className="h-6 px-3 bg-zinc-950 border-t border-zinc-800/80 flex items-center justify-between text-[10px] font-mono text-zinc-500 shrink-0 select-none">
           {/* Left: Active session & Agent stats */}
-          <div className="flex items-center gap-2.5">
-            <span className="text-zinc-400">Dewwie Mesh</span>
+          <div className="flex items-center gap-2">
+            <span className="text-zinc-400">{currentProject?.name || 'Local'}</span>
             <span className="text-zinc-700">|</span>
-            <span className="text-zinc-300 font-semibold">{activeWs?.branch || activeWs?.name || 'main'}</span>
+            <span className="text-zinc-400 font-mono text-[9px] truncate max-w-[200px]">{currentProject?.rootPath}</span>
             <span className="text-zinc-700">|</span>
-            <span className="text-zinc-400">• {projectSessions.length} agents</span>
-            {leadSessionId && (
-              <span className="text-zinc-400 font-medium">
-                Lead: {workspaces[leadSessionId]?.name || 'Local'}
-              </span>
-            )}
+            <span className="text-zinc-400">{projectSessions.length} sessions</span>
             {blockedCount > 0 && (
               <span className="text-rose-400 font-medium">· {blockedCount} blocked</span>
             )}
           </div>
 
-          {/* Center: Live Port Registry */}
-          <div className="hidden md:flex items-center gap-2">
-            <Radio className="w-2.5 h-2.5 text-zinc-600" />
-            <span className="text-zinc-600">PORT:</span>
-            <span className="text-zinc-400 font-mono">7501 (PTY + Room)</span>
-          </div>
-
-          {/* Right: Telemetry & Daemon */}
+          {/* Right: Telemetry & Port */}
           <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-1.5">
+              <Radio className="w-2.5 h-2.5 text-zinc-600" />
+              <span className="text-zinc-500">:7501</span>
+            </div>
             <div className="flex items-center gap-1.5">
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
@@ -477,7 +575,7 @@ export const App: React.FC = () => {
                 }`}
               />
               <span className="text-zinc-400">
-                {daemonStatus === 'connected' ? 'Native PTY Live' : 'Offline'}
+                {daemonStatus === 'connected' ? 'Online' : 'Offline'}
               </span>
             </div>
           </div>
@@ -488,6 +586,12 @@ export const App: React.FC = () => {
       <DelegateTaskModal
         isOpen={isDelegateModalOpen}
         onClose={() => setIsDelegateModalOpen(false)}
+      />
+
+      {/* Preferences & Themes Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
     </div>
   );
