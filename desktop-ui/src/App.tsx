@@ -9,6 +9,7 @@ import { MergeBar } from './components/ReviewMode/MergeBar';
 import { DelegateTaskModal } from './components/DelegateTaskModal';
 import { AgentMenuDropdown } from './components/AgentMenuDropdown';
 import { SettingsModal } from './components/SettingsModal';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { getAgentIcon, TerminalAgentIcon } from './components/AgentIcons';
 import {
   MessageSquare,
@@ -29,6 +30,8 @@ import {
   Plus,
   Palette,
   FolderOpen,
+  Command,
+  Settings,
 } from 'lucide-react';
 import { ExternalEditor } from './types';
 
@@ -77,6 +80,7 @@ export const App: React.FC = () => {
   const [isDelegateModalOpen, setIsDelegateModalOpen] = useState(false);
   const [isAgentMenuOpen, setIsAgentMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   // Resize drag states
   const [isResizingLeft, setIsResizingLeft] = useState(false);
@@ -155,6 +159,12 @@ export const App: React.FC = () => {
       } else if (isCmdOrCtrl && e.key === ',') {
         e.preventDefault();
         setIsSettingsOpen(true);
+      } else if ((isCmdOrCtrl && (e.key === 'p' || e.key === 'P' || e.key === 'k' || e.key === 'K')) || e.key === ':') {
+        const target = e.target as HTMLElement;
+        const isEditing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.classList?.contains('xterm-helper-textarea');
+        if (e.key === ':' && isEditing) return;
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
       }
     };
 
@@ -184,12 +194,17 @@ export const App: React.FC = () => {
       setIsDelegateModalOpen(true);
       return;
     }
-    await createSession({
-      projectId: activeProjectId || currentProject?.id,
-      name: `${agentType} ${projectSessions.length + 1}`,
+    const targetProjId = activeProjectId || currentProject?.id;
+    const newId = await createSession({
+      projectId: targetProjId,
+      name: `${agentType === 'terminal' ? 'terminal' : agentType} ${projectSessions.length + 1}`,
       sessionMode: 'local', // Default is local folder-based session!
       agentType,
     });
+    if (newId) {
+      setActiveWorkspace(newId);
+      setActiveTab('terminal');
+    }
   };
 
   const currentTheme = THEME_STYLES[theme] || THEME_STYLES.zinc;
@@ -201,7 +216,10 @@ export const App: React.FC = () => {
       {/* 1. Left Hierarchical Navigation Sidebar with Drag-Resize Handle */}
       {sidebarOpen && (
         <div className="relative flex shrink-0" style={{ width: `${sidebarWidth}px` }}>
-          <WorkspaceSidebar />
+          <WorkspaceSidebar
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          />
           {/* Left Edge Resize Splitter */}
           <div
             onMouseDown={(e) => {
@@ -268,7 +286,7 @@ export const App: React.FC = () => {
                     />
 
                     {/* Close Tab Button */}
-                    {ws.id !== 'ws-local-proj-dewwie' && ws.id !== 'ws-local-proj-exbytelab' && !isLocal && (
+                    {ws.id !== 'ws-local-proj-dewwie' && ws.id !== 'ws-local-proj-exbytelab' && !ws.id.startsWith('ws-local-proj-') && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -316,66 +334,14 @@ export const App: React.FC = () => {
 
           {/* Right: Ultra-Compact Icon Toolbar */}
           <div className="flex items-center gap-1 shrink-0">
-            {/* View Mode Switcher Pills (Icon Only with Native Tooltips) */}
-            <div className="flex items-center bg-zinc-900/80 p-0.5 rounded border border-zinc-800 text-xs">
-              <button
-                onClick={() => setActiveTab('terminal')}
-                title="Terminal (Ctrl+1)"
-                className={`p-1 rounded transition-colors ${
-                  activeTab === 'terminal'
-                    ? 'bg-zinc-800 text-zinc-100 shadow-xs'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                <TerminalAgentIcon className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                onClick={() => setRightPanelView('room')}
-                title="Agent Room Mesh (Ctrl+2)"
-                className={`p-1 rounded transition-colors relative flex items-center ${
-                  rightPanelOpen && rightPanelView === 'room'
-                    ? 'bg-zinc-800 text-zinc-100 shadow-xs'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                {roomMessages.length > 0 && (
-                  <span className="ml-1 px-1 py-0.2 text-[9px] rounded bg-zinc-800 text-zinc-400 font-mono">
-                    {roomMessages.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setRightPanelView('files')}
-                title="Files Explorer (Ctrl+3)"
-                className={`p-1 rounded transition-colors ${
-                  rightPanelOpen && rightPanelView === 'files'
-                    ? 'bg-zinc-800 text-zinc-100 shadow-xs'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                <FolderTree className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                onClick={() => setRightPanelView('changes')}
-                title="Git Diff (Ctrl+4)"
-                className={`p-1 rounded transition-colors relative flex items-center ${
-                  rightPanelOpen && rightPanelView === 'changes'
-                    ? 'bg-zinc-800 text-zinc-100 shadow-xs'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                <GitCompare className="w-3.5 h-3.5" />
-                {totalFilesChanged > 0 && (
-                  <span className="ml-1 px-1 py-0.2 text-[9px] rounded bg-zinc-800 text-zinc-300 font-mono">
-                    {totalFilesChanged}
-                  </span>
-                )}
-              </button>
-            </div>
+            {/* Linux Terminal / Vim-style Command Palette Prompt (Ctrl+P / :) */}
+            <button
+              onClick={() => setIsCommandPaletteOpen(true)}
+              title="Command Palette & Shell (Ctrl+P / :)"
+              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+            >
+              <Command className="w-3.5 h-3.5" />
+            </button>
 
             <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
 
@@ -441,13 +407,16 @@ export const App: React.FC = () => {
             <button
               onClick={toggleRightPanel}
               title={rightPanelOpen ? 'Collapse Right Panel (Ctrl+Alt+B)' : 'Expand Right Panel (Ctrl+Alt+B)'}
-              className={`p-1 rounded transition-colors ${
+              className={`p-1 rounded transition-colors relative flex items-center ${
                 rightPanelOpen
                   ? 'bg-zinc-800 text-zinc-200'
                   : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900'
               }`}
             >
               {rightPanelOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRight className="w-3.5 h-3.5" />}
+              {(totalFilesChanged > 0 || roomMessages.length > 0) && !rightPanelOpen && (
+                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-zinc-400" />
+              )}
             </button>
           </div>
         </header>
@@ -592,6 +561,13 @@ export const App: React.FC = () => {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      {/* Linux Terminal / Vim-style Command Palette Modal */}
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
     </div>
   );

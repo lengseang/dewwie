@@ -7,16 +7,28 @@ import {
   ChevronDown,
   ChevronRight,
   Plus,
-  Search,
   Trash2,
   X,
   FolderPlus,
   Terminal,
   Bot,
-  Crown,
+  Settings,
+  RotateCw,
+  AlertCircle,
+  HelpCircle,
+  CheckCircle2,
+  Command,
 } from 'lucide-react';
 
-export const WorkspaceSidebar: React.FC = () => {
+interface WorkspaceSidebarProps {
+  onOpenSettings?: () => void;
+  onOpenCommandPalette?: () => void;
+}
+
+export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
+  onOpenSettings,
+  onOpenCommandPalette,
+}) => {
   const {
     projects,
     workspaces,
@@ -29,9 +41,10 @@ export const WorkspaceSidebar: React.FC = () => {
     deleteWorkspace,
     leadSessionId,
     setSessionRole,
+    sidebarWidth,
+    pickAndOpenFolder,
   } = useWorkspaceStore();
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
   const [newFolderPath, setNewFolderPath] = useState('');
@@ -42,9 +55,11 @@ export const WorkspaceSidebar: React.FC = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [sessionMode, setSessionMode] = useState<SessionMode>('local');
   const [branchName, setBranchName] = useState('');
-  const [agentType, setAgentType] = useState('claude-code');
+  const [agentType, setAgentType] = useState('terminal');
   const [isCreating, setIsCreating] = useState(false);
   const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({});
+
+  const isNarrow = sidebarWidth < 140;
 
   const projectList = Object.values(projects);
   const allSessions = Object.values(workspaces);
@@ -95,118 +110,177 @@ export const WorkspaceSidebar: React.FC = () => {
 
   return (
     <aside className="w-full h-full flex flex-col bg-zinc-950/90 border-r border-zinc-800/80 text-zinc-300 select-none shrink-0 font-mono">
-      {/* Header */}
-      <div className="h-9 px-3 border-b border-zinc-800/80 flex items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Dewwie" className="w-4 h-4 rounded object-contain shrink-0" />
-          <span className="text-xs font-bold tracking-wider text-zinc-200 uppercase">
-            Dewwie
-          </span>
-        </div>
+      {/* 1. Header: Dewwie Logo + Setting + Command Palette + New Session */}
+      <div className={`h-9 border-b border-zinc-800/80 flex items-center justify-between gap-1.5 shrink-0 ${isNarrow ? 'px-1.5 justify-center' : 'px-3'}`}>
+        {!isNarrow ? (
+          <>
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                onClick={onOpenSettings}
+                title="Settings & Themes (Ctrl+,)"
+                className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors shrink-0"
+              >
+                <img src="/logo.png" alt="Dewwie" className="w-4 h-4 rounded object-contain" />
+              </button>
+              <span className="text-xs font-bold tracking-wider text-zinc-200 uppercase truncate">
+                Dewwie
+              </span>
+            </div>
 
-        <button
-          onClick={() => {
-            setSelectedProjectId(activeProjectId || projectList[0]?.id || '');
-            setIsModalOpen(true);
-          }}
-          title="Create New Agent Session"
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 text-[11px] transition-colors"
-        >
-          <Plus className="w-3 h-3" />
-          <span>New</span>
-        </button>
+            <div className="flex items-center gap-1">
+              {onOpenCommandPalette && (
+                <button
+                  onClick={onOpenCommandPalette}
+                  title="Command Palette & Shell (Ctrl+P / :)"
+                  className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors"
+                >
+                  <Command className="w-3 h-3" />
+                </button>
+              )}
+
+              {onOpenSettings && (
+                <button
+                  onClick={onOpenSettings}
+                  title="Preferences & Themes"
+                  className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors"
+                >
+                  <Settings className="w-3 h-3" />
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setSelectedProjectId(activeProjectId || projectList[0]?.id || '');
+                  setIsModalOpen(true);
+                }}
+                title="Create New Agent Session"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 text-[11px] transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                <span>New</span>
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-1 py-1">
+            <button
+              onClick={onOpenSettings}
+              title="Settings & Themes"
+              className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors"
+            >
+              <img src="/logo.png" alt="Dewwie" className="w-3.5 h-3.5 rounded object-contain" />
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Directory & Filter */}
-      <div className="p-2 border-b border-zinc-800/60 shrink-0 space-y-1.5">
+      {/* 2. Open Directory Shortcut Bar */}
+      <div className={`p-1.5 border-b border-zinc-800/60 shrink-0 ${isNarrow ? 'flex justify-center' : ''}`}>
         <button
           onClick={handlePickFolder}
           title="Open Any Directory from your PC (Ctrl+O)"
-          className="w-full px-2.5 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center justify-between"
+          className={`rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center ${
+            isNarrow ? 'p-1.5 justify-center' : 'w-full px-2 py-1 justify-between'
+          }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <FolderPlus className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="font-medium text-xs">Open Directory</span>
+            {!isNarrow && <span className="font-medium text-[11px]">Open Directory</span>}
           </div>
-          <span className="text-[10px] text-zinc-600">Ctrl+O</span>
+          {!isNarrow && <span className="text-[9px] text-zinc-600">Ctrl+O</span>}
         </button>
-
-        <div className="relative">
-          <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600" />
-          <input
-            type="text"
-            placeholder="Filter..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-7 pr-2.5 py-1 bg-zinc-900/60 border border-zinc-800 rounded text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-700 transition-colors"
-          />
-        </div>
       </div>
 
-      {/* Projects & Sessions Tree */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-3">
-        {projectList.map((proj) => {
+      {/* 3. Projects & Sessions Tree with Number Badges & Hollow Dots */}
+      <div className={`flex-1 overflow-y-auto no-scrollbar space-y-2 ${isNarrow ? 'p-1' : 'p-2'}`}>
+        {projectList.map((proj, projIdx) => {
           const projectSessions = allSessions.filter(
-            (w) => (w.projectId === proj.id) || (w.repository === proj.name)
+            (w) => w.projectId === proj.id || w.repository === proj.name
           );
-
-          const filtered = projectSessions.filter(
-            (w) =>
-              w.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              (w.branch && w.branch.toLowerCase().includes(searchQuery.toLowerCase())) ||
-              w.agentStatus.message.toLowerCase().includes(searchQuery.toLowerCase())
-          );
-
-          if (filtered.length === 0 && searchQuery) return null;
-
           const isCollapsed = collapsedProjects[proj.id];
 
           return (
             <div key={proj.id} className="space-y-1">
-              {/* Project Folder Row */}
+              {/* Project Row: Numbered Badge [1], [2] */}
               <div
                 onClick={() => {
                   setActiveProject(proj.id);
                   toggleProject(proj.id);
                 }}
-                className={`flex items-center justify-between px-2 py-1 text-xs cursor-pointer rounded transition-colors ${
+                className={`flex items-center rounded transition-colors cursor-pointer ${
+                  isNarrow
+                    ? 'justify-center p-1 hover:bg-zinc-900'
+                    : 'justify-between px-2 py-1 text-xs hover:bg-zinc-900/40'
+                } ${
                   activeProjectId === proj.id
                     ? 'text-zinc-100 bg-zinc-900/60 font-semibold'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
+                    : 'text-zinc-400 hover:text-zinc-200'
                 }`}
-                title={proj.rootPath}
+                title={`${proj.name} (${proj.rootPath})`}
               >
-                <div className="flex items-center gap-1.5 truncate">
-                  {isCollapsed ? (
-                    <ChevronRight className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
-                  ) : (
-                    <ChevronDown className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {/* Clean Number Badge [1] */}
+                  <span className="w-4 h-4 rounded bg-zinc-900 border border-zinc-700/80 flex items-center justify-center text-[10px] font-bold text-zinc-200 shrink-0 shadow-xs">
+                    {projIdx + 1}
+                  </span>
+
+                  {!isNarrow && (
+                    <>
+                      <span className="truncate text-xs">{proj.name}</span>
+                      {isCollapsed ? (
+                        <ChevronRight className="w-3 h-3 text-zinc-600 shrink-0 ml-auto" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3 text-zinc-600 shrink-0 ml-auto" />
+                      )}
+                    </>
                   )}
-                  {proj.isGitRepo ? (
-                    <FolderGit2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                  ) : (
-                    <Folder className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                  )}
-                  <span className="truncate">{proj.name}</span>
                 </div>
-                <span className="text-[11px] font-mono text-zinc-500">
-                  {filtered.length}
-                </span>
+
+                {!isNarrow && (
+                  <span className="text-[10px] font-mono text-zinc-500 shrink-0">
+                    {projectSessions.length}
+                  </span>
+                )}
               </div>
 
-              {/* Sessions Tree with Continuous Guide Line */}
+              {/* Sessions Tree with Hollow Circles (○) & Clean Guide Lines */}
               {!isCollapsed && (
-                <div className="relative ml-4 pl-3.5 space-y-1 py-1">
-                  {filtered.map((ws) => {
+                <div className={isNarrow ? 'flex flex-col items-center gap-2 py-1' : 'relative ml-4 pl-3.5 space-y-1 py-0.5'}>
+                  {projectSessions.map((ws, sIdx) => {
                     const isActive = activeWorkspaceId === ws.id;
                     const isLocal = ws.sessionMode === 'local' || !ws.sessionMode;
                     const isLead = ws.agentRole === 'lead' || ws.id === leadSessionId;
 
+                    if (isNarrow) {
+                      // Ultra-compact Narrow Rail: Hollow Dot (○) or Filled (●)
+                      return (
+                        <div
+                          key={ws.id}
+                          onClick={() => setActiveWorkspace(ws.id)}
+                          title={`${ws.name} (${ws.agentType || 'shell'})\nStatus: ${ws.agentStatus?.message || 'idle'}`}
+                          className="relative flex items-center justify-center cursor-pointer py-0.5 group"
+                        >
+                          <span
+                            className={`rounded-full transition-all ${
+                              isActive
+                                ? 'w-2.5 h-2.5 bg-zinc-100 ring-2 ring-zinc-700'
+                                : ws.agentStatus?.state === 'blocked'
+                                ? 'w-2 h-2 bg-rose-500'
+                                : ws.agentStatus?.state === 'working'
+                                ? 'w-2 h-2 border border-zinc-300 bg-zinc-500 animate-pulse'
+                                : 'w-2 h-2 border border-zinc-600 bg-transparent group-hover:border-zinc-300'
+                            }`}
+                          />
+                        </div>
+                      );
+                    }
+
+                    // Full Width Mode: Hollow Dot + Title + Diff & Actions
                     return (
                       <div
                         key={ws.id}
                         onClick={() => setActiveWorkspace(ws.id)}
-                        className={`group relative flex items-center justify-between px-2.5 py-1.5 rounded-md cursor-pointer text-xs font-mono transition-all ${
+                        className={`group relative flex items-center justify-between px-2 py-1 rounded cursor-pointer text-xs font-mono transition-all ${
                           isActive
                             ? 'bg-zinc-900 text-white font-medium border border-zinc-800 shadow-xs'
                             : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
@@ -222,37 +296,27 @@ export const WorkspaceSidebar: React.FC = () => {
                           }`}
                         />
 
-                        {/* Bullet Dot & Session Name */}
+                        {/* Hollow Circle Dot (○) / Filled (●) & Session Name */}
                         <div className="flex items-center gap-2 min-w-0 pr-1">
                           <span
-                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                              ws.agentStatus?.state === 'blocked'
-                                ? 'bg-rose-500'
-                                : isActive
-                                ? 'bg-zinc-300'
-                                : 'bg-zinc-600 group-hover:bg-zinc-400'
+                            className={`rounded-full shrink-0 transition-colors ${
+                              isActive
+                                ? 'w-2 h-2 bg-zinc-200 border border-zinc-200 shadow-xs'
+                                : ws.agentStatus?.state === 'blocked'
+                                ? 'w-2 h-2 bg-rose-500 border border-rose-500'
+                                : 'w-2 h-2 border border-zinc-600 bg-transparent group-hover:border-zinc-300'
                             }`}
                           />
-                          <span className="truncate">{ws.name}</span>
+                          <span className="truncate text-[11px]">{ws.name}</span>
                         </div>
 
-                        {/* Right: Lead, Diff & delete */}
+                        {/* Right: Role, Diff & delete */}
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {/* Lead Agent Role Badge / Promotion Toggle */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSessionRole(ws.id, isLead ? 'worker' : 'lead');
-                            }}
-                            title={isLead ? 'Lead Agent (click to demote)' : 'Promote to Lead Agent'}
-                            className={`px-1 py-0.2 rounded text-[9px] uppercase font-mono transition-colors ${
-                              isLead
-                                ? 'text-zinc-200 bg-zinc-800 border border-zinc-700'
-                                : 'opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-300'
-                            }`}
-                          >
-                            {isLead ? 'Lead' : 'Make Lead'}
-                          </button>
+                          {isLead && (
+                            <span className="px-1 py-0.2 rounded text-[8px] uppercase font-mono text-zinc-300 bg-zinc-800 border border-zinc-700">
+                              Lead
+                            </span>
+                          )}
 
                           {ws.diffSummary && (ws.diffSummary.additions > 0 || ws.diffSummary.deletions > 0) && (
                             <span className="text-[9px] font-mono text-zinc-500">
@@ -261,7 +325,7 @@ export const WorkspaceSidebar: React.FC = () => {
                             </span>
                           )}
 
-                          {ws.id !== 'ws-local-proj-dewwie' && ws.id !== 'ws-local-proj-exbytelab' && !isLocal && (
+                          {ws.id !== 'ws-local-proj-dewwie' && ws.id !== 'ws-local-proj-exbytelab' && !ws.id.startsWith('ws-local-proj-') && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -278,19 +342,20 @@ export const WorkspaceSidebar: React.FC = () => {
                     );
                   })}
 
-                  {/* Branch Line Hook (Curving out at bottom: ╰── + new session) */}
-                  <div
-                    onClick={() => {
-                      setSelectedProjectId(proj.id);
-                      setIsModalOpen(true);
-                    }}
-                    className="group relative flex items-center gap-2 px-2.5 py-1 text-xs font-mono text-zinc-600 hover:text-zinc-300 cursor-pointer transition-colors"
-                  >
-                    <span className="absolute -left-3.5 top-0 w-2.5 h-1/2 border-b border-l border-zinc-800/80 rounded-bl-sm" />
-                    <span className="text-[11px] text-zinc-600 group-hover:text-zinc-400 select-none">
-                      + new session
-                    </span>
-                  </div>
+                  {!isNarrow && (
+                    <div
+                      onClick={() => {
+                        setSelectedProjectId(proj.id);
+                        setIsModalOpen(true);
+                      }}
+                      className="group relative flex items-center gap-2 px-2 py-0.5 text-xs font-mono text-zinc-600 hover:text-zinc-300 cursor-pointer transition-colors"
+                    >
+                      <span className="absolute -left-3.5 top-0 w-2.5 h-1/2 border-b border-l border-zinc-800/80 rounded-bl-sm" />
+                      <span className="text-[10px] text-zinc-600 group-hover:text-zinc-400 select-none">
+                        + session
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -298,14 +363,70 @@ export const WorkspaceSidebar: React.FC = () => {
         })}
       </div>
 
-      {/* Bottom Add Project Action */}
-      <div className="p-2 border-t border-zinc-800/80 bg-zinc-950 shrink-0">
+      {/* 4. Live Session Process Status Tray (Bottom Section from User Sketch) */}
+      <div className={`border-t border-zinc-800/80 bg-zinc-950/80 shrink-0 ${isNarrow ? 'p-1' : 'p-2'}`}>
+        {!isNarrow && (
+          <div className="flex items-center justify-between pb-1.5 text-[9px] uppercase font-semibold text-zinc-500 tracking-wider">
+            <span>Process Status</span>
+            <span className="text-[9px] text-zinc-600 font-mono">{allSessions.length} live</span>
+          </div>
+        )}
+
+        <div className={`flex flex-wrap gap-1 ${isNarrow ? 'flex-col items-center' : 'items-center'}`}>
+          {allSessions.map((s, idx) => {
+            const isActive = activeWorkspaceId === s.id;
+            const state = s.agentStatus?.state;
+            const isWorking = state === 'working';
+            const isBlocked = state === 'blocked';
+            const isError = state === 'error' || state === 'failed';
+            const isDone = state === 'done';
+
+            return (
+              <button
+                key={s.id}
+                onClick={() => setActiveWorkspace(s.id)}
+                title={`[${idx + 1}] ${s.name}\nState: ${state || 'idle'}\n${s.agentStatus?.message || ''}`}
+                className={`flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all ${
+                  isActive
+                    ? 'ring-1 ring-zinc-500 bg-zinc-800 text-zinc-100 font-semibold'
+                    : 'bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+                }`}
+              >
+                <span className="font-bold">{idx + 1}</span>
+
+                {/* Status Indicator Icon from User Sketch */}
+                {isWorking && (
+                  <RotateCw className="w-2.5 h-2.5 text-zinc-200 animate-spin" />
+                )}
+                {isError && (
+                  <span className="text-rose-400 font-black">!</span>
+                )}
+                {isBlocked && (
+                  <span className="text-amber-400 font-black">?</span>
+                )}
+                {isDone && (
+                  <span className="text-emerald-400 font-black">✓</span>
+                )}
+                {!isWorking && !isError && !isBlocked && !isDone && (
+                  <span className="text-zinc-600 font-mono">~</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 5. Bottom Add Project / Repository Action */}
+      <div className={`border-t border-zinc-800/80 bg-zinc-950 shrink-0 ${isNarrow ? 'p-1 flex justify-center' : 'p-2'}`}>
         <button
           onClick={() => setIsAddProjectOpen(true)}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+          className={`flex items-center rounded bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors ${
+            isNarrow ? 'p-1.5 justify-center' : 'w-full justify-center gap-1.5 py-1.5 px-3 text-xs'
+          }`}
+          title="Add Repository / Folder"
         >
-          <FolderPlus className="w-3.5 h-3.5 text-zinc-500" />
-          <span>+ Add Repository</span>
+          <FolderPlus className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          {!isNarrow && <span>+ Add Repository</span>}
         </button>
       </div>
 
@@ -383,7 +504,7 @@ export const WorkspaceSidebar: React.FC = () => {
         </div>
       )}
 
-      {/* Create Agent Session Modal (Local vs Branch) */}
+      {/* Create Agent Session Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl p-4 space-y-4">
@@ -400,7 +521,6 @@ export const WorkspaceSidebar: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateSessionSubmit} className="space-y-3">
-              {/* Project Target */}
               <div>
                 <label className="block text-[11px] text-zinc-400 mb-1">
                   Target Project
@@ -410,15 +530,14 @@ export const WorkspaceSidebar: React.FC = () => {
                   onChange={(e) => setSelectedProjectId(e.target.value)}
                   className="w-full px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-200 focus:outline-none"
                 >
-                  {projectList.map((p) => (
+                  {projectList.map((p, idx) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({p.rootPath})
+                      [{idx + 1}] {p.name} ({p.rootPath})
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Session Name */}
               <div>
                 <label className="block text-[11px] text-zinc-400 mb-1">
                   Session Name
@@ -428,12 +547,11 @@ export const WorkspaceSidebar: React.FC = () => {
                   required
                   value={sessionName}
                   onChange={(e) => setSessionName(e.target.value)}
-                  placeholder="e.g. Refactor API, Test Terminal, Fix Auth"
+                  placeholder="e.g. terminal 2, claude-code, codex"
                   className="w-full px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-700"
                 />
               </div>
 
-              {/* Mode Selection: Local vs Branch */}
               <div>
                 <label className="block text-[11px] text-zinc-400 mb-1">
                   Execution Mode
@@ -451,7 +569,7 @@ export const WorkspaceSidebar: React.FC = () => {
                     <div>
                       <div className="text-xs font-semibold">Local (In-Place)</div>
                       <div className="text-[10px] text-zinc-500">
-                        Runs directly in project folder. No new git branch.
+                        Runs directly in project folder.
                       </div>
                     </div>
                   </div>
@@ -460,22 +578,21 @@ export const WorkspaceSidebar: React.FC = () => {
                     onClick={() => setSessionMode('branch')}
                     className={`flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors ${
                       sessionMode === 'branch'
-                        ? 'bg-zinc-900 border-blue-700/80 text-zinc-100'
+                        ? 'bg-zinc-900 border-zinc-700 text-zinc-100'
                         : 'bg-zinc-950 border-zinc-800/80 text-zinc-400 hover:bg-zinc-900/40'
                     }`}
                   >
-                    <FolderGit2 className="w-3.5 h-3.5 mt-0.5 text-blue-400 shrink-0" />
+                    <FolderGit2 className="w-3.5 h-3.5 mt-0.5 text-zinc-400 shrink-0" />
                     <div>
                       <div className="text-xs font-semibold">Branch (Worktree)</div>
                       <div className="text-[10px] text-zinc-500">
-                        Isolated git branch with non-colliding port.
+                        Isolated git branch worktree.
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Branch Name if mode === 'branch' */}
               {sessionMode === 'branch' && (
                 <div>
                   <label className="block text-[11px] text-zinc-400 mb-1">
@@ -492,7 +609,6 @@ export const WorkspaceSidebar: React.FC = () => {
                 </div>
               )}
 
-              {/* Agent Tool CLI */}
               <div>
                 <label className="block text-[11px] text-zinc-400 mb-1">
                   Agent Tool / CLI
@@ -504,10 +620,12 @@ export const WorkspaceSidebar: React.FC = () => {
                     onChange={(e) => setAgentType(e.target.value)}
                     className="flex-1 px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-200 focus:outline-none"
                   >
+                    <option value="terminal">Terminal Shell (PowerShell)</option>
                     <option value="claude-code">Claude Code</option>
                     <option value="codex">OpenAI Codex</option>
-                    <option value="aider">Aider</option>
-                    <option value="custom">Custom Agent / Shell</option>
+                    <option value="gemini">Gemini CLI</option>
+                    <option value="antigravity">Antigravity</option>
+                    <option value="hermes">Hermes</option>
                   </select>
                 </div>
               </div>

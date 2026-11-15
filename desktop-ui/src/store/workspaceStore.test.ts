@@ -3,8 +3,35 @@ import { useWorkspaceStore } from './workspaceStore';
 
 describe('useWorkspaceStore', () => {
   beforeEach(() => {
-    // Reset store state
+    // Reset store state with test workspaces
+    const mockWs = (id: string, branch = 'main') => ({
+      id,
+      name: `Test ${id}`,
+      sessionMode: 'branch' as const,
+      branch,
+      baseBranch: 'main',
+      worktreePath: `D:\\test\\${id}`,
+      agentStatus: {
+        state: 'idle' as const,
+        message: 'Ready',
+        timestamp: Date.now(),
+      },
+      metrics: { cpuPercent: 0.5, memoryMb: 50 },
+      ports: [{ service: 'App', port: 5173, status: 'active' as const, url: 'http://localhost:5173' }],
+      diffSummary: { filesChanged: 2, additions: 10, deletions: 2 },
+      createdAt: new Date().toISOString(),
+      lastActivity: 'Just now',
+      commitSha: 'HEAD',
+      terminalSessionId: `term-${id}`,
+    });
+
     useWorkspaceStore.setState({
+      workspaces: {
+        'ws-1': mockWs('ws-1', 'feature/test-1'),
+        'ws-2': mockWs('ws-2', 'feature/test-2'),
+        'ws-3': mockWs('ws-3', 'feature/test-3'),
+      },
+      workspaceOrder: ['ws-1', 'ws-2', 'ws-3'],
       activeWorkspaceId: 'ws-1',
       mode: 'build',
     });

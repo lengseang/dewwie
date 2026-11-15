@@ -128,14 +128,14 @@ async function getWorkspaces() {
   for (const proj of projects) {
     // 1. Ensure at least one primary Local session for this project
     const defaultLocalId = `ws-local-${proj.id}`;
-    const existingLocal = saved.find(s => s.id === defaultLocalId || (s.projectId === proj.id && s.sessionMode === 'local' && s.worktreePath === proj.rootPath));
+    const existingLocal = saved.find(s => s.id === defaultLocalId);
 
     allSessions.push({
       id: existingLocal?.id || defaultLocalId,
       projectId: proj.id,
       projectName: proj.name,
       repository: proj.name,
-      name: existingLocal?.name || 'Local Main Shell',
+      name: existingLocal?.name || `${proj.name} Shell`,
       sessionMode: 'local',
       branch: 'main',
       baseBranch: 'main',
@@ -381,20 +381,13 @@ function getOrCreatePty(workspaceId, cwd) {
 
   if (hasHc) {
     try {
-      const safeId = workspaceId.replace(/[^a-zA-Z0-9_-]/g, '_');
-      // Ensure persistent background terminal in herdr-core
+      const safeId = workspaceId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 32);
+      // Synchronously notify herdr-core if available without blocking interactive PTY
       spawn(hcBin, ['run', '--bg', '--name', safeId, '--cwd', workDir, 'powershell.exe'], { stdio: 'ignore' });
-      shell = hcBin;
-      shellArgs = ['attach', safeId];
-      console.log(`[PTY] Bridged workspace ${workspaceId} to persistent Herdr terminal: ${safeId}`);
-    } catch (err) {
-      console.warn(`[PTY] Herdr bridge fallback to direct powershell: ${err}`);
-      shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
-      shellArgs = process.platform === 'win32' ? ['-NoLogo'] : [];
-    }
-  } else {
-    console.log(`[PTY] Spawning direct shell '${shell}' for ${workspaceId} in: ${workDir}`);
+      console.log(`[PTY] Registered workspace ${workspaceId} in Herdr background registry`);
+    } catch (_) {}
   }
+  console.log(`[PTY] Spawning rock-solid native shell '${shell}' for ${workspaceId} in: ${workDir}`);
 
   const ptyProcess = pty.spawn(shell, shellArgs, {
     name: 'xterm-256color',
@@ -645,10 +638,18 @@ ipcMain.handle('workspaces:get', () => getWorkspaces());
 
 ipcMain.handle('sessions:create', async (_, { projectId, name, sessionMode, branch, baseBranch, agentType }) => {
   const projects = getProjects();
-  const proj = projects.find(p => p.id === projectId) || projects[0];
-  const rootDir = proj ? proj.rootPath : 'D:\\1111-Works\\exbytelab';
+  let proj = projects.find(p => p.id === projectId);
+  if (!proj) {
+    proj = projects[0] || {
+      id: 'proj-dewwie',
+      name: 'Dewwie',
+      rootPath: 'D:\\1111-Works\\Dewwie',
+      isGitRepo: true
+    };
+  }
+  const rootDir = proj.rootPath;
   const mode = sessionMode || (branch ? 'branch' : 'local');
-  const safeName = name?.trim() || (mode === 'branch' ? branch : `${proj.name} Session`);
+  const safeName = name?.trim() || (mode === 'branch' ? branch : `${agentType || 'Terminal'} Session`);
 
   let targetPath = rootDir;
   let allocatedPort = 5173;
@@ -696,6 +697,22 @@ ipcMain.handle('sessions:create', async (_, { projectId, name, sessionMode, bran
   list.push(newSession);
   saveWorkspaces(list);
   return newSession;
+});
+
+ipcMain.handle('sessions:delete', async (_, { sessionId }) => {
+  if (!sessionId) return false;
+  const list = await getWorkspaces();
+  const filtered = list.filter(w => w.id !== sessionId);
+  saveWorkspaces(filtered);
+
+  if (activePtys.has(sessionId)) {
+    const session = activePtys.get(sessionId);
+    try {
+      session.ptyProcess.kill();
+    } catch (_) {}
+    activePtys.delete(sessionId);
+  }
+  return true;
 });
 
 ipcMain.handle('workspaces:create', async (_, { name, branch, baseBranch, repository }) => {

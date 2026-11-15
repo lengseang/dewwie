@@ -166,7 +166,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   rightPanelView: 'room',
   sidebarWidth: 240,
   rightPanelWidth: 320,
-  setSidebarWidth: (w) => set({ sidebarWidth: Math.max(160, Math.min(480, w)) }),
+  setSidebarWidth: (w) => set({ sidebarWidth: Math.max(52, Math.min(480, w)) }),
   setRightPanelWidth: (w) => set({ rightPanelWidth: Math.max(220, Math.min(600, w)) }),
   theme: (typeof window !== 'undefined' && (localStorage.getItem('dewwie_theme') as any)) || 'zinc',
   setTheme: (theme) => {
@@ -415,9 +415,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         if (realSession) {
           set((state) => ({
             workspaces: { ...state.workspaces, [realSession.id]: realSession },
-            workspaceOrder: [realSession.id, ...state.workspaceOrder],
+            workspaceOrder: [realSession.id, ...state.workspaceOrder.filter((id) => id !== realSession.id)],
             activeWorkspaceId: realSession.id,
+            activeTab: 'terminal',
           }));
+          get().persistState();
           return realSession.id;
         }
       } catch (err) {
@@ -651,6 +653,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   deleteWorkspace: async (id: string) => {
+    if (typeof window !== 'undefined' && window.swarmherdNative?.deleteSession) {
+      try {
+        await window.swarmherdNative.deleteSession(id);
+      } catch (_) {}
+    }
     set((state) => {
       const remainingOrder = state.workspaceOrder.filter((wId) => wId !== id);
       const remainingWorkspaces = { ...state.workspaces };
@@ -667,6 +674,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         activeWorkspaceId: newActive,
       };
     });
+    get().persistState();
   },
 
   updateWorkspaceStatus: (id: string, status: Partial<AgentStatus>) => {
