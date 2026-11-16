@@ -264,9 +264,15 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#09090b] text-zinc-200 overflow-hidden font-mono select-none">
+    <div
+      style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text)' }}
+      className="flex-1 flex flex-col h-full overflow-hidden font-mono select-none"
+    >
       {/* 1. Top Header Bar: Room Title, 1-Click Sync Skills, and 1-Click + Add Agent */}
-      <div className="h-9 px-3 border-b border-zinc-800/80 bg-zinc-950 flex items-center justify-between gap-2 shrink-0">
+      <div
+        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+        className="h-9 px-3 border-b flex items-center justify-between gap-2 shrink-0"
+      >
         <div className="flex items-center gap-2 min-w-0">
           <MessageSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
           <span className="text-xs font-bold text-zinc-100 tracking-wider uppercase truncate">
@@ -357,7 +363,10 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
       </div>
 
       {/* 2. Active Agents Roster Strip */}
-      <div className="px-3 py-1.5 border-b border-zinc-800/60 bg-zinc-950/60 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+      <div
+        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+        className="px-3 py-1.5 border-b flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0"
+      >
         <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider shrink-0 mr-1">
           Roster:
         </span>
@@ -592,7 +601,10 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
       </div>
 
       {/* 4. Quick Broadcast Preset Chips */}
-      <div className="px-3 py-1.5 border-t border-zinc-800/60 bg-zinc-950 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+      <div
+        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+        className="px-3 py-1.5 border-t flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0"
+      >
         <span className="text-[10px] text-zinc-500 shrink-0 uppercase font-semibold">Presets:</span>
         <button
           onClick={() => handleQuickPrompt('@all', 'chat', 'Status check: report your active tasks and test progress.')}
@@ -621,7 +633,11 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
       </div>
 
       {/* 5. Broadcaster / Input Form */}
-      <form onSubmit={handleSend} className="p-3 border-t border-zinc-800/80 bg-zinc-950 shrink-0 space-y-2">
+      <form
+        onSubmit={handleSend}
+        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+        className="p-3 border-t shrink-0 space-y-2"
+      >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {/* Target Selector */}

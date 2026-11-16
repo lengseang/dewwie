@@ -120,4 +120,24 @@ describe('useWorkspaceStore', () => {
     expect(result.success).toBe(true);
     expect(useWorkspaceStore.getState().workspaces[wsId]).toBeUndefined();
   });
+
+  it('switches and persists color themes correctly', () => {
+    const store = useWorkspaceStore.getState();
+    expect(store.theme).toBeDefined();
+
+    store.setTheme('tokyo');
+    expect(useWorkspaceStore.getState().theme).toBe('tokyo');
+
+    store.setTheme('oled');
+    expect(useWorkspaceStore.getState().theme).toBe('oled');
+
+    store.setTheme('slate');
+    expect(useWorkspaceStore.getState().theme).toBe('slate');
+
+    store.setTheme('monokai');
+    expect(useWorkspaceStore.getState().theme).toBe('monokai');
+
+    store.setTheme('zinc');
+    expect(useWorkspaceStore.getState().theme).toBe('zinc');
+  });
 });

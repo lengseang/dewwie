@@ -168,9 +168,15 @@ export const DiffViewer: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-hidden select-none">
+    <div
+      style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text)' }}
+      className="flex-1 flex flex-col h-full overflow-hidden select-none"
+    >
       {/* Top Precision Bar */}
-      <div className="h-10 px-3 border-b border-zinc-800/80 bg-zinc-950 flex items-center justify-between gap-3 shrink-0">
+      <div
+        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+        className="h-10 px-3 border-b flex items-center justify-between gap-3 shrink-0"
+      >
         {/* Left: Branch comparison or Local changes */}
         <div className="flex items-center gap-2 font-mono text-xs">
           <GitCompare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />

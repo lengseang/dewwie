@@ -103,9 +103,18 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   };
 
   return (
-    <aside className="w-full h-full flex flex-col bg-zinc-950/90 border-r border-zinc-800/80 text-zinc-300 select-none shrink-0 font-mono">
+    <aside
+      style={{
+        backgroundColor: 'var(--app-surface)',
+        borderColor: 'var(--app-border)',
+      }}
+      className="w-full h-full flex flex-col border-r text-zinc-300 select-none shrink-0 font-mono"
+    >
       {/* 1. Header: Dewwie Logo + Setting + Command Palette + New Session */}
-      <div className={`h-9 border-b border-zinc-800/80 flex items-center justify-between gap-1.5 shrink-0 ${isNarrow ? 'px-1.5 justify-center' : 'px-3'}`}>
+      <div
+        style={{ borderColor: 'var(--app-border)' }}
+        className={`h-9 border-b flex items-center justify-between gap-1.5 shrink-0 ${isNarrow ? 'px-1.5 justify-center' : 'px-3'}`}
+      >
         {!isNarrow ? (
           <>
             <div className="flex items-center gap-2 min-w-0">
@@ -169,7 +178,10 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       </div>
 
       {/* 2. Open Directory Shortcut Bar */}
-      <div className={`p-1.5 border-b border-zinc-800/60 shrink-0 ${isNarrow ? 'flex justify-center' : ''}`}>
+      <div
+        style={{ borderColor: 'var(--app-border)' }}
+        className={`p-1.5 border-b shrink-0 ${isNarrow ? 'flex justify-center' : ''}`}
+      >
         <button
           onClick={handlePickFolder}
           title="Open Any Directory from your PC (Ctrl+O)"
@@ -357,7 +369,13 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       </div>
 
       {/* 4. Live Session Process Status Tray (Bottom Section from User Sketch) */}
-      <div className={`border-t border-zinc-800/80 bg-zinc-950/80 shrink-0 ${isNarrow ? 'p-1' : 'p-2'}`}>
+      <div
+        style={{
+          backgroundColor: 'var(--app-surface)',
+          borderColor: 'var(--app-border)',
+        }}
+        className={`border-t shrink-0 ${isNarrow ? 'p-1' : 'p-2'}`}
+      >
         {!isNarrow && (
           <div className="flex items-center justify-between pb-1.5 text-[9px] uppercase font-semibold text-zinc-500 tracking-wider">
             <span>Process Status</span>
@@ -410,7 +428,13 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       </div>
 
       {/* 5. Bottom Add Project / Repository Action */}
-      <div className={`border-t border-zinc-800/80 bg-zinc-950 shrink-0 ${isNarrow ? 'p-1 flex justify-center' : 'p-2'}`}>
+      <div
+        style={{
+          backgroundColor: 'var(--app-surface)',
+          borderColor: 'var(--app-border)',
+        }}
+        className={`border-t shrink-0 ${isNarrow ? 'p-1 flex justify-center' : 'p-2'}`}
+      >
         <button
           onClick={() => setIsAddProjectOpen(true)}
           className={`flex items-center rounded bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors ${

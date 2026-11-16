@@ -1,21 +1,77 @@
 @import "tailwindcss";
 
 @layer base {
-  :root {
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  :root, [data-theme="zinc"] {
+    --app-bg: #09090b;
+    --app-surface: #111113;
+    --app-surface-elevated: #18181b;
+    --app-nav-bg: #09090b;
+    --app-border: #27272a;
+    --app-border-subtle: #18181b;
+    --app-text: #f4f4f5;
+    --app-text-muted: #a1a1aa;
+    --app-accent: #e4e4e7;
+  }
+
+  [data-theme="oled"] {
+    --app-bg: #000000;
+    --app-surface: #050505;
+    --app-surface-elevated: #0a0a0a;
+    --app-nav-bg: #000000;
+    --app-border: #1c1c1f;
+    --app-border-subtle: #121214;
+    --app-text: #ffffff;
+    --app-text-muted: #888888;
+    --app-accent: #ffffff;
+  }
+
+  [data-theme="slate"] {
+    --app-bg: #0b0f19;
+    --app-surface: #0f172a;
+    --app-surface-elevated: #1e293b;
+    --app-nav-bg: #080d17;
+    --app-border: #1e293b;
+    --app-border-subtle: #131d31;
+    --app-text: #f8fafc;
+    --app-text-muted: #94a3b8;
+    --app-accent: #38bdf8;
+  }
+
+  [data-theme="tokyo"] {
+    --app-bg: #1a1b26;
+    --app-surface: #16161e;
+    --app-surface-elevated: #24283b;
+    --app-nav-bg: #13141c;
+    --app-border: #2f354a;
+    --app-border-subtle: #1f2335;
+    --app-text: #c0caf5;
+    --app-text-muted: #7aa2f7;
+    --app-accent: #bb9af7;
+  }
+
+  [data-theme="monokai"] {
+    --app-bg: #19181a;
+    --app-surface: #221f22;
+    --app-surface-elevated: #2d2a2e;
+    --app-nav-bg: #151416;
+    --app-border: #363337;
+    --app-border-subtle: #262327;
+    --app-text: #fcfcfa;
+    --app-text-muted: #939293;
+    --app-accent: #ffd866;
   }
 
   body {
-    background-color: #09090b;
-    color: #f4f4f5;
-    font-family: var(--font-sans);
+    background-color: var(--app-bg);
+    color: var(--app-text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     margin: 0;
     padding: 0;
     overflow: hidden;
     user-select: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   /* Ultra-minimal scrollbar */
@@ -27,11 +83,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #27272a;
+    background: var(--app-border);
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3f3f46;
+    background: var(--app-border-subtle);
   }
 }
 
@@ -43,10 +99,10 @@
 }
 
 .xterm-viewport {
-  background-color: #09090b !important;
+  background-color: var(--app-bg) !important;
+  transition: background-color 0.2s ease;
 }
 
 .xterm .xterm-screen canvas {
   image-rendering: pixelated;
 }
-

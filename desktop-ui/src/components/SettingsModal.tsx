@@ -24,12 +24,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs font-mono select-none">
       <div
-        className="w-full max-w-md bg-[#09090b] border border-zinc-800 rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+        className="w-full max-w-md border rounded-lg shadow-2xl overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
       >
         {/* Header */}
-        <div className="h-10 px-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
+        <div
+          style={{ backgroundColor: 'var(--app-nav-bg)', borderColor: 'var(--app-border)' }}
+          className="h-10 px-4 border-b flex items-center justify-between"
+        >
           <div className="flex items-center gap-2">
             <Palette className="w-3.5 h-3.5 text-zinc-400" />
             <span className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">

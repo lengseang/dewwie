@@ -34,14 +34,7 @@ import {
   Radio,
 } from 'lucide-react';
 import { ExternalEditor } from './types';
-
-const THEME_STYLES: Record<string, { bg: string; navBg: string; border: string }> = {
-  zinc: { bg: 'bg-[#09090b]', navBg: 'bg-zinc-950', border: 'border-zinc-800/80' },
-  oled: { bg: 'bg-[#000000]', navBg: 'bg-[#0a0a0a]', border: 'border-zinc-900' },
-  slate: { bg: 'bg-[#0b0f19]', navBg: 'bg-[#0f172a]', border: 'border-slate-800' },
-  tokyo: { bg: 'bg-[#1a1b26]', navBg: 'bg-[#16161e]', border: 'border-indigo-950' },
-  monokai: { bg: 'bg-[#19181a]', navBg: 'bg-[#221f22]', border: 'border-stone-800' },
-};
+import { THEMES_CONFIG } from './theme/themes';
 
 export const App: React.FC = () => {
   const {
@@ -93,6 +86,13 @@ export const App: React.FC = () => {
   useEffect(() => {
     initNativeSync();
   }, [initNativeSync]);
+
+  // Synchronize dynamic active theme with document and xterm viewports
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    const activeColor = THEMES_CONFIG[theme]?.bg || '#09090b';
+    document.body.style.backgroundColor = activeColor;
+  }, [theme]);
 
   // Window resize mouse drag listener
   useEffect(() => {
@@ -209,12 +209,17 @@ export const App: React.FC = () => {
     }
   };
 
-  const currentTheme = THEME_STYLES[theme] || THEME_STYLES.zinc;
   const totalFilesChanged = activeWs?.diffSummary?.filesChanged || 0;
   const blockedCount = Object.values(workspaces).filter((w) => w.agentStatus?.state === 'blocked').length;
 
   return (
-    <div className={`flex h-screen w-screen ${currentTheme.bg} text-zinc-100 overflow-hidden font-sans select-none antialiased`}>
+    <div
+      style={{
+        backgroundColor: 'var(--app-bg)',
+        color: 'var(--app-text)',
+      }}
+      className="flex h-screen w-screen overflow-hidden font-sans select-none antialiased"
+    >
       {/* 1. Left Hierarchical Navigation Sidebar with Drag-Resize Handle */}
       {sidebarOpen && (
         <div className="relative flex shrink-0" style={{ width: `${sidebarWidth}px` }}>
@@ -239,7 +244,11 @@ export const App: React.FC = () => {
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
         {/* Compact Single Unified Top Bar */}
         <header
-          className={`h-9 px-2 ${currentTheme.navBg} border-b ${currentTheme.border} flex items-center justify-between gap-2 shrink-0 z-20 font-mono ${
+          style={{
+            backgroundColor: 'var(--app-nav-bg)',
+            borderColor: 'var(--app-border)',
+          }}
+          className={`h-9 px-2 border-b flex items-center justify-between gap-2 shrink-0 z-20 font-mono ${
             isNative ? 'pr-36' : ''
           }`}
         >
@@ -556,8 +565,12 @@ export const App: React.FC = () => {
           {/* Right Navigation Inspector Sidebar with Drag-Resize Handle */}
           {rightPanelOpen && activeTab === 'terminal' && (
             <aside
-              className="relative h-full border-l border-zinc-800/80 bg-zinc-950 flex flex-col shrink-0 font-mono"
-              style={{ width: `${rightPanelWidth}px` }}
+              style={{
+                width: `${rightPanelWidth}px`,
+                backgroundColor: 'var(--app-surface)',
+                borderColor: 'var(--app-border)',
+              }}
+              className="relative h-full border-l flex flex-col shrink-0 font-mono"
             >
               {/* Left Edge Resize Splitter for Right Panel */}
               <div
@@ -586,7 +599,13 @@ export const App: React.FC = () => {
         </main>
 
         {/* Minimal Footer Status Bar */}
-        <footer className="h-6 px-3 bg-zinc-950 border-t border-zinc-800/80 flex items-center justify-between text-[10px] font-mono text-zinc-500 shrink-0 select-none">
+        <footer
+          style={{
+            backgroundColor: 'var(--app-nav-bg)',
+            borderColor: 'var(--app-border)',
+          }}
+          className="h-6 px-3 border-t flex items-center justify-between text-[10px] font-mono text-zinc-500 shrink-0 select-none"
+        >
           {/* Left: Active session & Agent stats */}
           <div className="flex items-center gap-2">
             <span className="text-zinc-400">{currentProject?.name || 'Local'}</span>

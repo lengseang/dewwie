@@ -1,170 +1,170 @@
 {
-  "timestamp": "2026-11-16 20:20:36",
+  "timestamp": "2026-11-16 20:56:22",
   "total": 23,
   "passed": 23,
   "failed": 0,
-  "elapsed_sec": 4.9,
+  "elapsed_sec": 4.79,
   "scenarios": [
     {
       "section": "Scenario A.1",
       "name": "Git Worktree Lock Contention Verification",
       "passed": true,
       "detail": "Observed raw concurrent git behavior: 0/6 calls encountered lock contention.\nDemonstrates need for SwarmHerd serialization / retry protocol.",
-      "timestamp": "20:20:32"
+      "timestamp": "20:56:18"
     },
     {
       "section": "Scenario A.2",
       "name": "SwarmHerd Resilient Parallel Worktree Creation (6 workers)",
       "passed": true,
       "detail": "All 6 parallel agent worktrees successfully created and registered in git.\nZero lock corruption, 100% success rate with retry/mutex protection.",
-      "timestamp": "20:20:33"
+      "timestamp": "20:56:19"
     },
     {
       "section": "Scenario A.3",
       "name": "Parallel Worktree Teardown & Metadata Prune",
       "passed": true,
       "detail": "All 6 worktree instances cleanly removed and pruned without orphan locks.",
-      "timestamp": "20:20:34"
+      "timestamp": "20:56:19"
     },
     {
       "section": "Scenario B.1",
       "name": "Spawning 12 Workspaces with Isolated Port Offsets",
       "passed": true,
       "detail": "Allocated slots 0..11 across 12 workspaces.\nWeb: 14000-14011 | Backend: 15000-15011 | Vite: 16000-16011. Zero collisions.",
-      "timestamp": "20:20:34"
+      "timestamp": "20:56:19"
     },
     {
       "section": "Scenario B.2",
       "name": "Host Port Conflict Detection & Slot Skipping",
       "passed": true,
       "detail": "Host port 14012 was intentionally blocked.\nBroker detected collision, skipped slot 12, and cleanly allocated slot 13 (web:14013).",
-      "timestamp": "20:20:34"
+      "timestamp": "20:56:19"
     },
     {
       "section": "Scenario B.3",
       "name": "Port Exhaustion Graceful Error Handling",
       "passed": true,
       "detail": "When max_slots limit is reached, broker throws descriptive error rather than silent collision or panic.",
-      "timestamp": "20:20:34"
+      "timestamp": "20:56:19"
     },
     {
       "section": "Scenario B.4",
       "name": "Concurrent Port Allocation Thread-Safety",
       "passed": true,
       "detail": "10 simultaneous threads requested port bundles. Assigned unique slots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].",
-      "timestamp": "20:20:34"
+      "timestamp": "20:56:19"
     },
     {
       "section": "Scenario B.5",
       "name": ".env.local Injection & Non-Destructive Update Across 10 Workspaces",
       "passed": true,
       "detail": "Successfully injected PORT, BACKEND_PORT, VITE_PORT, and SWARMHERD_PORT_SLOT while preserving existing config.",
-      "timestamp": "20:20:34"
+      "timestamp": "20:56:19"
     },
     {
       "section": "Scenario C.1",
       "name": "Initial Client Stream Ingestion",
       "passed": true,
       "detail": "Client 1 connected. Read initial scrollback chunk (235 bytes).",
-      "timestamp": "20:20:34"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario C.2",
       "name": "Agent Process Survival During Client Disconnect",
       "passed": true,
       "detail": "Client killed abruptly. Agent thread PID/loop remained active.\nScrollback grew from 235 bytes -> 705 bytes during disconnect.",
-      "timestamp": "20:20:34"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario C.3",
       "name": "Client Reconnection & Scrollback Hydration Verification",
       "passed": true,
       "detail": "New client reconnected. Hydrated 940 bytes (20 lines).\n100% byte-exact match with zero data loss or stream corruption.",
-      "timestamp": "20:20:35"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario C.4",
       "name": "Daemon Restart State Machine Recovery",
       "passed": true,
       "detail": "Daemon restart safely reconciles orphaned PIDs, resets 'working' states to 'idle', and prevents deadlock.",
-      "timestamp": "20:20:35"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario D.1",
       "name": "Standard BEL and ST Sequences",
       "passed": true,
       "detail": "Both BEL (\\x07) and ST (\\x1b\\\\) parsed cleanly.",
-      "timestamp": "20:20:35"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario D.2",
       "name": "Truncated Stream at EOF",
       "passed": true,
       "detail": "Parser remains stable without terminating delimiter.",
-      "timestamp": "20:20:35"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario D.3",
       "name": "Payload Bomb Protection (64KB overflow)",
       "passed": true,
       "detail": "Parser enforced payload size bound and prevented memory exhaustion.",
-      "timestamp": "20:20:35"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario D.4",
       "name": "Malformed Syntax & Missing Tokens",
       "passed": true,
       "detail": "Handled empty tokens, extra delimiters, and missing keys without panics.",
-      "timestamp": "20:20:35"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario D.5",
       "name": "Non-UTF-8 Binary Byte Sequences",
       "passed": true,
       "detail": "Decoded lossy UTF-8 replacement chars safely.",
-      "timestamp": "20:20:35"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario D.6",
       "name": "Null Byte Injection Handling",
       "passed": true,
       "detail": "Null bytes inside state/msg safely absorbed.",
-      "timestamp": "20:20:35"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario D.7",
       "name": "False ST Escape Recovery (\\x1bX instead of \\x1b\\\\)",
       "passed": true,
       "detail": "Parser successfully recovers when ESC is not followed by backslash.",
-      "timestamp": "20:20:35"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario D.8",
       "name": "High-Frequency Adversarial Fuzzing (5,000 iterations)",
       "passed": true,
       "detail": "Stream parser survived 5,000 randomized chunks with zero unhandled exceptions.",
-      "timestamp": "20:20:35"
+      "timestamp": "20:56:20"
     },
     {
       "section": "Scenario E.1 & E.2",
       "name": "Complex Diff Detection (Binary Files & Renames)",
       "passed": true,
       "detail": "Diff parser accurately identified:\n - Binary file change (logo.png marked with '-' / '-' numstat)\n - File rename (module_rename.ts -> module_renamed_v2.ts)\n - Source modification (calculator.ts additions/deletions)",
-      "timestamp": "20:20:36"
+      "timestamp": "20:56:21"
     },
     {
       "section": "Scenario E.3",
       "name": "Merge Conflict Detection & Clean Rollback",
       "passed": true,
       "detail": "Divergent changes produced expected merge conflict in calculator.ts.\nSwarmHerd detected conflict status, extracted conflict list, and cleanly rolled back.",
-      "timestamp": "20:20:36"
+      "timestamp": "20:56:22"
     },
     {
       "section": "Scenario E.4",
       "name": "Structured Diff Chunk Generation for UI React Components",
       "passed": true,
       "detail": "Parsed 3 diff chunks with unified line numbering matching DiffViewer/DiffChunk interface.",
-      "timestamp": "20:20:36"
+      "timestamp": "20:56:22"
     }
   ]
 }

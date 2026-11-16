@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { THEMES_CONFIG } from '../../theme/themes';
 import {
   Play,
   Trash2,
@@ -22,6 +23,7 @@ export const TerminalPane: React.FC = () => {
     clearTerminal,
     parseAndDispatchOsc,
     startAgentSimulation,
+    theme,
   } = useWorkspaceStore();
 
   const terminalContainerRef = useRef<HTMLDivElement>(null);
@@ -44,33 +46,14 @@ export const TerminalPane: React.FC = () => {
       terminalInstanceRef.current = null;
     }
 
+    const currentThemeDef = THEMES_CONFIG[theme] || THEMES_CONFIG.zinc;
+
     const term = new Terminal({
       cursorBlink: true,
       cursorStyle: 'bar',
       fontSize,
       fontFamily: "'JetBrains Mono', 'Fira Code', Cascadia Code, Menlo, monospace",
-      theme: {
-        background: '#09090b',
-        foreground: '#f4f4f5',
-        cursor: '#a1a1aa',
-        selectionBackground: 'rgba(255, 255, 255, 0.15)',
-        black: '#18181b',
-        red: '#f43f5e',
-        green: '#10b981',
-        yellow: '#f59e0b',
-        blue: '#38bdf8',
-        magenta: '#c084fc',
-        cyan: '#22d3ee',
-        white: '#f4f4f5',
-        brightBlack: '#71717a',
-        brightRed: '#fb7185',
-        brightGreen: '#34d399',
-        brightYellow: '#fbbf24',
-        brightBlue: '#60a5fa',
-        brightMagenta: '#e879f9',
-        brightCyan: '#67e8f9',
-        brightWhite: '#ffffff',
-      },
+      theme: currentThemeDef.terminal,
       convertEol: true,
       scrollback: 10000,
       allowTransparency: true,
@@ -164,6 +147,14 @@ export const TerminalPane: React.FC = () => {
       terminalInstanceRef.current.writeln('\x1b[2m[Terminal buffer cleared]\x1b[0m\r\n');
     }
   };
+
+  // Dynamic Live Theme Synchronization
+  useEffect(() => {
+    if (terminalInstanceRef.current) {
+      const tDef = THEMES_CONFIG[theme] || THEMES_CONFIG.zinc;
+      terminalInstanceRef.current.options.theme = tDef.terminal;
+    }
+  }, [theme]);
 
   if (!activeWs) {
     return (

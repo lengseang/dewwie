@@ -191,7 +191,10 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean }> = ({ sidebarOnly 
 
   if (sidebarOnly) {
     return (
-      <div className="w-full h-full bg-zinc-950 flex flex-col font-mono select-none overflow-hidden">
+      <div
+        style={{ backgroundColor: 'var(--app-surface)' }}
+        className="w-full h-full flex flex-col font-mono select-none overflow-hidden"
+      >
         {/* Explorer Header */}
         <div className="h-9 px-3 border-b border-zinc-800/80 flex items-center justify-between gap-2 shrink-0">
           <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider truncate">
@@ -283,7 +286,10 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean }> = ({ sidebarOnly 
             </div>
 
             {/* Quick Viewer Body */}
-            <div className="flex-1 overflow-auto p-2 text-[11px] leading-relaxed text-zinc-300 bg-[#09090b]">
+            <div
+              style={{ backgroundColor: 'var(--app-bg)' }}
+              className="flex-1 overflow-auto p-2 text-[11px] leading-relaxed text-zinc-300"
+            >
               {isLoadingFile ? (
                 <div className="text-zinc-600 text-xs">Loading file...</div>
               ) : (
@@ -297,7 +303,10 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean }> = ({ sidebarOnly 
   }
 
   return (
-    <div className="flex-1 flex h-full bg-[#09090b] text-zinc-200 overflow-hidden font-mono select-none">
+    <div
+      style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text)' }}
+      className="flex-1 flex h-full overflow-hidden font-mono select-none"
+    >
       {/* Left Column: Explorer Directory Tree */}
       <div className="w-72 border-r border-zinc-800/80 bg-zinc-950 flex flex-col h-full shrink-0">
         {/* Explorer Header */}

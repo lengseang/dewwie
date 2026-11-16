@@ -3,12 +3,14 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { THEMES_CONFIG } from '../../theme/themes';
 
 export const DualTerminalPane: React.FC = () => {
   const {
     activeWorkspaceId,
     workspaces,
     isSplitView,
+    theme,
   } = useWorkspaceStore();
 
   const [splitRatio, setSplitRatio] = useState(50);
@@ -35,33 +37,14 @@ export const DualTerminalPane: React.FC = () => {
     if (!container) return;
     container.innerHTML = ''; // Ensure clean container with zero duplicate DOM artifacts
 
+    const currentThemeDef = THEMES_CONFIG[theme] || THEMES_CONFIG.zinc;
+
     const term = new Terminal({
       cursorBlink: true,
       cursorStyle: 'bar',
       fontSize: 12,
       fontFamily: "'JetBrains Mono', 'Fira Code', Cascadia Code, Menlo, monospace",
-      theme: {
-        background: '#09090b',
-        foreground: '#f4f4f5',
-        cursor: '#a1a1aa',
-        selectionBackground: 'rgba(255, 255, 255, 0.15)',
-        black: '#18181b',
-        red: '#f43f5e',
-        green: '#10b981',
-        yellow: '#f59e0b',
-        blue: '#38bdf8',
-        magenta: '#c084fc',
-        cyan: '#22d3ee',
-        white: '#f4f4f5',
-        brightBlack: '#71717a',
-        brightRed: '#fb7185',
-        brightGreen: '#34d399',
-        brightYellow: '#fbbf24',
-        brightBlue: '#60a5fa',
-        brightMagenta: '#e879f9',
-        brightCyan: '#67e8f9',
-        brightWhite: '#ffffff',
-      },
+      theme: currentThemeDef.terminal,
       convertEol: true,
       scrollback: 10000,
       allowTransparency: true,
@@ -255,21 +238,42 @@ export const DualTerminalPane: React.FC = () => {
     };
   }, [isDraggingSplit]);
 
+  // Dynamic Live Theme Synchronization
+  useEffect(() => {
+    const tDef = THEMES_CONFIG[theme] || THEMES_CONFIG.zinc;
+    if (leftTermRef.current) {
+      leftTermRef.current.options.theme = tDef.terminal;
+    }
+    if (rightTermRef.current) {
+      rightTermRef.current.options.theme = tDef.terminal;
+    }
+  }, [theme]);
+
   if (!activeWs) {
     return (
-      <div className="flex-1 h-full flex items-center justify-center bg-zinc-950 text-zinc-600 font-mono text-xs">
+      <div
+        style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text-muted)' }}
+        className="flex-1 h-full flex items-center justify-center font-mono text-xs"
+      >
         No active workspace. Select or create one from the sidebar.
       </div>
     );
   }
 
   return (
-    <div ref={splitContainerRef} className="flex-1 flex h-full overflow-hidden bg-[#09090b] relative">
+    <div
+      ref={splitContainerRef}
+      style={{ backgroundColor: 'var(--app-bg)' }}
+      className="flex-1 flex h-full overflow-hidden relative"
+    >
       {/* Left Pane (Primary Agent PTY) */}
       <div
         onClick={() => leftTermRef.current?.focus()}
-        style={{ width: isSplitView && secondaryWs ? `${splitRatio}%` : '100%' }}
-        className="h-full bg-[#09090b] relative overflow-hidden cursor-text shrink-0"
+        style={{
+          width: isSplitView && secondaryWs ? `${splitRatio}%` : '100%',
+          backgroundColor: 'var(--app-bg)',
+        }}
+        className="h-full relative overflow-hidden cursor-text shrink-0"
       >
         <div ref={leftContainerRef} className="w-full h-full" />
       </div>
@@ -297,8 +301,11 @@ export const DualTerminalPane: React.FC = () => {
       {isSplitView && secondaryWs && (
         <div
           onClick={() => rightTermRef.current?.focus()}
-          style={{ width: `${100 - splitRatio}%` }}
-          className="h-full bg-[#09090b] relative overflow-hidden cursor-text shrink-0"
+          style={{
+            width: `${100 - splitRatio}%`,
+            backgroundColor: 'var(--app-bg)',
+          }}
+          className="h-full relative overflow-hidden cursor-text shrink-0"
         >
           <div ref={rightContainerRef} className="w-full h-full" />
         </div>
