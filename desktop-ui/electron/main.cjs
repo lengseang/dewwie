@@ -472,13 +472,25 @@ function getOrCreatePty(workspaceId, cwd) {
     const matched = workspacesCache.find(w => w.id === workspaceId);
     if (matched?.agentType) detectedAgent = matched.agentType;
   }
-  if (detectedAgent === 'claude-code') {
+  if (detectedAgent === 'claude-code' || detectedAgent === 'claude') {
     setTimeout(() => {
       try { ptyProcess.write('claude\r'); } catch (_) {}
     }, 700);
-  } else if (detectedAgent === 'antigravity') {
+  } else if (detectedAgent === 'antigravity' || detectedAgent === 'agy') {
     setTimeout(() => {
       try { ptyProcess.write('agy\r'); } catch (_) {}
+    }, 700);
+  } else if (detectedAgent === 'gemini') {
+    setTimeout(() => {
+      try { ptyProcess.write('gemini\r'); } catch (_) {}
+    }, 700);
+  } else if (detectedAgent === 'codex') {
+    setTimeout(() => {
+      try { ptyProcess.write('codex\r'); } catch (_) {}
+    }, 700);
+  } else if (detectedAgent === 'hermes') {
+    setTimeout(() => {
+      try { ptyProcess.write('hermes\r'); } catch (_) {}
     }, 700);
   }
 
