@@ -62,7 +62,10 @@ const FALLBACK_TREE: FileItem[] = [
   { name: 'README.md', type: 'file', path: 'README.md', size: '2.4 KB' },
 ];
 
-export const ExplorerPane: React.FC<{ sidebarOnly?: boolean }> = ({ sidebarOnly = false }) => {
+export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => void }> = ({
+  sidebarOnly = false,
+  onClose,
+}) => {
   const { activeWorkspaceId, workspaces, launchEditor } = useWorkspaceStore();
   const [tree, setTree] = useState<FileItem[]>(FALLBACK_TREE);
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({
@@ -216,6 +219,15 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean }> = ({ sidebarOnly 
             >
               <ExternalLink className="w-3 h-3" />
             </button>
+            {onClose && (
+              <button
+                onClick={onClose}
+                title="Close Explorer Panel"
+                className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 ml-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 

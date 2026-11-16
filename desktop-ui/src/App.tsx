@@ -32,6 +32,7 @@ import {
   Command,
   Terminal,
   Radio,
+  ChevronDown,
 } from 'lucide-react';
 import { ExternalEditor } from './types';
 import { THEMES_CONFIG } from './theme/themes';
@@ -66,6 +67,7 @@ export const App: React.FC = () => {
     setRightPanelWidth,
     pickAndOpenFolder,
     renameWorkspace,
+    workspaceOrder,
   } = useWorkspaceStore();
 
   const [launchingEditor, setLaunchingEditor] = useState<string | null>(null);
@@ -127,8 +129,14 @@ export const App: React.FC = () => {
   const activeWs = activeWorkspaceId ? workspaces[activeWorkspaceId] : null;
   const currentProject = activeProjectId ? projects[activeProjectId] : Object.values(projects)[0];
 
-  // Filter project sessions
-  const projectSessions = Object.values(workspaces).filter(
+  // Filter project sessions with stable order
+  const orderedList = workspaceOrder
+    .map((id) => workspaces[id])
+    .filter((w): w is NonNullable<typeof w> => !!w);
+  const remainingWorkspaces = Object.values(workspaces).filter(
+    (w) => !workspaceOrder.includes(w.id)
+  );
+  const projectSessions = [...orderedList, ...remainingWorkspaces].filter(
     (w) => !activeProjectId || w.projectId === activeProjectId || w.repository === currentProject?.name
   );
 
@@ -137,7 +145,10 @@ export const App: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmdOrCtrl = e.ctrlKey || e.metaKey;
 
-      if (isCmdOrCtrl && e.key === '1') {
+      if (isCmdOrCtrl && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault();
+        handleSpawnAgent('terminal');
+      } else if (isCmdOrCtrl && e.key === '1') {
         e.preventDefault();
         setActiveTab('terminal');
       } else if (isCmdOrCtrl && e.key === '2') {
@@ -341,14 +352,23 @@ export const App: React.FC = () => {
                 );
               })}
 
-              {/* Herdr Agent Dropdown Trigger (+) */}
+              {/* Quick Add Terminal Tab (+) */}
+              <button
+                onClick={() => handleSpawnAgent('terminal')}
+                title="New Terminal Tab (Ctrl+T)"
+                className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Agent Launcher Dropdown Trigger (▾) */}
               <div className="relative shrink-0">
                 <button
                   onClick={() => setIsAgentMenuOpen(!isAgentMenuOpen)}
-                  title="Start an Agent (Ctrl+Shift+T)"
-                  className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors"
+                  title="Start an AI Agent (Claude Code, Antigravity, Gemini, Codex)..."
+                  className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <ChevronDown className="w-3 h-3" />
                 </button>
                 <AgentMenuDropdown
                   isOpen={isAgentMenuOpen}
@@ -375,14 +395,17 @@ export const App: React.FC = () => {
           <div className="flex items-center gap-1 shrink-0">
             {/* View Switcher: Terminal, Room, Files, Diff */}
             <div className="flex items-center gap-0.5 bg-zinc-900/60 p-0.5 rounded border border-zinc-800/80">
-              {/* Terminal View */}
+              {/* Terminal View (Click to toggle full-screen TUI) */}
               <button
                 onClick={() => {
                   setActiveTab('terminal');
+                  if (rightPanelOpen) {
+                    toggleRightPanel();
+                  }
                 }}
-                title="Terminal Workspace (Ctrl+1)"
+                title={rightPanelOpen ? 'Maximize Terminal TUI (Close Side Panel) (Ctrl+1)' : 'Terminal Workspace (Ctrl+1)'}
                 className={`p-1 rounded transition-colors ${
-                  activeTab === 'terminal' && (!rightPanelOpen || rightPanelView === 'room')
+                  activeTab === 'terminal' && !rightPanelOpen
                     ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
@@ -390,16 +413,18 @@ export const App: React.FC = () => {
                 <Terminal className="w-3.5 h-3.5" />
               </button>
 
-              {/* Room Mesh View */}
+              {/* Room Mesh View (Click to open, click again to close) */}
               <button
                 onClick={() => {
                   setActiveTab('terminal');
-                  if (!rightPanelOpen) {
+                  if (rightPanelOpen && rightPanelView === 'room') {
                     toggleRightPanel();
+                  } else {
+                    if (!rightPanelOpen) toggleRightPanel();
+                    setRightPanelView('room');
                   }
-                  setRightPanelView('room');
                 }}
-                title="Agent Room Mesh (Ctrl+2)"
+                title={rightPanelOpen && rightPanelView === 'room' ? 'Close Room Panel (Ctrl+2)' : 'Open Agent Room Mesh (Ctrl+2)'}
                 className={`p-1 rounded transition-colors flex items-center gap-1 ${
                   rightPanelOpen && rightPanelView === 'room'
                     ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
@@ -407,23 +432,25 @@ export const App: React.FC = () => {
                 }`}
               >
                 <MessageSquare className="w-3.5 h-3.5" />
-                {roomMessages.length > 0 && (
+                {projectSessions.length > 0 && (
                   <span className="text-[10px] font-mono text-zinc-400 font-bold px-0.5">
-                    {roomMessages.length}
+                    {projectSessions.length}
                   </span>
                 )}
               </button>
 
-              {/* Files Explorer View */}
+              {/* Files Explorer View (Click to open, click again to close) */}
               <button
                 onClick={() => {
                   setActiveTab('terminal');
-                  if (!rightPanelOpen) {
+                  if (rightPanelOpen && rightPanelView === 'files') {
                     toggleRightPanel();
+                  } else {
+                    if (!rightPanelOpen) toggleRightPanel();
+                    setRightPanelView('files');
                   }
-                  setRightPanelView('files');
                 }}
-                title="Project File Tree (Ctrl+3)"
+                title={rightPanelOpen && rightPanelView === 'files' ? 'Close Files Panel (Ctrl+3)' : 'Open Project File Tree (Ctrl+3)'}
                 className={`p-1 rounded transition-colors ${
                   rightPanelOpen && rightPanelView === 'files'
                     ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
@@ -433,16 +460,18 @@ export const App: React.FC = () => {
                 <FolderTree className="w-3.5 h-3.5" />
               </button>
 
-              {/* Git Changes & Diff View */}
+              {/* Git Changes & Diff View (Click to open, click again to close) */}
               <button
                 onClick={() => {
                   setActiveTab('terminal');
-                  if (!rightPanelOpen) {
+                  if (rightPanelOpen && rightPanelView === 'changes') {
                     toggleRightPanel();
+                  } else {
+                    if (!rightPanelOpen) toggleRightPanel();
+                    setRightPanelView('changes');
                   }
-                  setRightPanelView('changes');
                 }}
-                title="Git Changes & Diff (Ctrl+4)"
+                title={rightPanelOpen && rightPanelView === 'changes' ? 'Close Diff Panel (Ctrl+4)' : 'Open Git Changes & Diff (Ctrl+4)'}
                 className={`p-1 rounded transition-colors flex items-center gap-1 ${
                   rightPanelOpen && rightPanelView === 'changes'
                     ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
@@ -585,11 +614,16 @@ export const App: React.FC = () => {
 
               {/* Right Panel Content View */}
               <div className="flex-1 flex flex-col h-full overflow-hidden">
-                {rightPanelView === 'room' && <AgentRoomPane onOpenDelegateModal={() => setIsDelegateModalOpen(true)} />}
-                {rightPanelView === 'files' && <ExplorerPane sidebarOnly />}
+                {rightPanelView === 'room' && (
+                  <AgentRoomPane
+                    onOpenDelegateModal={() => setIsDelegateModalOpen(true)}
+                    onClose={toggleRightPanel}
+                  />
+                )}
+                {rightPanelView === 'files' && <ExplorerPane sidebarOnly onClose={toggleRightPanel} />}
                 {rightPanelView === 'changes' && (
                   <div className="flex-1 flex flex-col h-full overflow-hidden">
-                    <DiffViewer />
+                    <DiffViewer onClose={toggleRightPanel} />
                     <MergeBar />
                   </div>
                 )}

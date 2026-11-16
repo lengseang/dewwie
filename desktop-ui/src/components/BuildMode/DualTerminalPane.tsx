@@ -25,6 +25,8 @@ export const DualTerminalPane: React.FC = () => {
   const rightTermRef = useRef<Terminal | null>(null);
   const leftFitRef = useRef<FitAddon | null>(null);
   const rightFitRef = useRef<FitAddon | null>(null);
+  const lastLeftWsId = useRef<string | null>(null);
+  const lastRightWsId = useRef<string | null>(null);
 
   const activeWs = activeWorkspaceId ? workspaces[activeWorkspaceId] : null;
 
@@ -34,7 +36,7 @@ export const DualTerminalPane: React.FC = () => {
 
   // Helper: Setup real PTY WebSocket connection for an xterm instance
   const attachPty = useCallback(async (container: HTMLDivElement | null, workspaceId: string, isLeft: boolean) => {
-    if (!container) return;
+    if (!container || !workspaceId) return;
     container.innerHTML = ''; // Ensure clean container with zero duplicate DOM artifacts
 
     const currentThemeDef = THEMES_CONFIG[theme] || THEMES_CONFIG.zinc;
@@ -54,25 +56,25 @@ export const DualTerminalPane: React.FC = () => {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(container);
-    fit.fit();
-    term.focus();
+
+    requestAnimationFrame(() => {
+      try {
+        fit.fit();
+        term.focus();
+      } catch (_) {}
+    });
 
     if (isLeft) {
       leftTermRef.current = term;
       leftFitRef.current = fit;
+      lastLeftWsId.current = workspaceId;
     } else {
       rightTermRef.current = term;
       rightFitRef.current = fit;
+      lastRightWsId.current = workspaceId;
     }
 
-    let targetPort = 7501;
-    if (typeof window !== 'undefined' && window.swarmherdNative?.getWsPort) {
-      try {
-        targetPort = await window.swarmherdNative.getWsPort();
-      } catch (_) {}
-    } else if (typeof window !== 'undefined' && window.swarmherdNative?.wsPort) {
-      targetPort = window.swarmherdNative.wsPort;
-    }
+    const targetPort = (typeof window !== 'undefined' && window.swarmherdNative?.wsPort) || 7501;
 
     // Connect to native PTY WebSocket server
     const wsUrl = `ws://127.0.0.1:${targetPort}?workspaceId=${encodeURIComponent(workspaceId)}`;
@@ -81,10 +83,15 @@ export const DualTerminalPane: React.FC = () => {
 
     ws.onopen = () => {
       console.log(`[PTY Client] Connected live to ${workspaceId}`);
-      fit.fit();
-      term.focus();
-      // Send initial terminal geometry
-      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      setTimeout(() => {
+        try {
+          fit.fit();
+          term.focus();
+        } catch (_) {}
+        if (term.cols > 0 && term.rows > 0) {
+          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+        }
+      }, 20);
     };
 
     ws.onmessage = (event) => {
@@ -112,7 +119,7 @@ export const DualTerminalPane: React.FC = () => {
 
     // Handle resize
     term.onResize((size) => {
-      if (ws.readyState === WebSocket.OPEN) {
+      if (ws.readyState === WebSocket.OPEN && size.cols > 0 && size.rows > 0) {
         ws.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
       }
     });
@@ -122,21 +129,31 @@ export const DualTerminalPane: React.FC = () => {
     } else {
       rightWsRef.current = ws;
     }
-  }, []);
+  }, [theme]);
 
   useEffect(() => {
-    // Cleanup previous instances
-    leftWsRef.current?.close();
-    rightWsRef.current?.close();
-    leftTermRef.current?.dispose();
-    rightTermRef.current?.dispose();
-
-    if (activeWorkspaceId) {
+    // Only re-attach if workspace has actually changed
+    if (activeWorkspaceId && activeWorkspaceId !== lastLeftWsId.current) {
+      leftWsRef.current?.close();
+      leftTermRef.current?.dispose();
+      if (leftContainerRef.current) leftContainerRef.current.innerHTML = '';
+      attachPty(leftContainerRef.current, activeWorkspaceId, true);
+    } else if (!leftTermRef.current && activeWorkspaceId) {
       attachPty(leftContainerRef.current, activeWorkspaceId, true);
     }
 
     if (isSplitView && secondaryWs) {
-      attachPty(rightContainerRef.current, secondaryWs.id, false);
+      if (secondaryWs.id !== lastRightWsId.current || !rightTermRef.current) {
+        rightWsRef.current?.close();
+        rightTermRef.current?.dispose();
+        if (rightContainerRef.current) rightContainerRef.current.innerHTML = '';
+        attachPty(rightContainerRef.current, secondaryWs.id, false);
+      }
+    } else {
+      rightWsRef.current?.close();
+      rightTermRef.current?.dispose();
+      lastRightWsId.current = null;
+      if (rightContainerRef.current) rightContainerRef.current.innerHTML = '';
     }
 
     const handleResize = () => {
@@ -157,12 +174,6 @@ export const DualTerminalPane: React.FC = () => {
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', handleResize);
-      leftWsRef.current?.close();
-      rightWsRef.current?.close();
-      leftTermRef.current?.dispose();
-      rightTermRef.current?.dispose();
-      if (leftContainerRef.current) leftContainerRef.current.innerHTML = '';
-      if (rightContainerRef.current) rightContainerRef.current.innerHTML = '';
     };
   }, [activeWorkspaceId, isSplitView, isSplitView ? secondaryWs?.id : null, attachPty]);
 

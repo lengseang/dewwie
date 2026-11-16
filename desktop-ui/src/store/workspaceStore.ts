@@ -46,6 +46,12 @@ interface WorkspaceStore {
   setRightPanelView: (view: 'room' | 'files' | 'changes') => void;
 
   // Inter-Agent Room & Mesh
+  rooms: Array<{ id: string; name: string }>;
+  activeRoomId: string;
+  setActiveRoomId: (roomId: string) => void;
+  addRoom: (name: string) => string;
+  removeRoom: (id: string) => void;
+  setSessionRoom: (sessionId: string, roomId: string | null) => void;
   roomMessages: RoomMessage[];
   leadSessionId: string | null;
   postRoomMessage: (params: { content: string; target?: string; type?: RoomMessageType }) => Promise<void>;
@@ -207,7 +213,49 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     get().persistState();
   },
 
-  // Room & Inter-Agent Mesh
+  // Room & Inter-Agent Mesh Orchestration
+  rooms: [
+    { id: 'room-1', name: 'Room 1' },
+    { id: 'room-2', name: 'Room 2' },
+  ],
+  activeRoomId: 'room-1',
+  setActiveRoomId: (roomId) => set({ activeRoomId: roomId }),
+  addRoom: (name) => {
+    const newId = `room-${Date.now().toString(36)}`;
+    const newRoom = { id: newId, name: name.trim() || `Room ${get().rooms.length + 1}` };
+    set((s) => ({ rooms: [...s.rooms, newRoom], activeRoomId: newId }));
+    return newId;
+  },
+  removeRoom: (id) => {
+    set((s) => {
+      const filtered = s.rooms.filter((r) => r.id !== id);
+      const nextActive = s.activeRoomId === id ? (filtered[0]?.id || 'room-1') : s.activeRoomId;
+      const updatedWorkspaces = { ...s.workspaces };
+      Object.keys(updatedWorkspaces).forEach((wsId) => {
+        if (updatedWorkspaces[wsId].roomId === id) {
+          updatedWorkspaces[wsId] = { ...updatedWorkspaces[wsId], roomId: undefined };
+        }
+      });
+      return {
+        rooms: filtered.length > 0 ? filtered : [{ id: 'room-1', name: 'Room 1' }],
+        activeRoomId: nextActive,
+        workspaces: updatedWorkspaces,
+      };
+    });
+  },
+  setSessionRoom: (sessionId, roomId) => {
+    set((s) => {
+      const ws = s.workspaces[sessionId];
+      if (!ws) return s;
+      return {
+        workspaces: {
+          ...s.workspaces,
+          [sessionId]: { ...ws, roomId: roomId || undefined },
+        },
+      };
+    });
+    get().persistState();
+  },
   roomMessages: [],
   leadSessionId: 'ws-local-proj-dewwie',
 
@@ -297,7 +345,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
           const map: Record<string, WorkspaceState> = {};
           const order: string[] = [];
           for (const ws of nativeList) {
-            map[ws.id] = ws;
+            map[ws.id] = { ...ws, roomId: ws.roomId || 'room-1' };
             order.push(ws.id);
           }
           const currentActive = get().activeWorkspaceId;
@@ -416,14 +464,18 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
           agentType,
         });
         if (realSession) {
+          const sessionWithRoom: WorkspaceState = {
+            ...realSession,
+            roomId: realSession.roomId || get().activeRoomId || 'room-1',
+          };
           set((state) => ({
-            workspaces: { ...state.workspaces, [realSession.id]: realSession },
-            workspaceOrder: [realSession.id, ...state.workspaceOrder.filter((id) => id !== realSession.id)],
-            activeWorkspaceId: realSession.id,
+            workspaces: { ...state.workspaces, [sessionWithRoom.id]: sessionWithRoom },
+            workspaceOrder: [sessionWithRoom.id, ...state.workspaceOrder.filter((id) => id !== sessionWithRoom.id)],
+            activeWorkspaceId: sessionWithRoom.id,
             activeTab: 'terminal',
           }));
           get().persistState();
-          return realSession.id;
+          return sessionWithRoom.id;
         }
       } catch (err) {
         console.error('Failed to create native session:', err);

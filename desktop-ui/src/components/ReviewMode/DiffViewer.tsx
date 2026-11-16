@@ -10,6 +10,7 @@ import {
   Check,
   Copy,
   Binary,
+  X,
 } from 'lucide-react';
 
 function parseGitPatch(patch: string): DiffFile[] {
@@ -91,7 +92,7 @@ function parseGitPatch(patch: string): DiffFile[] {
   return files;
 }
 
-export const DiffViewer: React.FC = () => {
+export const DiffViewer: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
   const { activeWorkspaceId, workspaces, diffs, setWorkspaceDiffs } = useWorkspaceStore();
   const [viewMode, setViewMode] = useState<'unified' | 'split'>('unified');
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
@@ -197,33 +198,45 @@ export const DiffViewer: React.FC = () => {
           </span>
         </div>
 
-        {/* Right: View Mode Toggle */}
-        <div className="flex items-center bg-zinc-900/80 p-0.5 rounded border border-zinc-800">
-          <button
-            onClick={() => setViewMode('unified')}
-            title="Unified line-by-line view"
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono transition-colors ${
-              viewMode === 'unified'
-                ? 'bg-zinc-800 text-zinc-100 font-medium'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            <AlignLeft className="w-3 h-3" />
-            <span>Unified</span>
-          </button>
+        {/* Right: View Mode Toggle & Close Panel Button */}
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center bg-zinc-900/80 p-0.5 rounded border border-zinc-800">
+            <button
+              onClick={() => setViewMode('unified')}
+              title="Unified line-by-line view"
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                viewMode === 'unified'
+                  ? 'bg-zinc-800 text-zinc-100 font-medium'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <AlignLeft className="w-3 h-3" />
+              <span>Unified</span>
+            </button>
 
-          <button
-            onClick={() => setViewMode('split')}
-            title="Side-by-side split view"
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono transition-colors ${
-              viewMode === 'split'
-                ? 'bg-zinc-800 text-zinc-100 font-medium'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            <Columns2 className="w-3 h-3" />
-            <span>Split</span>
-          </button>
+            <button
+              onClick={() => setViewMode('split')}
+              title="Side-by-side split view"
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                viewMode === 'split'
+                  ? 'bg-zinc-800 text-zinc-100 font-medium'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <Columns2 className="w-3 h-3" />
+              <span>Split</span>
+            </button>
+          </div>
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              title="Close Diff Panel (Focus Fullscreen Terminal TUI)"
+              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

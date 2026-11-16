@@ -110,6 +110,7 @@ export interface WorkspaceState {
   repository?: string;
   parentId?: string; // Sub-agent hierarchy
   agentRole?: AgentRole; // 'lead' | 'worker' | 'reviewer'
+  roomId?: string; // Room mesh membership (e.g. 'room-1'). One session belongs to at most one room.
   agentType?: 'claude-code' | 'codex' | 'aider' | 'gemini' | 'custom' | 'shell';
   agentStatus: AgentStatus;
   metrics: WorkspaceMetrics;

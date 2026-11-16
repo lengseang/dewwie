@@ -31,6 +31,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     activeWorkspaceId,
     activeProjectId,
     setActiveWorkspace,
+    setActiveTab,
     setActiveProject,
     addProject,
     createSession,
@@ -261,7 +262,10 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                       return (
                         <div
                           key={ws.id}
-                          onClick={() => setActiveWorkspace(ws.id)}
+                          onClick={() => {
+                            setActiveWorkspace(ws.id);
+                            setActiveTab('terminal');
+                          }}
                           title={`${ws.name} (${ws.agentType || 'shell'})\nStatus: ${ws.agentStatus?.message || 'idle'}`}
                           className="relative flex items-center justify-center cursor-pointer py-0.5 group"
                         >
@@ -284,7 +288,10 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                     return (
                       <div
                         key={ws.id}
-                        onClick={() => setActiveWorkspace(ws.id)}
+                        onClick={() => {
+                          setActiveWorkspace(ws.id);
+                          setActiveTab('terminal');
+                        }}
                         className={`group relative flex items-center justify-between px-2 py-1 rounded cursor-pointer text-xs font-mono transition-all ${
                           isActive
                             ? 'bg-zinc-900 text-white font-medium border border-zinc-800 shadow-xs'
@@ -395,7 +402,10 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             return (
               <button
                 key={s.id}
-                onClick={() => setActiveWorkspace(s.id)}
+                onClick={() => {
+                  setActiveWorkspace(s.id);
+                  setActiveTab('terminal');
+                }}
                 title={`[${idx + 1}] ${s.name}\nState: ${state || 'idle'}\n${s.agentStatus?.message || ''}`}
                 className={`flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all ${
                   isActive

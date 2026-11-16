@@ -1,265 +1,125 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
-import { RoomMessageType, AgentRole } from '../types';
 import { getAgentIcon } from './AgentIcons';
 import {
   Users,
-  Send,
-  MessageSquare,
   ChevronDown,
-  Play,
   Check,
-  GitMerge,
-  AlertCircle,
   Plus,
-  ExternalLink,
   Crown,
   Zap,
   RotateCw,
   Terminal,
-  FolderGit2,
+  X,
+  ArrowRight,
+  MinusCircle,
 } from 'lucide-react';
 
 interface AgentRoomPaneProps {
   onOpenDelegateModal?: () => void;
+  onClose?: () => void;
 }
 
-export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModal }) => {
+export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModal, onClose }) => {
   const {
+    rooms,
+    activeRoomId,
+    setActiveRoomId,
+    addRoom,
+    removeRoom,
+    setSessionRoom,
     workspaces,
     activeWorkspaceId,
     activeProjectId,
     projects,
-    roomMessages,
     leadSessionId,
-    postRoomMessage,
     setSessionRole,
-    runWorktreeTests,
-    mergeWorktree,
     setActiveWorkspace,
+    setActiveTab,
     createSession,
-    sendTerminalInput,
     syncMeshSkills,
+    toggleRightPanel,
   } = useWorkspaceStore();
 
-  const [inputContent, setInputContent] = useState('');
-  const [selectedTarget, setSelectedTarget] = useState<string>('@all');
-  const [selectedType, setSelectedType] = useState<RoomMessageType>('chat');
-  const [injectToStdin, setInjectToStdin] = useState(true);
-  const [isSending, setIsSending] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [isNewRoomPromptOpen, setIsNewRoomPromptOpen] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
   const [syncMessage, setSyncMessage] = useState('');
-  const [sentFeedback, setSentFeedback] = useState<Record<string, boolean>>({});
-  const [testStates, setTestStates] = useState<Record<string, { running: boolean; success?: boolean; output?: string }>>({});
-  const [mergeStates, setMergeStates] = useState<Record<string, { merging: boolean; success?: boolean; message?: string }>>({});
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const currentProject = activeProjectId ? projects[activeProjectId] : Object.values(projects)[0];
+  const allSessions = Object.values(workspaces);
 
-  // Filter sessions belonging to active project
-  const projectSessions = Object.values(workspaces).filter(
-    (w) => !activeProjectId || w.projectId === activeProjectId || w.repository === currentProject?.name
-  );
-
-  // Auto-scroll messages to bottom
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [roomMessages]);
-
-  const handleSend = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputContent.trim()) return;
-
-    setIsSending(true);
-    const content = inputContent.trim();
-    try {
-      await postRoomMessage({
-        content,
-        target: selectedTarget,
-        type: selectedType,
-      });
-
-      // If Inject to Terminal is checked and target is a specific session, also feed stdin!
-      if (injectToStdin && selectedTarget !== '@all') {
-        const targetClean = selectedTarget.replace('@', '').toLowerCase();
-        const matched = projectSessions.find(
-          (w) => w.name.toLowerCase() === targetClean || w.branch?.toLowerCase() === targetClean || w.id === targetClean
-        );
-        if (matched) {
-          await sendTerminalInput(matched.id, content);
-        }
-      }
-
-      setInputContent('');
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleQuickPrompt = (target: string, type: RoomMessageType, text: string) => {
-    setSelectedTarget(target);
-    setSelectedType(type);
-    setInputContent(text);
-  };
-
-  const handleToggleLead = (sessionId: string, currentRole?: AgentRole) => {
-    const newRole: AgentRole = currentRole === 'lead' ? 'worker' : 'lead';
-    setSessionRole(sessionId, newRole);
-  };
-
-  const handleAddAgent = async (agentType: string, isWorktree = false) => {
-    setIsAddMenuOpen(false);
-    if (isWorktree) {
-      onOpenDelegateModal?.();
-      return;
-    }
-    const targetProjId = activeProjectId || currentProject?.id;
-    const newId = await createSession({
-      projectId: targetProjId,
-      name: `${agentType === 'terminal' ? 'Terminal' : agentType === 'claude-code' ? 'Claude' : 'Antigravity'} ${projectSessions.length + 1}`,
-      sessionMode: 'local',
-      agentType,
-    });
-    if (newId) {
-      setActiveWorkspace(newId);
-      // Announce new agent in room
-      await postRoomMessage({
-        content: `New session created with agent [${agentType}] and joined the room.`,
-        target: '@all',
-        type: 'status_update',
-      });
-    }
-  };
+  // Filter sessions that belong to the active room
+  const currentRoomId = activeRoomId || rooms[0]?.id || 'room-1';
+  const roomSessions = allSessions.filter((w) => (w.roomId || 'room-1') === currentRoomId);
+  const availableSessions = allSessions.filter((w) => (w.roomId || 'room-1') !== currentRoomId);
 
   const handleSyncSkills = async () => {
     setSyncStatus('syncing');
+    setSyncMessage('Injecting Dewwie protocols & rules...');
     try {
       const res = await syncMeshSkills(currentProject?.rootPath);
       if (res.success) {
         setSyncStatus('synced');
-        setSyncMessage('✔ Skills & protocols synced');
-        setTimeout(() => setSyncStatus('idle'), 3500);
+        setSyncMessage(res.message);
+        setTimeout(() => setSyncStatus('idle'), 3000);
       } else {
         setSyncStatus('error');
         setSyncMessage(res.message);
-        setTimeout(() => setSyncStatus('idle'), 3500);
+        setTimeout(() => setSyncStatus('idle'), 4000);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setSyncStatus('error');
-      setSyncMessage(err?.message || 'Sync failed');
-      setTimeout(() => setSyncStatus('idle'), 3500);
+      setSyncMessage(err instanceof Error ? err.message : 'Skill synchronization failed');
+      setTimeout(() => setSyncStatus('idle'), 4000);
     }
   };
 
-  const handleSendToTerminal = async (msgId: string, targetSession: any, text: string) => {
-    if (!targetSession?.id || !text) return;
-    setSentFeedback((prev) => ({ ...prev, [msgId]: true }));
-    await sendTerminalInput(targetSession.id, text);
-    setTimeout(() => {
-      setSentFeedback((prev) => ({ ...prev, [msgId]: false }));
-    }, 2000);
+  const handleCreateRoom = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRoomName.trim()) return;
+    addRoom(newRoomName.trim());
+    setNewRoomName('');
+    setIsNewRoomPromptOpen(false);
   };
 
-  const handleRunTests = async (msgId: string, ws: any) => {
-    setTestStates((prev) => ({ ...prev, [msgId]: { running: true } }));
-    try {
-      const res = await runWorktreeTests({
-        worktreePath: ws.worktreePath,
-        repo: ws.repository,
-      });
-      setTestStates((prev) => ({
-        ...prev,
-        [msgId]: { running: false, success: res.success, output: res.output },
-      }));
-    } catch (err: any) {
-      setTestStates((prev) => ({
-        ...prev,
-        [msgId]: { running: false, success: false, output: err?.message || 'Test execution failed' },
-      }));
+  const handleSpawnAgentIntoRoom = async (agentType: string) => {
+    setIsAddMenuOpen(false);
+    const targetProjId = activeProjectId || currentProject?.id;
+    const newId = await createSession({
+      projectId: targetProjId,
+      name: `${agentType === 'terminal' ? 'terminal' : agentType} ${allSessions.length + 1}`,
+      sessionMode: 'local',
+      agentType,
+    });
+    if (newId) {
+      setSessionRoom(newId, currentRoomId);
+      setActiveWorkspace(newId);
+      setActiveTab('terminal');
     }
   };
 
-  const handleMerge = async (msgId: string, ws: any) => {
-    setMergeStates((prev) => ({ ...prev, [msgId]: { merging: true } }));
-    try {
-      const res = await mergeWorktree(ws.id, `feat: merge ${ws.branch} verified by autonomous quality gate`);
-      setMergeStates((prev) => ({
-        ...prev,
-        [msgId]: { merging: false, success: res.success, message: res.message },
-      }));
-      if (res.success) {
-        await postRoomMessage({
-          content: `Merged @${ws.name} into main. Quality gate passed.`,
-          target: '@all',
-          type: 'status_update',
-        });
-      }
-    } catch (err: any) {
-      setMergeStates((prev) => ({
-        ...prev,
-        [msgId]: { merging: false, success: false, message: err?.message || 'Merge failed' },
-      }));
-    }
+  const handleAddExistingSession = (sessionId: string) => {
+    setSessionRoom(sessionId, currentRoomId);
+    setIsAddMenuOpen(false);
   };
 
-  const getAgentVisual = (fromName: string, role?: string) => {
-    const lower = fromName.toLowerCase();
-    if (role === 'lead' || lower.includes('lead') || lower.includes('main')) {
-      return {
-        label: 'LEAD',
-        border: 'border-amber-600/60',
-        text: 'text-amber-400',
-        bg: 'bg-amber-950/40',
-        icon: <Crown className="w-3.5 h-3.5 text-amber-400" />,
-      };
-    }
-    if (lower.includes('claude')) {
-      return {
-        label: 'CLAUDE',
-        border: 'border-orange-600/60',
-        text: 'text-orange-400',
-        bg: 'bg-orange-950/40',
-        icon: getAgentIcon('claude-code', 'w-3.5 h-3.5'),
-      };
-    }
-    if (lower.includes('antigravity') || lower.includes('agy')) {
-      return {
-        label: 'ANTIGRAVITY',
-        border: 'border-cyan-600/60',
-        text: 'text-cyan-400',
-        bg: 'bg-cyan-950/40',
-        icon: getAgentIcon('antigravity', 'w-3.5 h-3.5'),
-      };
-    }
-    if (lower.includes('human') || role === 'human') {
-      return {
-        label: 'HUMAN',
-        border: 'border-emerald-600/60',
-        text: 'text-emerald-400',
-        bg: 'bg-emerald-950/40',
-        icon: <span className="w-2 h-2 rounded-full bg-emerald-400" />,
-      };
-    }
-    return {
-      label: 'AGENT',
-      border: 'border-zinc-700',
-      text: 'text-zinc-300',
-      bg: 'bg-zinc-900',
-      icon: <Terminal className="w-3.5 h-3.5 text-zinc-400" />,
-    };
+  const handleFocusSession = (sessionId: string) => {
+    setActiveWorkspace(sessionId);
+    setActiveTab('terminal');
   };
 
-  const getTypeStyle = (type?: RoomMessageType) => {
-    switch (type) {
-      case 'task_delegate':
-        return 'bg-purple-950/70 text-purple-300 border-purple-800/80';
-      case 'review_request':
-        return 'bg-amber-950/70 text-amber-300 border-amber-800/80';
-      case 'status_update':
-        return 'bg-emerald-950/70 text-emerald-300 border-emerald-800/80';
-      default:
-        return 'bg-zinc-900 text-zinc-400 border-zinc-800';
+  const handleRemoveFromRoom = (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    setSessionRoom(sessionId, null);
+  };
+
+  const handleClosePane = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      toggleRightPanel();
     }
   };
 
@@ -268,28 +128,64 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
       style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text)' }}
       className="flex-1 flex flex-col h-full overflow-hidden font-mono select-none"
     >
-      {/* 1. Top Header Bar: Room Title, 1-Click Sync Skills, and 1-Click + Add Agent */}
+      {/* 1. Header: Rooms Navigation Bar + Sync + Add Agent + Fullscreen TUI Close Button */}
       <div
         style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
-        className="h-9 px-3 border-b flex items-center justify-between gap-2 shrink-0"
+        className="h-9 px-2 border-b flex items-center justify-between gap-1.5 shrink-0"
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <MessageSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-          <span className="text-xs font-bold text-zinc-100 tracking-wider uppercase truncate">
-            Agent Room Mesh
-          </span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 shrink-0">
-            {projectSessions.length} sessions
-          </span>
+        {/* Left: Room Switcher Tabs */}
+        <div className="flex items-center gap-1 min-w-0 overflow-x-auto no-scrollbar">
+          {rooms.map((r) => {
+            const isRoomActive = r.id === currentRoomId;
+            const count = allSessions.filter((s) => (s.roomId || 'room-1') === r.id).length;
+
+            return (
+              <div
+                key={r.id}
+                onClick={() => setActiveRoomId(r.id)}
+                className={`group flex items-center gap-1 px-2 py-0.5 rounded text-[11px] cursor-pointer transition-colors shrink-0 ${
+                  isRoomActive
+                    ? 'bg-zinc-800 text-zinc-100 font-semibold border border-zinc-700 shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/60 border border-transparent'
+                }`}
+              >
+                <span>{r.name}</span>
+                <span className="text-[10px] text-zinc-500 font-normal">({count})</span>
+
+                {rooms.length > 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeRoom(r.id);
+                    }}
+                    title="Delete Room"
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 ml-0.5 transition-opacity"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Add Room Tab Button */}
+          <button
+            onClick={() => setIsNewRoomPromptOpen(true)}
+            title="Create New Multi-Agent Room"
+            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 border border-transparent hover:border-zinc-700 transition-colors shrink-0"
+          >
+            <Plus className="w-3 h-3" />
+          </button>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* 1-Click Sync Skills & Protocols Button */}
+        {/* Right Actions: Sync Skills + Add Session + Close Panel */}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Sync Skills Button */}
           <button
             onClick={handleSyncSkills}
             disabled={syncStatus === 'syncing'}
-            title={syncMessage || "Inject Dewwie room protocol, CLAUDE.md, and .gemini rules into project"}
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border transition-colors ${
+            title={syncMessage || 'Inject Dewwie room protocol, CLAUDE.md, and .gemini rules into project'}
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors ${
               syncStatus === 'synced'
                 ? 'bg-emerald-950/80 border-emerald-800 text-emerald-300'
                 : syncStatus === 'error'
@@ -298,415 +194,316 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
             }`}
           >
             {syncStatus === 'syncing' ? (
-              <RotateCw className="w-3 h-3 text-zinc-400 animate-spin" />
+              <RotateCw className="w-2.5 h-2.5 text-zinc-400 animate-spin" />
             ) : syncStatus === 'synced' ? (
-              <Check className="w-3 h-3 text-emerald-400" />
+              <Check className="w-2.5 h-2.5 text-emerald-400" />
             ) : (
-              <Zap className="w-3 h-3 text-amber-400" />
+              <Zap className="w-2.5 h-2.5 text-zinc-400" />
             )}
-            <span>{syncStatus === 'synced' ? 'Skills Synced' : 'Sync Skills'}</span>
+            <span className="hidden sm:inline">{syncStatus === 'synced' ? 'Synced' : 'Sync'}</span>
           </button>
 
-          {/* 1-Click + Add Session Dropdown */}
+          {/* + Add Agent / Session Dropdown */}
           <div className="relative">
             <button
               onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-800 active:scale-[0.98] transition-colors"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-800 transition-colors"
             >
               <Plus className="w-3 h-3 text-zinc-400" />
-              <span>Add Agent</span>
+              <span>Add</span>
               <ChevronDown className="w-2.5 h-2.5 text-zinc-500" />
             </button>
 
             {isAddMenuOpen && (
               <div
-                className="absolute right-0 top-7 w-48 bg-zinc-950 border border-zinc-800 rounded shadow-xl py-1 z-50 text-xs font-mono"
+                className="absolute right-0 top-7 w-56 bg-zinc-950 border border-zinc-800 rounded shadow-xl py-1 z-50 text-xs font-mono"
                 onMouseLeave={() => setIsAddMenuOpen(false)}
               >
-                <div className="px-2 py-1 text-[10px] text-zinc-500 uppercase tracking-wider font-semibold border-b border-zinc-900">
-                  Spawn Agent CLI
+                {/* Section A: Move Existing Session to this Room */}
+                {availableSessions.length > 0 && (
+                  <>
+                    <div className="px-2.5 py-1 text-[9px] text-zinc-500 uppercase tracking-wider font-semibold border-b border-zinc-900">
+                      Add Existing Session
+                    </div>
+                    <div className="max-h-32 overflow-y-auto no-scrollbar py-0.5">
+                      {availableSessions.map((s) => (
+                        <button
+                          key={s.id}
+                          onClick={() => handleAddExistingSession(s.id)}
+                          className="w-full px-2.5 py-1 flex items-center justify-between hover:bg-zinc-900 text-left text-zinc-300 hover:text-white transition-colors"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            {getAgentIcon(s.agentType, 'w-3 h-3 shrink-0')}
+                            <span className="truncate text-[11px]">{s.name}</span>
+                          </div>
+                          <span className="text-[9px] text-zinc-600 font-mono shrink-0 ml-1">
+                            {s.roomId || 'unassigned'}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="h-px bg-zinc-800/80 my-1" />
+                  </>
+                )}
+
+                {/* Section B: Spawn New Agent Directly Into This Room */}
+                <div className="px-2.5 py-1 text-[9px] text-zinc-500 uppercase tracking-wider font-semibold border-b border-zinc-900">
+                  Spawn Agent into Room
                 </div>
                 <button
-                  onClick={() => handleAddAgent('claude-code')}
-                  className="w-full px-2.5 py-1.5 flex items-center gap-2 hover:bg-zinc-900 text-left text-zinc-200 hover:text-white"
+                  onClick={() => handleSpawnAgentIntoRoom('claude-code')}
+                  className="w-full px-2.5 py-1.5 flex items-center gap-2 hover:bg-zinc-900 text-left text-zinc-200 hover:text-white transition-colors"
                 >
                   {getAgentIcon('claude-code', 'w-3.5 h-3.5')}
                   <span>Claude Code</span>
                 </button>
                 <button
-                  onClick={() => handleAddAgent('antigravity')}
-                  className="w-full px-2.5 py-1.5 flex items-center gap-2 hover:bg-zinc-900 text-left text-zinc-200 hover:text-white"
+                  onClick={() => handleSpawnAgentIntoRoom('antigravity')}
+                  className="w-full px-2.5 py-1.5 flex items-center gap-2 hover:bg-zinc-900 text-left text-zinc-200 hover:text-white transition-colors"
                 >
                   {getAgentIcon('antigravity', 'w-3.5 h-3.5')}
                   <span>Google Antigravity</span>
                 </button>
                 <button
-                  onClick={() => handleAddAgent('terminal')}
-                  className="w-full px-2.5 py-1.5 flex items-center gap-2 hover:bg-zinc-900 text-left text-zinc-200 hover:text-white"
+                  onClick={() => handleSpawnAgentIntoRoom('gemini')}
+                  className="w-full px-2.5 py-1.5 flex items-center gap-2 hover:bg-zinc-900 text-left text-zinc-200 hover:text-white transition-colors"
+                >
+                  {getAgentIcon('gemini', 'w-3.5 h-3.5')}
+                  <span>Gemini</span>
+                </button>
+                <button
+                  onClick={() => handleSpawnAgentIntoRoom('terminal')}
+                  className="w-full px-2.5 py-1.5 flex items-center gap-2 hover:bg-zinc-900 text-left text-zinc-200 hover:text-white transition-colors"
                 >
                   <Terminal className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Shell Terminal</span>
                 </button>
-                {currentProject?.isGitRepo && (
-                  <button
-                    onClick={() => handleAddAgent('claude-code', true)}
-                    className="w-full px-2.5 py-1.5 flex items-center gap-2 hover:bg-zinc-900 text-left text-zinc-200 hover:text-white border-t border-zinc-900"
-                  >
-                    <FolderGit2 className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>New Worktree Branch...</span>
-                  </button>
+                {onOpenDelegateModal && (
+                  <>
+                    <div className="h-px bg-zinc-800/80 my-1" />
+                    <button
+                      onClick={() => {
+                        setIsAddMenuOpen(false);
+                        onOpenDelegateModal();
+                      }}
+                      className="w-full px-2.5 py-1.5 flex items-center gap-2 hover:bg-zinc-900 text-left text-zinc-300 hover:text-white transition-colors"
+                    >
+                      <Users className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Delegate Task to Worktree...</span>
+                    </button>
+                  </>
                 )}
               </div>
             )}
           </div>
+
+          {/* Close Panel Button (Full Screen TUI) */}
+          <button
+            onClick={handleClosePane}
+            title="Close Panel (Focus Fullscreen Terminal TUI)"
+            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
-      {/* 2. Active Agents Roster Strip */}
-      <div
-        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
-        className="px-3 py-1.5 border-b flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0"
-      >
-        <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider shrink-0 mr-1">
-          Roster:
-        </span>
-        {projectSessions.map((ws, sIdx) => {
-          const isLead = ws.agentRole === 'lead' || ws.id === leadSessionId;
-          const isCurrentActive = ws.id === activeWorkspaceId;
-          const visual = getAgentVisual(ws.name, ws.agentRole);
-
-          return (
-            <div
-              key={ws.id}
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono transition-colors border shrink-0 ${
-                isCurrentActive
-                  ? 'bg-zinc-900 text-zinc-100 border-zinc-700 shadow-xs'
-                  : 'bg-zinc-950/80 text-zinc-400 border-zinc-800/80 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
+      {/* 2. New Room Modal Form */}
+      {isNewRoomPromptOpen && (
+        <div className="p-2 border-b border-zinc-800 bg-zinc-950/80">
+          <form onSubmit={handleCreateRoom} className="flex items-center gap-1.5">
+            <input
+              autoFocus
+              type="text"
+              placeholder="Room name (e.g. Backend Mesh, Code Review)..."
+              value={newRoomName}
+              onChange={(e) => setNewRoomName(e.target.value)}
+              className="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-xs text-zinc-100 focus:outline-none focus:border-zinc-500"
+            />
+            <button
+              type="submit"
+              className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium"
             >
-              <button
-                onClick={() => setActiveWorkspace(ws.id)}
-                title={`Jump to session: ${ws.name} (${ws.agentType || 'shell'})`}
-                className="flex items-center gap-1.5 hover:underline"
-              >
-                {visual.icon}
-                <span className="font-semibold text-zinc-200">{sIdx + 1}.</span>
-                <span className="truncate max-w-[100px]">{ws.name}</span>
-              </button>
+              Create
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsNewRoomPromptOpen(false)}
+              className="p-1 text-zinc-500 hover:text-zinc-300"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </form>
+        </div>
+      )}
 
-              {/* Lead Toggle Badge */}
+      {/* 3. Room Sessions Grid / Cards Stack */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+        {roomSessions.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center p-6 text-center text-zinc-500">
+            <Users className="w-8 h-8 text-zinc-700 mb-2" />
+            <p className="text-xs font-semibold text-zinc-300 mb-1">No Agents in this Room</p>
+            <p className="text-[11px] text-zinc-500 max-w-xs mb-4">
+              Add sessions to this room to collaborate in parallel. Each session belongs to one room.
+            </p>
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => handleToggleLead(ws.id, ws.agentRole)}
-                title={isLead ? 'Session is Lead Agent (click to demote)' : 'Promote session to Lead Agent'}
-                className={`p-0.5 rounded transition-colors ${
-                  isLead
-                    ? 'text-amber-400 hover:bg-amber-950/60'
-                    : 'text-zinc-600 hover:text-amber-400 hover:bg-zinc-800'
-                }`}
+                onClick={() => setIsAddMenuOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-medium transition-colors"
               >
-                <Crown className={`w-3 h-3 ${isLead ? 'fill-amber-400/30' : ''}`} />
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Session to Room</span>
               </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* 3. Messages Stream */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-        {roomMessages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-6 text-zinc-500 space-y-3">
-            <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800">
-              <Users className="w-4 h-4 text-zinc-400" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-zinc-300">Room Mesh Ready</p>
-              <p className="text-[11px] text-zinc-500 max-w-xs mt-1">
-                Claude Code, Google Antigravity, and Terminal Shells broadcast and hand off tasks here in real-time.
-              </p>
             </div>
           </div>
         ) : (
-          roomMessages.map((msg) => {
-            const visual = getAgentVisual(msg.fromSessionName, msg.fromRole);
-            const typeStyle = getTypeStyle(msg.type);
-
-            // Match target workspace
-            const targetClean = msg.target?.replace('@', '').toLowerCase();
-            const targetWs = projectSessions.find(
-              (w) =>
-                w.name.toLowerCase() === targetClean ||
-                w.branch?.toLowerCase() === targetClean ||
-                w.id.toLowerCase() === targetClean ||
-                (targetClean === 'lead' && (w.agentRole === 'lead' || w.id === leadSessionId))
-            );
-
-            const testState = testStates[msg.id];
-            const mergeState = mergeStates[msg.id];
-            const isSent = sentFeedback[msg.id];
+          roomSessions.map((ws, idx) => {
+            const isActive = activeWorkspaceId === ws.id;
+            const isLead = ws.agentRole === 'lead' || ws.id === leadSessionId;
+            const state = ws.agentStatus?.state;
+            const isWorking = state === 'working';
+            const isError = state === 'blocked' && !!ws.agentStatus?.message?.toLowerCase().includes('err');
+            const isBlocked = state === 'blocked' && !isError;
+            const isDone = state === 'done';
 
             return (
               <div
-                key={msg.id}
-                className="p-3 rounded border border-zinc-800/80 bg-zinc-950/80 hover:bg-zinc-900/40 hover:border-zinc-700/80 transition-all text-xs space-y-2 shadow-xs"
+                key={ws.id}
+                onClick={() => handleFocusSession(ws.id)}
+                className={`group relative rounded-lg border p-3 transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-zinc-900/90 border-zinc-600 ring-1 ring-zinc-500 shadow-sm'
+                    : 'bg-zinc-950/60 hover:bg-zinc-900/40 border-zinc-800/80 hover:border-zinc-700'
+                }`}
               >
-                {/* Meta Header */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {/* Agent Avatar Badge */}
-                    <span
-                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border ${visual.border} ${visual.bg} ${visual.text}`}
-                    >
-                      {visual.icon}
-                      <span>{visual.label}</span>
+                {/* Header Row: Agent Icon + Session Name + Status & Role */}
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {getAgentIcon(ws.agentType, 'w-4 h-4 shrink-0')}
+                    <span className="font-semibold text-xs text-zinc-100 truncate">
+                      {ws.name}
                     </span>
-
-                    <span className="font-semibold text-zinc-200 truncate">
-                      {msg.fromSessionName}
-                    </span>
-
-                    <span className="text-zinc-600 font-sans">→</span>
-
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-900 text-zinc-300 border border-zinc-800">
-                      {msg.target}
-                    </span>
-
-                    {msg.type && (
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-wider border ${typeStyle}`}>
-                        {msg.type.replace('_', ' ')}
-                      </span>
-                    )}
+                    <span className="text-[10px] text-zinc-500 font-mono">#{idx + 1}</span>
                   </div>
 
-                  <span className="text-[10px] text-zinc-500 shrink-0 font-mono">
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Active in Left Terminal Indicator Badge */}
+                    {isActive && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-zinc-800 border border-zinc-700 text-zinc-200">
+                        Active Terminal
+                      </span>
+                    )}
+
+                    {/* Lead Role Badge */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSessionRole(ws.id, isLead ? 'worker' : 'lead');
+                      }}
+                      title={isLead ? 'Session is Room Lead (Click to demote)' : 'Click to promote to Lead'}
+                      className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-semibold border transition-colors ${
+                        isLead
+                          ? 'bg-amber-950/60 border-amber-700/80 text-amber-300'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      <Crown className="w-2.5 h-2.5" />
+                      <span>{isLead ? 'LEAD' : 'WORKER'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status Message Line */}
+                <div className="flex items-center gap-2 text-xs mb-2">
+                  <div className="shrink-0">
+                    {isWorking ? (
+                      <RotateCw className="w-3 h-3 text-zinc-300 animate-spin" />
+                    ) : isError ? (
+                      <span className="w-3 h-3 rounded-full bg-rose-500/20 text-rose-400 font-bold inline-flex items-center justify-center text-[10px]">
+                        !
+                      </span>
+                    ) : isBlocked ? (
+                      <span className="w-3 h-3 rounded-full bg-amber-500/20 text-amber-400 font-bold inline-flex items-center justify-center text-[10px]">
+                        ?
+                      </span>
+                    ) : isDone ? (
+                      <Check className="w-3 h-3 text-emerald-400" />
+                    ) : (
+                      <span className="text-zinc-600 font-mono text-xs">~</span>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-zinc-300 truncate">
+                    {ws.agentStatus?.message || 'Idle in room'}
                   </span>
                 </div>
 
-                {/* Content */}
-                <div className="text-[11px] leading-relaxed break-words whitespace-pre-wrap text-zinc-200 pl-1 font-mono bg-zinc-900/30 p-2 rounded border border-zinc-800/40">
-                  {msg.content}
+                {/* Metadata & Diff Info */}
+                <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono border-t border-zinc-900 pt-2">
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="truncate">{ws.projectName || ws.repository}</span>
+                    {ws.branch && ws.sessionMode === 'branch' && (
+                      <>
+                        <span>•</span>
+                        <span className="text-zinc-400 truncate">{ws.branch}</span>
+                      </>
+                    )}
+                  </div>
+
+                  {ws.diffSummary && (ws.diffSummary.additions > 0 || ws.diffSummary.deletions > 0) && (
+                    <span className="shrink-0">
+                      <span className="text-emerald-400">+{ws.diffSummary.additions}</span>{' '}
+                      <span className="text-rose-400">-{ws.diffSummary.deletions}</span>
+                    </span>
+                  )}
                 </div>
 
-                {/* Interactive Action Strip on Message Card */}
-                <div className="pt-1.5 flex flex-wrap items-center gap-1.5">
-                  {/* Direct Stdin Injection: Send to Terminal */}
-                  {targetWs && (
-                    <button
-                      onClick={() => handleSendToTerminal(msg.id, targetWs, msg.content)}
-                      title={`Write this prompt/task directly to @${targetWs.name}'s running terminal stdin`}
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border transition-colors ${
-                        isSent
-                          ? 'bg-emerald-950/80 border-emerald-800 text-emerald-300'
-                          : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white'
-                      }`}
-                    >
-                      {isSent ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Zap className="w-2.5 h-2.5 text-amber-400" />}
-                      <span>{isSent ? 'Sent to Terminal!' : '⚡ Send to Terminal'}</span>
-                    </button>
-                  )}
+                {/* Card Action Controls */}
+                <div className="flex items-center justify-between gap-2 mt-2 pt-1 border-t border-zinc-900/60">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleFocusSession(ws.id);
+                    }}
+                    title="Focus this session in the left terminal pane"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors"
+                  >
+                    <ArrowRight className="w-2.5 h-2.5" />
+                    <span>Focus Terminal</span>
+                  </button>
 
-                  {/* Jump to Workspace */}
-                  {targetWs && (
-                    <button
-                      onClick={() => setActiveWorkspace(targetWs.id)}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-                      title="Switch active tab to this agent workspace"
-                    >
-                      <ExternalLink className="w-2.5 h-2.5 text-zinc-500" />
-                      <span>Focus Tab</span>
-                    </button>
-                  )}
-
-                  {/* Run Tests Quality Gate */}
-                  {targetWs && targetWs.sessionMode === 'branch' && (
-                    <button
-                      onClick={() => handleRunTests(msg.id, targetWs)}
-                      disabled={testState?.running}
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border transition-colors ${
-                        testState?.success === true
-                          ? 'bg-zinc-800 border-zinc-700 text-zinc-200'
-                          : testState?.success === false
-                          ? 'bg-zinc-900 border-rose-900/60 text-rose-400'
-                          : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-zinc-100'
-                      }`}
-                    >
-                      {testState?.running ? (
-                        <>
-                          <span className="w-2.5 h-2.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
-                          <span>Testing...</span>
-                        </>
-                      ) : testState?.success === true ? (
-                        <>
-                          <Check className="w-2.5 h-2.5 text-zinc-300" />
-                          <span>Tests Passed</span>
-                        </>
-                      ) : testState?.success === false ? (
-                        <>
-                          <AlertCircle className="w-2.5 h-2.5 text-rose-400" />
-                          <span>Tests Failed</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-2.5 h-2.5 text-zinc-400" />
-                          <span>Run Tests</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  {/* 1-Click Fast-Forward Merge Gate */}
-                  {targetWs && targetWs.sessionMode === 'branch' && (
-                    <button
-                      onClick={() => handleMerge(msg.id, targetWs)}
-                      disabled={mergeState?.merging || mergeState?.success === true}
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border transition-colors ${
-                        mergeState?.success === true
-                          ? 'bg-zinc-800 border-zinc-700 text-zinc-400 cursor-default'
-                          : mergeState?.success === false
-                          ? 'bg-zinc-900 border-rose-900/60 text-rose-400'
-                          : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-200 hover:text-white'
-                      }`}
-                    >
-                      {mergeState?.merging ? (
-                        <>
-                          <span className="w-2.5 h-2.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
-                          <span>Merging...</span>
-                        </>
-                      ) : mergeState?.success === true ? (
-                        <>
-                          <Check className="w-2.5 h-2.5 text-zinc-400" />
-                          <span>Merged into main</span>
-                        </>
-                      ) : (
-                        <>
-                          <GitMerge className="w-2.5 h-2.5 text-zinc-400" />
-                          <span>1-Click Merge</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  {/* Test Failure Output */}
-                  {testState?.success === false && testState?.output && (
-                    <div className="w-full mt-1 p-2 bg-black/90 rounded border border-rose-950 text-[10px] font-mono text-rose-400 max-h-24 overflow-y-auto whitespace-pre-wrap">
-                      {testState.output}
-                    </div>
-                  )}
+                  <button
+                    onClick={(e) => handleRemoveFromRoom(e, ws.id)}
+                    title="Remove this session from current room"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-zinc-500 hover:text-rose-400 hover:bg-zinc-900 transition-colors"
+                  >
+                    <MinusCircle className="w-2.5 h-2.5" />
+                    <span>Leave Room</span>
+                  </button>
                 </div>
               </div>
             );
           })
         )}
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* 4. Quick Broadcast Preset Chips */}
+      {/* 4. Minimal Bottom Room Footer */}
       <div
         style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
-        className="px-3 py-1.5 border-t flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0"
+        className="h-7 px-3 border-t flex items-center justify-between text-[10px] font-mono text-zinc-500 shrink-0"
       >
-        <span className="text-[10px] text-zinc-500 shrink-0 uppercase font-semibold">Presets:</span>
+        <span>
+          {roomSessions.length} {roomSessions.length === 1 ? 'agent' : 'agents'} active in {rooms.find((r) => r.id === currentRoomId)?.name || 'Room'}
+        </span>
         <button
-          onClick={() => handleQuickPrompt('@all', 'chat', 'Status check: report your active tasks and test progress.')}
-          className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] text-zinc-300 hover:text-white transition-colors shrink-0"
+          onClick={handleClosePane}
+          className="text-zinc-500 hover:text-zinc-300 transition-colors"
+          title="Close room panel to work solely in fullscreen TUI"
         >
-          @all Status Check
-        </button>
-        <button
-          onClick={() => handleQuickPrompt('@lead', 'review_request', 'Ready for code review. Branch diffs are verified.')}
-          className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] text-zinc-300 hover:text-white transition-colors shrink-0"
-        >
-          @lead Review Diff
-        </button>
-        <button
-          onClick={() => handleQuickPrompt('@antigravity', 'task_delegate', 'Please run e2e verification and adversarial review.')}
-          className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] text-zinc-300 hover:text-white transition-colors shrink-0"
-        >
-          Claude ➔ Antigravity Handoff
-        </button>
-        <button
-          onClick={() => handleQuickPrompt('@all', 'task_delegate', 'Run full test suite and verify clean build.')}
-          className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] text-zinc-300 hover:text-white transition-colors shrink-0"
-        >
-          ⚡ Verify All
+          Close Panel (Fullscreen TUI)
         </button>
       </div>
-
-      {/* 5. Broadcaster / Input Form */}
-      <form
-        onSubmit={handleSend}
-        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
-        className="p-3 border-t shrink-0 space-y-2"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {/* Target Selector */}
-            <div className="relative">
-              <select
-                value={selectedTarget}
-                onChange={(e) => setSelectedTarget(e.target.value)}
-                className="appearance-none bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 pr-6 text-[11px] text-zinc-300 focus:outline-none focus:border-zinc-700 transition-colors font-mono"
-              >
-                <option value="@all">@all (Broadcast)</option>
-                <option value="@lead">@lead (Lead Agent)</option>
-                {projectSessions.map((ws) => (
-                  <option key={ws.id} value={`@${ws.name}`}>
-                    @{ws.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3 h-3 text-zinc-500 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-
-            {/* Type Selector */}
-            <div className="relative">
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value as RoomMessageType)}
-                className="appearance-none bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 pr-6 text-[11px] text-zinc-300 focus:outline-none focus:border-zinc-700 transition-colors font-mono"
-              >
-                <option value="chat">Chat</option>
-                <option value="task_delegate">Task Delegate</option>
-                <option value="status_update">Status Update</option>
-                <option value="review_request">Review Request</option>
-              </select>
-              <ChevronDown className="w-3 h-3 text-zinc-500 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Stdin Injection Toggle */}
-          <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={injectToStdin}
-              onChange={(e) => setInjectToStdin(e.target.checked)}
-              className="rounded bg-zinc-900 border-zinc-700 text-amber-500 focus:ring-0 focus:ring-offset-0"
-            />
-            <span className="text-zinc-300 font-medium">⚡ Send to Terminal Stdin</span>
-          </label>
-        </div>
-
-        {/* Text Input & Submit */}
-        <div className="flex items-center gap-1.5">
-          <input
-            type="text"
-            value={inputContent}
-            onChange={(e) => setInputContent(e.target.value)}
-            placeholder={`Message or instruct ${selectedTarget}...`}
-            className="flex-1 px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-700 transition-colors font-mono"
-          />
-
-          <button
-            type="submit"
-            disabled={!inputContent.trim() || isSending}
-            className="px-3 py-1.5 rounded bg-zinc-100 hover:bg-white text-zinc-950 font-bold disabled:opacity-40 transition-all shrink-0 inline-flex items-center gap-1.5 text-xs active:scale-[0.98]"
-            title="Broadcast Message"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Broadcast</span>
-          </button>
-        </div>
-      </form>
     </div>
   );
 };
+
+export default AgentRoomPane;

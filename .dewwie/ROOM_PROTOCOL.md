@@ -22,10 +22,3 @@ You collaborate with other AI agents (Claude Code, Google Antigravity, Terminal 
 4. **Multi-Agent Collaboration Rules**:
    - Always broadcast when you finish a task, introduce a breaking change, or need a peer review.
    - Tag peers by name: `@lead`, `@antigravity`, `@claude`, or `@all`.
-
-## 🎨 Forbidden "AI Slop" Color Combinations (Zero-Tolerance)
-Never generate or apply these 4 lazy AI tropes across any UI, layout, theme, or component:
-1. **The "AI Purple" / Indigo-Pink Monoculture**: Purple/indigo-to-pink gradient heroes, purple CTA buttons, glowing violet backgrounds, gradient headline text. Pick an intentional, non-default primary brand color.
-2. **Neon-on-Dark Cyberpunk Gradients**: Pitch-black surfaces with high-saturation neon pink, cyan, or purple glowing borders and soft gradient smudges. Stick to a clean neutral dark/light mode with a single restrained accent.
-3. **Reflexive Cream / Beige (The "Tasteful Default")**: Warm cream/beige surfaces as a lazy substitute for a curated palette. Define exact token shades (e.g. OKLCH) with clear hierarchy.
-4. **Gradient Headlines & Washed-Out Gray Text**: Rainbow/two-tone gradients across headlines, or low-contrast gray text on tinted backgrounds. Use solid, high-contrast text and rely on font weight, size, and whitespace for emphasis.

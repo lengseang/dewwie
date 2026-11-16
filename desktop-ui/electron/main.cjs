@@ -153,14 +153,10 @@ function removeProject(id) {
 // -------------------------------------------------------------
 function saveWorkspaces(list) {
   workspacesCache = list;
-  const tmpPath = `${WORKSPACES_FILE}.${Date.now()}.tmp`;
   try {
-    fs.writeFileSync(tmpPath, JSON.stringify(list, null, 2), 'utf-8');
-    fs.renameSync(tmpPath, WORKSPACES_FILE);
+    fs.writeFileSync(WORKSPACES_FILE, JSON.stringify(list, null, 2), 'utf-8');
   } catch (err) {
-    try {
-      fs.writeFileSync(WORKSPACES_FILE, JSON.stringify(list, null, 2), 'utf-8');
-    } catch (_) {}
+    console.error('[Dewwie] Failed to save workspaces:', err);
   }
 }
 
@@ -498,10 +494,16 @@ function getOrCreatePty(workspaceId, cwd) {
 
   const scrollbackStream = fs.createWriteStream(scrollbackPath, { flags: 'a' });
   const subscribers = new Set();
+  let inMemoryBuffer = Buffer.alloc(0);
 
   ptyProcess.onData((data) => {
-    // 1. Write to append-only disk scrollback
+    // 1. Write to append-only disk scrollback & in-memory rolling buffer
     scrollbackStream.write(data);
+    const dataBuf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    inMemoryBuffer = Buffer.concat([inMemoryBuffer, dataBuf]);
+    if (inMemoryBuffer.length > 131072) {
+      inMemoryBuffer = inMemoryBuffer.subarray(inMemoryBuffer.length - 65536);
+    }
 
     // 2. Intercept OSC 7501
     parseOsc(data, workspaceId);
@@ -524,6 +526,7 @@ function getOrCreatePty(workspaceId, cwd) {
     scrollbackPath,
     subscribers,
     cwd: workDir,
+    getBuffer: () => inMemoryBuffer,
   };
 
   activePtys.set(workspaceId, sessionObj);
@@ -553,8 +556,14 @@ wss.on('connection', async (ws, req) => {
   console.log(`[WS] Client attached to workspace: ${workspaceId} (${cwd})`);
   const session = getOrCreatePty(workspaceId, cwd);
 
-  // Send scrollback history from disk to newly connected client
-  if (fs.existsSync(session.scrollbackPath)) {
+  // 1. Add subscriber FIRST so no live stream chunks are dropped during connection setup
+  session.subscribers.add(ws);
+
+  // 2. Send in-memory buffer or disk scrollback history
+  const memBuf = session.getBuffer ? session.getBuffer() : null;
+  if (memBuf && memBuf.length > 0) {
+    ws.send(memBuf);
+  } else if (fs.existsSync(session.scrollbackPath)) {
     try {
       const history = fs.readFileSync(session.scrollbackPath);
       if (history.length === 0) {
@@ -570,15 +579,15 @@ wss.on('connection', async (ws, req) => {
     }
   }
 
-  session.subscribers.add(ws);
-
   ws.on('message', (message) => {
     const strMsg = message.toString();
     try {
       if (strMsg.startsWith('{')) {
         const parsed = JSON.parse(strMsg);
-        if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
-          session.ptyProcess.resize(parsed.cols, parsed.rows);
+        if (parsed.type === 'resize' && parsed.cols > 0 && parsed.rows > 0) {
+          try {
+            session.ptyProcess.resize(parsed.cols, parsed.rows);
+          } catch (_) {}
           return;
         }
       }
@@ -820,6 +829,14 @@ ipcMain.handle('sessions:create', async (_, { projectId, name, sessionMode, bran
 
   list.push(newSession);
   saveWorkspaces(list);
+
+  // Pre-spawn and warm the PTY shell process immediately so it's live before WebSocket connects
+  try {
+    getOrCreatePty(newSession.id, targetPath);
+  } catch (err) {
+    console.error('[Dewwie] Failed to pre-warm PTY for session:', err);
+  }
+
   return newSession;
 });
 

@@ -140,4 +140,26 @@ describe('useWorkspaceStore', () => {
     store.setTheme('zinc');
     expect(useWorkspaceStore.getState().theme).toBe('zinc');
   });
+
+  it('manages multi-agent room membership and one-room-per-session constraint', () => {
+    const store = useWorkspaceStore.getState();
+    expect(store.rooms.length).toBeGreaterThanOrEqual(1);
+
+    // 1. Create a new room
+    const newRoomId = store.addRoom('Security Audit Mesh');
+    expect(newRoomId).toBeDefined();
+    expect(useWorkspaceStore.getState().activeRoomId).toBe(newRoomId);
+
+    // 2. Assign ws-1 to new room
+    store.setSessionRoom('ws-1', newRoomId);
+    expect(useWorkspaceStore.getState().workspaces['ws-1'].roomId).toBe(newRoomId);
+
+    // 3. Move ws-1 to another room (one room per session constraint)
+    store.setSessionRoom('ws-1', 'room-1');
+    expect(useWorkspaceStore.getState().workspaces['ws-1'].roomId).toBe('room-1');
+
+    // 4. Removing room cleans up membership
+    store.removeRoom(newRoomId);
+    expect(useWorkspaceStore.getState().rooms.some((r) => r.id === newRoomId)).toBe(false);
+  });
 });
