@@ -40,7 +40,9 @@ process.on('unhandledRejection', (reason) => {
 // Single Instance Lock: Prevents port collisions and corrupted workspace states
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
-  console.log('[Dewwie] Another instance is already running. Quitting secondary process.');
+  const warnMsg = '[Dewwie] Another instance is already running. Quitting secondary process.';
+  console.log(warnMsg);
+  logToFile(warnMsg);
   app.quit();
   process.exit(0);
 }
