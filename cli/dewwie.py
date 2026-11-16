@@ -438,11 +438,130 @@ def cmd_diff(args):
 
 ROOM_MESSAGES_PATH = Path.home() / ".swarmherd" / "room_messages.json"
 
+DEWWIE_MESH_PROTOCOL_DOC = """# Dewwie Multi-Agent Room Protocol
+
+This repository is running inside the **Dewwie Multi-Agent IDE & Terminal Workspace**.
+You collaborate with other AI agents (Claude Code, Google Antigravity, Terminal Shells) and the human developer in real-time through the Dewwie Room Mesh.
+
+## Core Commands (Available in your Shell & CLI)
+1. **Broadcast to Room**:
+   dewwie room send "Your message" --target @all
+   dewwie room send "Review request for PR" --target @lead --type review_request
+   dewwie room send "Please run e2e verification" --target @antigravity --type task_delegate
+
+2. **Report Live Progress (OSC 7501)**:
+   Report your state so the Dewwie IDE Process Tray animates your session status:
+   - While working: `dewwie status working "Refactoring authentication handler"`
+   - If blocked: `dewwie status blocked "Needs confirmation on schema changes"`
+   - When finished: `dewwie status done "All tests passed and code committed"`
+
+3. **Inspect Peer Agents**:
+   - `dewwie room list`   (views the last 10 messages from peer agents)
+   - `dewwie room agents` (lists active agents in the room and who is LEAD)
+
+4. **Multi-Agent Collaboration Rules**:
+   - Always broadcast when you finish a task, introduce a breaking change, or need a peer review.
+   - Tag peers by name: `@lead`, `@antigravity`, `@claude`, or `@all`.
+"""
+
+DEWWIE_SKILL_MD = """---
+name: dewwie-mesh
+description: Broadcast and collaborate with peer AI agents across Dewwie IDE workspaces and Git worktrees.
+---
+
+# Dewwie Mesh Skill
+
+Use this skill to communicate with other agents running in the Dewwie IDE room.
+
+## Instructions
+1. When you start a task, inform the room:
+   `dewwie room send "Starting work on <task>" --target @all`
+   `dewwie status working "<task summary>"`
+
+2. When you finish, hand off to peer agents or request lead review:
+   `dewwie room send "Completed <task>. Diffs are ready for review." --target @lead --type review_request`
+   `dewwie status done "Completed <task>"`
+
+3. When you encounter a block:
+   `dewwie room send "Blocked on: <reason>" --target @lead`
+   `dewwie status blocked "<reason>"`
+"""
+
+DEWWIE_ENV_PS1 = """# Dewwie PowerShell Collaboration Profile
+function broadcast($msg, $target = "@all") {
+    dewwie.exe room send "$msg" --target $target
+}
+function ask-lead($msg) {
+    dewwie.exe room send "$msg" --target "@lead" --type "review_request"
+}
+function status-report($state, $msg) {
+    dewwie.exe status "$state" "$msg"
+}
+function mesh-status {
+    dewwie.exe room agents
+}
+function mesh-listen {
+    dewwie.exe room list
+}
+"""
+
+def cmd_mesh_sync(args):
+    target_dir = Path(getattr(args, "dir", None) or os.getcwd()).resolve()
+    print(f"\n{CYAN}=== Syncing Dewwie Multi-Agent Skills & Configs ==={RESET}")
+    print(f"Target Directory: {target_dir}\n")
+
+    dewwie_dir = target_dir / ".dewwie"
+    skills_dir = dewwie_dir / "skills" / "dewwie-mesh"
+    gemini_rules_dir = target_dir / ".gemini" / "rules"
+
+    dewwie_dir.mkdir(parents=True, exist_ok=True)
+    skills_dir.mkdir(parents=True, exist_ok=True)
+    gemini_rules_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Write .dewwie/ROOM_PROTOCOL.md
+    (dewwie_dir / "ROOM_PROTOCOL.md").write_text(DEWWIE_MESH_PROTOCOL_DOC, encoding="utf-8")
+    print(f"  {GREEN}✓{RESET} Synced .dewwie/ROOM_PROTOCOL.md")
+
+    # 2. Sync CLAUDE.md for Claude Code
+    claude_md = target_dir / "CLAUDE.md"
+    if not claude_md.exists():
+        claude_md.write_text(DEWWIE_MESH_PROTOCOL_DOC, encoding="utf-8")
+        print(f"  {GREEN}✓{RESET} Created CLAUDE.md for Claude Code")
+    else:
+        existing = claude_md.read_text(encoding="utf-8")
+        if "Dewwie Multi-Agent Room Protocol" not in existing:
+            claude_md.write_text(existing + "\n\n" + DEWWIE_MESH_PROTOCOL_DOC, encoding="utf-8")
+            print(f"  {GREEN}✓{RESET} Updated CLAUDE.md with Dewwie Room Protocol")
+        else:
+            print(f"  {DIM}• CLAUDE.md already contains Dewwie protocol{RESET}")
+
+    # 3. Sync .gemini/rules/dewwie_mesh.md for Antigravity
+    (gemini_rules_dir / "dewwie_mesh.md").write_text(DEWWIE_MESH_PROTOCOL_DOC, encoding="utf-8")
+    print(f"  {GREEN}✓{RESET} Synced .gemini/rules/dewwie_mesh.md for Antigravity")
+
+    # 4. Sync universal skill
+    (skills_dir / "SKILL.md").write_text(DEWWIE_SKILL_MD, encoding="utf-8")
+    print(f"  {GREEN}✓{RESET} Synced .dewwie/skills/dewwie-mesh/SKILL.md")
+
+    # 5. Sync PowerShell profile helper
+    (dewwie_dir / "dewwie_env.ps1").write_text(DEWWIE_ENV_PS1, encoding="utf-8")
+    print(f"  {GREEN}✓{RESET} Synced .dewwie/dewwie_env.ps1 (broadcast, ask-lead, status-report)\n")
+    print(f"{GREEN}✔ Multi-agent skills and CLI configs ready. Claude Code and Antigravity can now communicate in the room.{RESET}\n")
+
+def cmd_status(args):
+    state = args.state
+    message = args.message
+    # Emit OSC 7501
+    sys.stdout.write(f"\033]7501;state={state};msg={message}\007")
+    sys.stdout.flush()
+    print(f"{GREEN}✔ Agent Status Reported -> [{state.upper()}]: {message}{RESET}")
+
 def cmd_room(args):
     action = args.room_action
     if action == "send":
         content = args.message
         target = args.target or "@all"
+        msg_type = getattr(args, "type", None) or "chat"
         current_ws = os.environ.get("SWARMHERD_WORKSPACE", "cli-agent")
         msg_obj = {
             "id": f"msg-{int(__import__('time').time() * 1000)}",
@@ -451,7 +570,7 @@ def cmd_room(args):
             "fromSessionName": current_ws,
             "fromRole": "lead" if "main" in current_ws or "lead" in current_ws else "worker",
             "target": target,
-            "type": "chat",
+            "type": msg_type,
             "content": content,
             "timestamp": int(__import__("time").time() * 1000)
         }
@@ -470,9 +589,9 @@ def cmd_room(args):
         except Exception:
             pass
         # Emit OSC 7502 so running PTY captures it live
-        sys.stdout.write(f"\033]7502;to={target};from={msg_obj['fromSessionName']};type=chat;msg={content}\007")
+        sys.stdout.write(f"\033]7502;to={target};from={msg_obj['fromSessionName']};type={msg_type};msg={content}\007")
         sys.stdout.flush()
-        print(f"{GREEN}✔ Message posted to Room -> {target}: {content}{RESET}")
+        print(f"{GREEN}✔ Message posted to Room -> {target} [{msg_type}]: {content}{RESET}")
     elif action == "list" or not action:
         msgs = []
         if ROOM_MESSAGES_PATH.exists():
@@ -535,10 +654,22 @@ def main():
     p_room_send = p_room_subs.add_parser("send", help="Send message to room or specific agent")
     p_room_send.add_argument("message", help="Message body")
     p_room_send.add_argument("--target", "-t", default="@all", help="Target agent (@lead, @feat-name, @all)")
+    p_room_send.add_argument("--type", choices=["chat", "task_delegate", "status_update", "review_request"], default="chat", help="Message type")
     p_room_subs.add_parser("list", help="List recent room messages")
     p_room_subs.add_parser("agents", help="List agents currently active in the room")
     p_room_lead = p_room_subs.add_parser("lead", help="Inspect or promote session to Lead Agent")
     p_room_lead.add_argument("target", nargs="?", default=None, help="Target session name or ID to promote to Lead")
+
+    # mesh
+    p_mesh = subparsers.add_parser("mesh", help="Multi-agent mesh skill and rule synchronizer")
+    p_mesh_subs = p_mesh.add_subparsers(dest="mesh_action")
+    p_mesh_sync = p_mesh_subs.add_parser("sync", help="Sync Dewwie room protocol, CLAUDE.md, and .gemini rules")
+    p_mesh_sync.add_argument("--dir", default=None, help="Target project root directory")
+
+    # status
+    p_status = subparsers.add_parser("status", help="Report live status via OSC 7501 to Dewwie process tray")
+    p_status.add_argument("state", choices=["working", "idle", "blocked", "done", "error"], help="Agent state")
+    p_status.add_argument("message", help="Brief progress or task description")
     
     # delegate
     p_del = subparsers.add_parser("delegate", help="Autonomous task delegation from Lead to isolated worktree")
@@ -592,6 +723,10 @@ def main():
         cmd_diff(args)
     elif args.subcommand == "room":
         cmd_room(args)
+    elif args.subcommand == "mesh":
+        cmd_mesh_sync(args)
+    elif args.subcommand == "status":
+        cmd_status(args)
 
 if __name__ == "__main__":
     main()

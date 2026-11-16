@@ -37,4 +37,6 @@ contextBridge.exposeInMainWorld('swarmherdNative', {
   saveWorkspaceState: (state) => ipcRenderer.invoke('workspace:saveState', state),
   delegateTask: (params) => ipcRenderer.invoke('task:delegate', params),
   runWorktreeTests: (params) => ipcRenderer.invoke('worktree:runTests', params || {}),
+  sendTerminalInput: (params) => ipcRenderer.invoke('terminal:sendInput', params),
+  syncMeshSkills: (params) => ipcRenderer.invoke('mesh:syncSkills', params || {}),
 });

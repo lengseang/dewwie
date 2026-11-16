@@ -84,6 +84,8 @@ interface WorkspaceStore {
   initNativeSync: () => Promise<void>;
   delegateTask: (params: { task: string; agent?: string; repo?: string; baseBranch?: string }) => Promise<string | null>;
   runWorktreeTests: (params?: { worktreePath?: string; repo?: string }) => Promise<{ success: boolean; output: string }>;
+  sendTerminalInput: (workspaceId: string, text: string, pressEnter?: boolean) => Promise<boolean>;
+  syncMeshSkills: (projectPath?: string) => Promise<{ success: boolean; message: string }>;
   mergeWorktree: (workspaceId: string, commitMsg: string) => Promise<{ success: boolean; message: string }>;
   rebaseWorktree: (workspaceId: string) => Promise<{ success: boolean; message: string }>;
   discardWorktree: (workspaceId: string) => Promise<{ success: boolean; message: string }>;
@@ -550,6 +552,31 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
     }
     return { success: true, output: 'Simulated quality gate: all test suites passed.' };
+  },
+
+  sendTerminalInput: async (workspaceId, text, pressEnter = true) => {
+    if (typeof window !== 'undefined' && window.swarmherdNative?.sendTerminalInput) {
+      try {
+        return await window.swarmherdNative.sendTerminalInput({ workspaceId, text, pressEnter });
+      } catch (e) {
+        console.error('Failed to send terminal input:', e);
+        return false;
+      }
+    }
+    return false;
+  },
+
+  syncMeshSkills: async (projectPath) => {
+    if (typeof window !== 'undefined' && window.swarmherdNative?.syncMeshSkills) {
+      try {
+        const activeProj = get().projects[get().activeProjectId || ''];
+        const target = projectPath || activeProj?.rootPath;
+        return await window.swarmherdNative.syncMeshSkills({ projectPath: target });
+      } catch (e: any) {
+        return { success: false, message: e?.message || 'Skill synchronization failed' };
+      }
+    }
+    return { success: false, message: 'Native bridge unavailable' };
   },
 
   createWorkspace: async (name: string, branch: string, baseBranch = 'main') => {

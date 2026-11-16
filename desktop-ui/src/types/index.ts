@@ -256,6 +256,8 @@ declare global {
         worktreePath?: string;
         repo?: string;
       }) => Promise<{ success: boolean; output: string }>;
+      sendTerminalInput?: (params: { workspaceId: string; text: string; pressEnter?: boolean }) => Promise<boolean>;
+      syncMeshSkills?: (params?: { projectPath?: string }) => Promise<{ success: boolean; message: string }>;
     };
   }
 }

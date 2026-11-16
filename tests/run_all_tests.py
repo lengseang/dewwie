@@ -40,6 +40,7 @@ SUITES = [
     ("Autonomous Lead Delegation Loop", ["python", str(TESTS_DIR / "test_delegation_loop.py")]),
     ("Visual Delegation & Quality Gate", ["python", str(TESTS_DIR / "test_visual_delegation.py")]),
     ("Desktop Launcher Health & Reliability", ["python", str(TESTS_DIR / "test_launcher_health.py")]),
+    ("Multi-Agent Mesh Protocol & Skill Sync", ["python", str(TESTS_DIR / "test_multiagent_mesh.py")]),
     ("Comprehensive E2E Scenarios (A-E)", ["python", str(TESTS_DIR / "e2e_scenarios.py")]),
 ]
 

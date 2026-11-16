@@ -447,6 +447,8 @@ function getOrCreatePty(workspaceId, cwd) {
   }
   console.log(`[PTY] Spawning rock-solid native shell '${shell}' for ${workspaceId} in: ${workDir}`);
 
+  const agentBinPath = `${path.join(os.homedir(), '.local', 'bin')};${path.join(os.homedir(), 'AppData', 'Local', 'agy', 'bin')};${path.join(__dirname, '../../cli')}`;
+
   const ptyProcess = pty.spawn(shell, shellArgs, {
     name: 'xterm-256color',
     cols: 120,
@@ -455,10 +457,30 @@ function getOrCreatePty(workspaceId, cwd) {
     useConpty: false, // Rock-solid WinPTY on Windows
     env: {
       ...process.env,
+      PATH: `${agentBinPath};${process.env.PATH || ''}`,
       TERM: 'xterm-256color',
       SWARMHERD_WORKSPACE: workspaceId,
+      DEWWIE_WORKSPACE_ID: workspaceId,
+      DEWWIE_ROOM_ID: 'general',
+      DEWWIE_PROJECT_DIR: workDir,
     }
   });
+
+  // Auto-launch CLI agent if specified
+  let detectedAgent = 'terminal';
+  if (workspacesCache && Array.isArray(workspacesCache)) {
+    const matched = workspacesCache.find(w => w.id === workspaceId);
+    if (matched?.agentType) detectedAgent = matched.agentType;
+  }
+  if (detectedAgent === 'claude-code') {
+    setTimeout(() => {
+      try { ptyProcess.write('claude\r'); } catch (_) {}
+    }, 700);
+  } else if (detectedAgent === 'antigravity') {
+    setTimeout(() => {
+      try { ptyProcess.write('agy\r'); } catch (_) {}
+    }, 700);
+  }
 
   const scrollbackStream = fs.createWriteStream(scrollbackPath, { flags: 'a' });
   const subscribers = new Set();
@@ -1094,6 +1116,70 @@ ipcMain.handle('worktree:runTests', async (_, { worktreePath, repo }) => {
       resolve({ success: false, output: `Execution error: ${err.message}` });
     });
   });
+});
+
+// -------------------------------------------------------------
+// Terminal Stdin Input Dispatcher
+// -------------------------------------------------------------
+ipcMain.handle('terminal:sendInput', async (_, { workspaceId, text, pressEnter = true }) => {
+  if (!workspaceId || !text) return false;
+  const list = await getWorkspaces();
+  const targetClean = workspaceId.replace('@', '').toLowerCase();
+  const ws = list.find(w => 
+    w.id === workspaceId || 
+    w.name.toLowerCase() === targetClean || 
+    w.branch?.toLowerCase() === targetClean
+  );
+  const targetId = ws ? ws.id : workspaceId;
+  const session = getOrCreatePty(targetId, ws?.worktreePath);
+  if (session && session.ptyProcess) {
+    session.ptyProcess.write(text + (pressEnter ? '\r' : ''));
+    return true;
+  }
+  return false;
+});
+
+// -------------------------------------------------------------
+// Multi-Agent Mesh Skill & Configuration Synchronizer
+// -------------------------------------------------------------
+ipcMain.handle('mesh:syncSkills', async (_, { projectPath }) => {
+  const projects = getProjects();
+  const targetDir = projectPath || (projects[0]?.rootPath) || 'D:\\1111-Works\\exbytelab';
+  try {
+    const dewwieDir = path.join(targetDir, '.dewwie');
+    const skillsDir = path.join(dewwieDir, 'skills', 'dewwie-mesh');
+    const geminiRulesDir = path.join(targetDir, '.gemini', 'rules');
+
+    fs.mkdirSync(dewwieDir, { recursive: true });
+    fs.mkdirSync(skillsDir, { recursive: true });
+    fs.mkdirSync(geminiRulesDir, { recursive: true });
+
+    const protocolDoc = `# Dewwie Multi-Agent Room Protocol\n\nThis repository is running inside the **Dewwie Multi-Agent IDE & Terminal Workspace**.\nYou collaborate with other AI agents (Claude Code, Google Antigravity, Terminal Shells) and the human developer in real-time through the Dewwie Room Mesh.\n\n## Core Commands (Available in your Shell & CLI)\n1. **Broadcast to Room**:\n   dewwie room send "Your message" --target @all\n   dewwie room send "Review request for PR" --target @lead --type review_request\n   dewwie room send "Please run e2e verification" --target @antigravity --type task_delegate\n\n2. **Report Live Progress (OSC 7501)**:\n   Report your state so the Dewwie IDE Process Tray animates your session status:\n   - While working: \`dewwie status working "Refactoring authentication handler"\`\n   - If blocked: \`dewwie status blocked "Needs confirmation on schema changes"\`\n   - When finished: \`dewwie status done "All tests passed and code committed"\`\n\n3. **Inspect Peer Agents**:\n   - \`dewwie room list\`   (views the last 10 messages from peer agents)\n   - \`dewwie room agents\` (lists active agents in the room and who is LEAD)\n\n4. **Multi-Agent Collaboration Rules**:\n   - Always broadcast when you finish a task, introduce a breaking change, or need a peer review.\n   - Tag peers by name: \`@lead\`, \`@antigravity\`, \`@claude\`, or \`@all\`.\n`;
+
+    const skillDoc = `---\nname: dewwie-mesh\ndescription: Broadcast and collaborate with peer AI agents across Dewwie IDE workspaces and Git worktrees.\n---\n\n# Dewwie Mesh Skill\n\nUse this skill to communicate with other agents running in the Dewwie IDE room.\n\n## Instructions\n1. When you start a task, inform the room:\n   \`dewwie room send "Starting work on <task>" --target @all\`\n   \`dewwie status working "<task summary>"\`\n\n2. When you finish, hand off to peer agents or request lead review:\n   \`dewwie room send "Completed <task>. Diffs are ready for review." --target @lead --type review_request\`\n   \`dewwie status done "Completed <task>"\`\n\n3. When you encounter a block:\n   \`dewwie room send "Blocked on: <reason>" --target @lead\`\n   \`dewwie status blocked "<reason>"\`\n`;
+
+    const ps1Doc = `# Dewwie PowerShell Collaboration Profile\nfunction broadcast($msg, $target = "@all") {\n    dewwie.exe room send "$msg" --target $target\n}\nfunction ask-lead($msg) {\n    dewwie.exe room send "$msg" --target "@lead" --type "review_request"\n}\nfunction status-report($state, $msg) {\n    dewwie.exe status "$state" "$msg"\n}\nfunction mesh-status {\n    dewwie.exe room agents\n}\nfunction mesh-listen {\n    dewwie.exe room list\n}\n`;
+
+    fs.writeFileSync(path.join(dewwieDir, 'ROOM_PROTOCOL.md'), protocolDoc, 'utf-8');
+
+    const claudeMdPath = path.join(targetDir, 'CLAUDE.md');
+    if (!fs.existsSync(claudeMdPath)) {
+      fs.writeFileSync(claudeMdPath, protocolDoc, 'utf-8');
+    } else {
+      const existing = fs.readFileSync(claudeMdPath, 'utf-8');
+      if (!existing.includes('Dewwie Multi-Agent Room Protocol')) {
+        fs.writeFileSync(claudeMdPath, existing + '\n\n' + protocolDoc, 'utf-8');
+      }
+    }
+
+    fs.writeFileSync(path.join(geminiRulesDir, 'dewwie_mesh.md'), protocolDoc, 'utf-8');
+    fs.writeFileSync(path.join(skillsDir, 'SKILL.md'), skillDoc, 'utf-8');
+    fs.writeFileSync(path.join(dewwieDir, 'dewwie_env.ps1'), ps1Doc, 'utf-8');
+
+    return { success: true, message: `Synced skills and room protocol into ${targetDir}` };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
 });
 
 app.whenReady().then(createWindow);

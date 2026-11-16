@@ -26,11 +26,12 @@ import {
   RefreshCw,
   Trash2,
   X,
-  Radio,
   Plus,
   Palette,
   FolderOpen,
   Command,
+  Terminal,
+  Radio,
 } from 'lucide-react';
 import { ExternalEditor } from './types';
 
@@ -361,8 +362,95 @@ export const App: React.FC = () => {
             </button>
           </div>
 
-          {/* Right: Ultra-Compact Icon Toolbar */}
+          {/* Right: Ultra-Compact Icon Toolbar with Unified View Switchers */}
           <div className="flex items-center gap-1 shrink-0">
+            {/* View Switcher: Terminal, Room, Files, Diff */}
+            <div className="flex items-center gap-0.5 bg-zinc-900/60 p-0.5 rounded border border-zinc-800/80">
+              {/* Terminal View */}
+              <button
+                onClick={() => {
+                  setActiveTab('terminal');
+                }}
+                title="Terminal Workspace (Ctrl+1)"
+                className={`p-1 rounded transition-colors ${
+                  activeTab === 'terminal' && (!rightPanelOpen || rightPanelView === 'room')
+                    ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <Terminal className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Room Mesh View */}
+              <button
+                onClick={() => {
+                  setActiveTab('terminal');
+                  if (!rightPanelOpen) {
+                    toggleRightPanel();
+                  }
+                  setRightPanelView('room');
+                }}
+                title="Agent Room Mesh (Ctrl+2)"
+                className={`p-1 rounded transition-colors flex items-center gap-1 ${
+                  rightPanelOpen && rightPanelView === 'room'
+                    ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                {roomMessages.length > 0 && (
+                  <span className="text-[10px] font-mono text-zinc-400 font-bold px-0.5">
+                    {roomMessages.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Files Explorer View */}
+              <button
+                onClick={() => {
+                  setActiveTab('terminal');
+                  if (!rightPanelOpen) {
+                    toggleRightPanel();
+                  }
+                  setRightPanelView('files');
+                }}
+                title="Project File Tree (Ctrl+3)"
+                className={`p-1 rounded transition-colors ${
+                  rightPanelOpen && rightPanelView === 'files'
+                    ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Git Changes & Diff View */}
+              <button
+                onClick={() => {
+                  setActiveTab('terminal');
+                  if (!rightPanelOpen) {
+                    toggleRightPanel();
+                  }
+                  setRightPanelView('changes');
+                }}
+                title="Git Changes & Diff (Ctrl+4)"
+                className={`p-1 rounded transition-colors flex items-center gap-1 ${
+                  rightPanelOpen && rightPanelView === 'changes'
+                    ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <GitCompare className="w-3.5 h-3.5" />
+                {totalFilesChanged > 0 && (
+                  <span className="text-[10px] font-mono text-zinc-400 font-bold px-0.5">
+                    {totalFilesChanged}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
+
             {/* Linux Terminal / Vim-style Command Palette Prompt (Ctrl+P / :) */}
             <button
               onClick={() => setIsCommandPaletteOpen(true)}
@@ -481,61 +569,6 @@ export const App: React.FC = () => {
                 title="Drag to resize panel (double-click to collapse)"
                 className="absolute -left-1 top-0 bottom-0 w-2 cursor-col-resize hover:bg-zinc-600 active:bg-zinc-400 z-30 transition-colors"
               />
-
-              {/* Right Panel Header Tabs */}
-              <div className="h-8 px-2 border-b border-zinc-800/80 bg-zinc-950 flex items-center justify-between gap-1 shrink-0">
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setRightPanelView('room')}
-                    title="Agent Swarm Room Mesh (Ctrl+2)"
-                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] transition-colors ${
-                      rightPanelView === 'room'
-                        ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800 shadow-xs'
-                        : 'text-zinc-500 hover:text-zinc-300'
-                    }`}
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
-                    {roomMessages.length > 0 && (
-                      <span className="text-[10px] font-mono text-zinc-400">{roomMessages.length}</span>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => setRightPanelView('files')}
-                    title="Project File Tree (Ctrl+3)"
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
-                      rightPanelView === 'files'
-                        ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800 shadow-xs'
-                        : 'text-zinc-500 hover:text-zinc-300'
-                    }`}
-                  >
-                    <FolderTree className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    onClick={() => setRightPanelView('changes')}
-                    title="Git Changes & Diff (Ctrl+4)"
-                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] transition-colors ${
-                      rightPanelView === 'changes'
-                        ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800 shadow-xs'
-                        : 'text-zinc-500 hover:text-zinc-300'
-                    }`}
-                  >
-                    <GitCompare className="w-3.5 h-3.5" />
-                    {totalFilesChanged > 0 && (
-                      <span className="text-[10px] font-mono text-zinc-400">{totalFilesChanged}</span>
-                    )}
-                  </button>
-                </div>
-
-                <button
-                  onClick={toggleRightPanel}
-                  title="Close right panel (Ctrl+Alt+B)"
-                  className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
 
               {/* Right Panel Content View */}
               <div className="flex-1 flex flex-col h-full overflow-hidden">
