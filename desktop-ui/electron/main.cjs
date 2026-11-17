@@ -381,19 +381,51 @@ async function getWorkspaces(forceRefresh = false) {
             let diffSummary = existing?.diffSummary || { filesChanged: 0, additions: 0, deletions: 0 };
             if (fs.existsSync(worktreePath)) {
               try {
-                const diffStat = await execGit(['diff', 'main', '--numstat'], worktreePath);
-                if (diffStat.stdout) {
-                  const statLines = diffStat.stdout.trim().split('\n').filter(Boolean);
-                  let adds = 0;
-                  let dels = 0;
-                  for (const s of statLines) {
-                    const parts = s.split('\t');
-                    adds += parseInt(parts[0], 10) || 0;
-                    dels += parseInt(parts[1], 10) || 0;
+                // 1. Check real uncommitted working changes in worktree
+                const statusRes = await execGit(['status', '--porcelain'], worktreePath);
+                const hasUncommitted = statusRes.stdout && statusRes.stdout.trim().length > 0;
+
+                if (hasUncommitted) {
+                  const uncommittedDiff = await execGit(['diff', 'HEAD', '--numstat'], worktreePath);
+                  if (uncommittedDiff.stdout && uncommittedDiff.stdout.trim().length > 0) {
+                    const statLines = uncommittedDiff.stdout.trim().split('\n').filter(Boolean);
+                    let adds = 0;
+                    let dels = 0;
+                    for (const s of statLines) {
+                      const parts = s.split('\t');
+                      adds += parseInt(parts[0], 10) || 0;
+                      dels += parseInt(parts[1], 10) || 0;
+                    }
+                    diffSummary = { filesChanged: statLines.length, additions: adds, deletions: dels };
+                  } else {
+                    const count = statusRes.stdout.trim().split('\n').filter(Boolean).length;
+                    diffSummary = { filesChanged: count, additions: 0, deletions: 0 };
                   }
-                  diffSummary = { filesChanged: statLines.length, additions: adds, deletions: dels };
+                } else {
+                  // 2. Clean worktree: check if branch has commits ahead of main
+                  const countAhead = await execGit(['rev-list', '--count', 'main..HEAD'], worktreePath);
+                  const ahead = parseInt(countAhead.stdout?.trim() || '0', 10);
+                  if (ahead > 0) {
+                    // Use triple dot to diff only branch commits from merge base
+                    const branchDiff = await execGit(['diff', 'main...HEAD', '--numstat'], worktreePath);
+                    if (branchDiff.stdout) {
+                      const statLines = branchDiff.stdout.trim().split('\n').filter(Boolean);
+                      let adds = 0;
+                      let dels = 0;
+                      for (const s of statLines) {
+                        const parts = s.split('\t');
+                        adds += parseInt(parts[0], 10) || 0;
+                        dels += parseInt(parts[1], 10) || 0;
+                      }
+                      diffSummary = { filesChanged: statLines.length, additions: adds, deletions: dels };
+                    }
+                  } else {
+                    diffSummary = { filesChanged: 0, additions: 0, deletions: 0 };
+                  }
                 }
-              } catch (_) {}
+              } catch (_) {
+                diffSummary = { filesChanged: 0, additions: 0, deletions: 0 };
+              }
             }
 
             allSessions.push({

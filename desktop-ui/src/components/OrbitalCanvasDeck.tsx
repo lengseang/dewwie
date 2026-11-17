@@ -233,7 +233,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
 
   // Geometry calculation for the orbital room
   const computeOrbitalGeometry = (w: number, h: number) => {
-    const wallH = Math.max(40, Math.round(h * 0.15));
+    const wallH = Math.max(22, Math.round(h * 0.08));
     const podH = Math.max(26, Math.round(h * 0.105));
     const podY = h - podH - 6;
     const holoY = wallH + Math.max(24, Math.round((podY - wallH) * 0.14));
@@ -351,52 +351,36 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
     bgCtx.fillStyle = 'rgba(212, 175, 55, 0.3)';
     bgCtx.fillRect(6, geo.podY - 4, W - 12, 1);
 
-    // 2. North panoramic bulkhead wall
+    // 2. North panoramic bulkhead wall (Sleek panoramic window, zero faux CTX/MESH clutter)
     bgCtx.fillStyle = '#0B0D15';
     bgCtx.fillRect(0, 0, W, geo.wallH);
     bgCtx.fillStyle = '#D4AF37';
     bgCtx.fillRect(0, geo.wallH - 2, W, 2);
 
-    const sideW = Math.max(32, Math.round(W * 0.21));
-    const winX = sideW + 6;
-    const winW = W - (sideW + 6) * 2;
-    const panelH = geo.wallH - 8;
+    // Panoramic Space Viewport spanning across the bulkhead
+    const winX = 6;
+    const winW = W - 12;
+    const panelH = Math.max(14, geo.wallH - 6);
 
-    // Left Bulkhead Frame: Live CTX Panel
-    bgCtx.fillStyle = '#161926';
-    bgCtx.fillRect(4, 4, sideW, panelH);
-    bgCtx.strokeStyle = '#2B2F42';
-    bgCtx.strokeRect(4.5, 4.5, sideW - 1, panelH - 1);
-
-    // Center Panoramic Space Viewport
     bgCtx.fillStyle = '#05070E';
-    bgCtx.fillRect(winX, 4, winW, panelH);
-    bgCtx.fillStyle = 'rgba(56, 189, 248, 0.08)';
-    bgCtx.fillRect(winX + 4, 9, Math.round(winW * 0.55), Math.round(panelH * 0.45));
-    bgCtx.fillStyle = 'rgba(167, 139, 250, 0.09)';
-    bgCtx.fillRect(winX + Math.round(winW * 0.35), 14, Math.round(winW * 0.5), Math.round(panelH * 0.42));
-
-    // Exoplanet
-    const planetX = winX + Math.max(12, winW - 22);
-    const planetY = 12;
-    bgCtx.fillStyle = '#38BDF8';
-    bgCtx.fillRect(planetX, planetY, 10, 10);
-    bgCtx.fillStyle = '#0284C7';
-    bgCtx.fillRect(planetX + 2, planetY + 2, 6, 6);
-    bgCtx.fillStyle = '#D4AF37';
-    bgCtx.fillRect(planetX - 4, planetY + 4, 18, 2);
-
-    // Mullions
-    bgCtx.fillStyle = '#1E2233';
-    bgCtx.fillRect(winX + Math.round(winW * 0.33), 4, 1, panelH);
-    bgCtx.fillRect(winX + Math.round(winW * 0.67), 4, 1, panelH);
-
-    // Right Bulkhead Frame: Live MESH Panel
-    const rightPanelX = W - sideW - 4;
-    bgCtx.fillStyle = '#161926';
-    bgCtx.fillRect(rightPanelX, 4, sideW, panelH);
+    bgCtx.fillRect(winX, 2, winW, panelH);
     bgCtx.strokeStyle = '#2B2F42';
-    bgCtx.strokeRect(rightPanelX + 0.5, 4.5, sideW - 1, panelH - 1);
+    bgCtx.strokeRect(winX + 0.5, 2.5, winW - 1, panelH - 1);
+    bgCtx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+    bgCtx.fillRect(winX + 4, 4, Math.round(winW * 0.55), Math.round(panelH * 0.45));
+
+    // Exoplanet in space
+    const planetX = winX + Math.max(12, winW - 24);
+    const planetY = 4;
+    bgCtx.fillStyle = '#38BDF8';
+    bgCtx.fillRect(planetX, planetY, 7, 7);
+    bgCtx.fillStyle = '#0284C7';
+    bgCtx.fillRect(planetX + 1, planetY + 1, 4, 4);
+
+    // Subtle Structural Mullions
+    bgCtx.fillStyle = '#1E2233';
+    bgCtx.fillRect(winX + Math.round(winW * 0.33), 2, 1, panelH);
+    bgCtx.fillRect(winX + Math.round(winW * 0.67), 2, 1, panelH);
 
     // 3. Command Table
     const hc = geo.holoCenter;
@@ -517,64 +501,24 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
               ctx.drawImage(bgCacheRef.current, 0, 0);
             }
 
-            // Draw North telemetry
-            const sideW = Math.max(32, Math.round(LW * 0.21));
-            const winX = sideW + 6;
-            const winW = LW - (sideW + 6) * 2;
-            const panelH = geo.wallH - 8;
+            // Viewport stars & gentle shuttle animation in panoramic window
+            const winX = 6;
+            const winW = LW - 12;
+            const panelH = Math.max(14, geo.wallH - 6);
 
-            // CTX label & bars
-            ctx.fillStyle = '#94A3B8';
-            ctx.font = '600 7px monospace';
-            ctx.fillText('CTX', 7, 10);
-            const barMaxW = sideW - 8;
-            for (let i = 0; i < 4; i++) {
-              const by = 13 + i * 5;
-              ctx.fillStyle = '#0B0D15';
-              ctx.fillRect(7, by, barMaxW, 3);
-              const ag = occupants[i];
-              if (ag) {
-                const fillW = Math.max(1, Math.round((ag.tokenPct / 100) * barMaxW));
-                const col = ag.tokenPct === 0 ? '#EF4444' : ag.tokenPct < 35 ? '#F97316' : ag.accent;
-                ctx.fillStyle = col;
-                ctx.fillRect(7, by, fillW, 3);
-              }
-            }
-
-            // Viewport stars & shuttle
-            for (let i = 0; i < 14; i++) {
+            for (let i = 0; i < 18; i++) {
               const sx = winX + 4 + ((i * 19) % Math.max(8, winW - 8));
-              const sy = 7 + ((i * 11) % Math.max(8, panelH - 6));
+              const sy = 4 + ((i * 7) % Math.max(6, panelH - 4));
               const bright = (tick + i * 7) % 28 < 20;
               ctx.fillStyle = bright ? '#F8FAFC' : '#475569';
               ctx.fillRect(sx, sy, 1, 1);
             }
-            const shuttleX = winX + 4 + ((tick * 0.35) % Math.max(12, winW - 12));
-            const shuttleY = 10 + Math.round(Math.sin(tick * 0.06) * 2);
+            const shuttleX = winX + 4 + ((tick * 0.3) % Math.max(12, winW - 12));
+            const shuttleY = 5 + Math.round(Math.sin(tick * 0.06) * 1.5);
             ctx.fillStyle = '#E2E8F0';
-            ctx.fillRect(shuttleX, shuttleY, 6, 2);
+            ctx.fillRect(shuttleX, shuttleY, 5, 2);
             ctx.fillStyle = '#38BDF8';
             ctx.fillRect(shuttleX - 2, shuttleY, 2, 1);
-
-            // MESH equalizer
-            const rx = LW - sideW - 4;
-            ctx.fillStyle = '#94A3B8';
-            ctx.font = '600 7px monospace';
-            ctx.fillText('MESH', rx + 3, 10);
-            const eqW = Math.max(3, Math.floor((sideW - 12) / 4));
-            for (let ch = 0; ch < 4; ch++) {
-              const ag = occupants[ch];
-              const isBusy = ag && ['CODING', 'TESTING', 'PLANNING', 'REPORTING'].includes(ag.state);
-              const maxH = panelH - 13;
-              const level = ag
-                ? isBusy
-                  ? Math.max(3, Math.round(((Math.sin(tick * 0.25 + ch * 1.7) + 1) / 2) * maxH))
-                  : 3
-                : 1;
-              const col = ag ? LIFECYCLE[ag.state]?.color || '#38BDF8' : '#262938';
-              ctx.fillStyle = col;
-              ctx.fillRect(rx + 3 + ch * (eqW + 2), 4 + panelH - 3 - level, eqW, level);
-            }
 
             // Command table hologram wireframe
             const bob = Math.round(Math.sin(tick * 0.08) * 2);
@@ -728,11 +672,39 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
               ctx.fillStyle = ag.visor;
               ctx.fillRect(x - 3, by - 10, 6, 2);
 
-              // Name label
-              ctx.font = '600 7px monospace';
-              ctx.fillStyle = isFocused ? '#D4AF37' : '#E2E8F0';
-              ctx.textAlign = 'center';
-              ctx.fillText(ag.shortName, x, y + 10.5);
+              // Name label: Only draw full pill when hovered/focused, or a compact 5-char tag when resting to avoid horizontal collisions
+              const inPod = y >= (geo.podY - 4);
+              if (isFocused || isHovered) {
+                // High-visibility focus/hover badge with clean background pill
+                ctx.save();
+                ctx.font = '700 7px monospace';
+                const labelText = ag.shortName;
+                const tw = ctx.measureText(labelText).width;
+                const bw = tw + 6;
+                const bh = 10;
+                const bx = x - bw / 2;
+                const byy = inPod ? y - 18 : y + 6;
+
+                ctx.fillStyle = 'rgba(11, 12, 18, 0.94)';
+                ctx.beginPath();
+                ctx.roundRect(bx, byy, bw, bh, 2);
+                ctx.fill();
+                ctx.strokeStyle = isFocused ? '#D4AF37' : '#38BDF8';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                ctx.fillStyle = isFocused ? '#FDE047' : '#F8FAFC';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(labelText, bx + bw / 2, byy + bh / 2 + 0.5);
+                ctx.restore();
+              } else if (!inPod) {
+                // At desk / walking: draw subtle clean label
+                ctx.font = '600 6.5px monospace';
+                ctx.fillStyle = '#94A3B8';
+                ctx.textAlign = 'center';
+                ctx.fillText(ag.shortName.slice(0, 6), x, y + 9.5);
+              }
 
               // Speech bubble
               if (ag.speech) {

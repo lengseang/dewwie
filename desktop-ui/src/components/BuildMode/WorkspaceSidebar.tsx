@@ -183,7 +183,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           </div>
         )}
 
-        {projectList.map((proj, projIdx) => {
+        {projectList.map((proj) => {
           const projectSessions = allSessions.filter(
             (w) => w.projectId === proj.id || w.repository === proj.name
           );
@@ -197,51 +197,45 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           const customSessions = projectSessions.filter((s) => s.id !== rootSession?.id);
 
           return (
-            <div key={proj.id} className="space-y-1">
-              {/* Project Row: Numbered Badge [1], Name, and Toggle */}
+            <div key={proj.id} className="space-y-0.5">
+              {/* Flat Tree Project Header (Zero boxy borders) */}
               <div
                 onClick={() => handleSelectProject(proj.id)}
-                className={`flex items-center rounded transition-colors cursor-pointer ${
+                className={`group flex items-center rounded-md transition-colors cursor-pointer select-none ${
                   isNarrow
-                    ? 'justify-center p-1 hover:bg-zinc-900'
-                    : 'justify-between px-2 py-1 text-xs hover:bg-zinc-900/40'
+                    ? 'justify-center p-1.5 hover:bg-zinc-900/60'
+                    : 'justify-between px-2 py-1 text-xs hover:bg-zinc-900/60'
                 } ${
                   isProjectActive
-                    ? 'text-zinc-100 bg-zinc-900/70 font-semibold border border-zinc-800/80'
+                    ? 'text-zinc-100 font-semibold'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
                 title={`${proj.name} (${proj.rootPath}) • Click to activate project workspace`}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                    isProjectActive ? 'bg-zinc-800 text-zinc-100 border border-zinc-700' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
-                  }`}>
-                    {projIdx + 1}
-                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleProject(proj.id);
+                    }}
+                    className="p-0.5 text-zinc-500 hover:text-zinc-300 transition-colors"
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    )}
+                  </button>
 
+                  <Folder className={`w-3.5 h-3.5 shrink-0 ${isProjectActive ? 'text-zinc-300' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
+                  
                   {!isNarrow && (
-                    <>
-                      <Folder className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                      <span className="truncate text-xs">{proj.name}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleProject(proj.id);
-                        }}
-                        className="p-0.5 text-zinc-600 hover:text-zinc-300 ml-1"
-                      >
-                        {isCollapsed ? (
-                          <ChevronRight className="w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="w-3 h-3" />
-                        )}
-                      </button>
-                    </>
+                    <span className="truncate text-xs font-medium tracking-tight">{proj.name}</span>
                   )}
                 </div>
 
                 {!isNarrow && (
-                  <span className="text-[10px] font-mono text-zinc-500 shrink-0">
+                  <span className="text-[10px] font-mono text-zinc-500 shrink-0 px-1 py-0.2 rounded bg-zinc-900/50">
                     {projectSessions.length}
                   </span>
                 )}

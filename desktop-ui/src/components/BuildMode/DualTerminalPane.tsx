@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { Terminal as TerminalIcon } from 'lucide-react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -302,9 +303,15 @@ export const DualTerminalPane: React.FC = () => {
     return (
       <div
         style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text-muted)' }}
-        className="flex-1 h-full flex items-center justify-center font-mono text-xs"
+        className="flex-1 h-full flex flex-col items-center justify-center font-mono text-xs gap-3 select-none"
       >
-        No active workspace. Select or create one from the sidebar.
+        <div className="w-10 h-10 rounded-lg border border-zinc-800 bg-zinc-900/60 flex items-center justify-center text-zinc-500">
+          <TerminalIcon className="w-5 h-5" />
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-zinc-300 font-semibold text-sm">Terminal Workspace Ready</span>
+          <span className="text-[11px] text-zinc-500">Select a session from the sidebar or click + to start a shell</span>
+        </div>
       </div>
     );
   }

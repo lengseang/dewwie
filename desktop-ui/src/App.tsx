@@ -12,29 +12,17 @@ import { SettingsModal } from './components/SettingsModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { getAgentIcon } from './components/AgentIcons';
 import {
-  MessageSquare,
-  FolderTree,
-  GitCompare,
-  Code2,
-  Copy,
-  Check,
   PanelRightClose,
   PanelRight,
   PanelLeftClose,
   PanelLeft,
   Columns2,
-  RefreshCw,
-  Trash2,
   X,
   Plus,
-  Palette,
-  FolderOpen,
-  Command,
-  Terminal,
+  Settings,
   Radio,
   ChevronDown,
 } from 'lucide-react';
-import { ExternalEditor } from './types';
 import { THEMES_CONFIG } from './theme/themes';
 
 export const App: React.FC = () => {
@@ -44,7 +32,6 @@ export const App: React.FC = () => {
     projects,
     workspaces,
     daemonStatus,
-    launchEditor,
     activeTab,
     setActiveTab,
     isSplitView,
@@ -70,8 +57,6 @@ export const App: React.FC = () => {
     workspaceOrder,
   } = useWorkspaceStore();
 
-  const [launchingEditor, setLaunchingEditor] = useState<string | null>(null);
-  const [copiedAction, setCopiedAction] = useState(false);
   const [isDelegateModalOpen, setIsDelegateModalOpen] = useState(false);
   const [isAgentMenuOpen, setIsAgentMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -195,23 +180,6 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setActiveTab, toggleSidebar, toggleRightPanel, setRightPanelView, pickAndOpenFolder]);
 
-  const handleLaunch = async (editor: ExternalEditor) => {
-    setLaunchingEditor(editor);
-    try {
-      await launchEditor(editor, activeWorkspaceId || undefined);
-    } finally {
-      setTimeout(() => setLaunchingEditor(null), 1000);
-    }
-  };
-
-  const dispatchTerminal = (action: 'restart' | 'copy' | 'clear') => {
-    if (action === 'copy') {
-      setCopiedAction(true);
-      setTimeout(() => setCopiedAction(false), 1500);
-    }
-    window.dispatchEvent(new CustomEvent('dewwie:terminal-action', { detail: { action } }));
-  };
-
   const handleSpawnAgent = async (agentType: string, isWorktree = false) => {
     if (isWorktree) {
       setIsDelegateModalOpen(true);
@@ -230,7 +198,6 @@ export const App: React.FC = () => {
     }
   };
 
-  const totalFilesChanged = activeWs?.diffSummary?.filesChanged || 0;
   const blockedCount = Object.values(workspaces).filter((w) => w.agentStatus?.state === 'blocked').length;
 
   return (
@@ -287,34 +254,7 @@ export const App: React.FC = () => {
             <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
 
             {/* Project & Workspace Scope Breadcrumb */}
-            <div
-              title={`Active Project: ${currentProject?.name || 'Project'} • ${currentProject?.rootPath || ''}`}
-              className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[10px] font-mono shrink-0"
-            >
-              <span className="text-zinc-500 font-medium">{currentProject?.name || 'Project'}:</span>
-              <span className={`font-semibold truncate max-w-[120px] ${
-                activeWs?.sessionMode === 'branch'
-                  ? 'text-cyan-400'
-                  : activeWs?.agentType && activeWs.agentType !== 'terminal'
-                  ? 'text-amber-400'
-                  : 'text-zinc-200'
-              }`}>
-                {activeWs?.sessionMode === 'branch' ? `🌿 ${activeWs.name}` : activeWs?.name || 'Root Shell'}
-              </span>
-              <span className={`text-[8.5px] px-1 py-0.2 rounded border font-semibold ${
-                activeWs?.sessionMode === 'branch'
-                  ? 'bg-cyan-950/60 border-cyan-800 text-cyan-300'
-                  : activeWs?.agentType && activeWs.agentType !== 'terminal'
-                  ? 'bg-amber-950/60 border-amber-800 text-amber-300'
-                  : 'bg-zinc-800 border-zinc-700 text-zinc-400'
-              }`}>
-                {activeWs?.sessionMode === 'branch' ? 'WORKTREE' : activeWs?.agentType && activeWs.agentType !== 'terminal' ? 'SESSION' : 'PROJECT'}
-              </span>
-            </div>
-
-            <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
-
-            {/* Herdr-Style Agent Navigation Tabs Strip */}
+            {/* Clean Agent Navigation Tabs Strip (Zero Duplicate Breadcrumbs) */}
             <div className="flex items-center gap-1 min-w-0 overflow-x-auto no-scrollbar">
               {projectSessions.map((ws) => {
                 const isActive = activeWs?.id === ws.id;
@@ -329,10 +269,10 @@ export const App: React.FC = () => {
                       setEditingTabName(ws.name);
                     }}
                     title={`${ws.name} (${ws.agentType || 'terminal'})${ws.branch ? ` • ${ws.branch}` : ''} - Double click to rename`}
-                    className={`group flex items-center gap-1.5 px-2 py-0.5 rounded text-xs cursor-pointer transition-colors shrink-0 ${
+                    className={`group flex items-center gap-1.5 px-2.5 py-1 rounded text-xs cursor-pointer transition-colors shrink-0 ${
                       isActive
-                        ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-700 shadow-xs'
-                        : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/60 border border-transparent'
+                        ? 'bg-zinc-800 text-zinc-100 font-medium border border-zinc-700 shadow-xs'
+                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60 border border-transparent'
                     }`}
                   >
                     {getAgentIcon(ws.agentType, 'w-3.5 h-3.5 shrink-0')}
@@ -358,27 +298,17 @@ export const App: React.FC = () => {
                       />
                     ) : (
                       <span className="font-mono text-[11px] font-medium max-w-[140px] truncate">
-                        {ws.name}
+                        {ws.sessionMode === 'branch' ? `🌿 ${ws.name}` : ws.name}
                       </span>
                     )}
 
-                    {ws.sessionMode === 'branch' ? (
-                      <span className="text-[8px] px-1 py-0.2 rounded bg-cyan-950/60 text-cyan-400 border border-cyan-800/80 shrink-0 font-mono">
-                        WT
-                      </span>
-                    ) : ws.agentType && ws.agentType !== 'terminal' ? (
-                      <span className="text-[8px] px-1 py-0.2 rounded bg-amber-950/60 text-amber-400 border border-amber-800/80 shrink-0 font-mono uppercase">
-                        {ws.agentType === 'claude-code' ? 'CLAUDE' : ws.agentType === 'antigravity' ? 'AGY' : ws.agentType}
-                      </span>
-                    ) : null}
-
                     {/* Subtle Status Indicator */}
                     <span
-                      className={`w-1 h-1 rounded-full shrink-0 ${
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                         ws.agentStatus?.state === 'blocked'
                           ? 'bg-rose-500'
                           : isActive
-                          ? 'bg-zinc-300'
+                          ? 'bg-emerald-400'
                           : 'bg-zinc-600'
                       }`}
                     />
@@ -391,7 +321,7 @@ export const App: React.FC = () => {
                           deleteWorkspace(ws.id);
                         }}
                         title="Close session"
-                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-rose-400 transition-opacity ml-0.5"
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-700 text-zinc-400 hover:text-rose-400 transition-opacity ml-0.5"
                       >
                         <X className="w-2.5 h-2.5" />
                       </button>
@@ -400,21 +330,19 @@ export const App: React.FC = () => {
                 );
               })}
 
-              {/* Quick Add Terminal Tab (+) */}
-              <button
-                onClick={() => handleSpawnAgent('terminal')}
-                title="New Terminal Tab (Ctrl+T)"
-                className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Agent Launcher Dropdown Trigger (▾) */}
-              <div className="relative shrink-0">
+              {/* Quick Add Terminal Tab (+) & Agent Dropdown */}
+              <div className="relative shrink-0 flex items-center">
+                <button
+                  onClick={() => handleSpawnAgent('terminal')}
+                  title="New Terminal Tab (Ctrl+T)"
+                  className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={() => setIsAgentMenuOpen(!isAgentMenuOpen)}
-                  title="Start an AI Agent (Claude Code, Antigravity, Gemini, Codex)..."
-                  className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors"
+                  title="Start AI Agent (Claude, Antigravity, Shell)..."
+                  className="p-1 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors -ml-0.5"
                 >
                   <ChevronDown className="w-3 h-3" />
                 </button>
@@ -428,198 +356,46 @@ export const App: React.FC = () => {
                 />
               </div>
             </div>
-
-            {/* Quick Open Directory Button */}
-            <button
-              onClick={pickAndOpenFolder}
-              title="Open Directory (Ctrl+O)"
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors shrink-0"
-            >
-              <FolderOpen className="w-3.5 h-3.5" />
-            </button>
           </div>
 
-          {/* Right: Ultra-Compact Icon Toolbar with Unified View Switchers */}
-          <div className="flex items-center gap-1 shrink-0">
-            {/* View Switcher: Terminal, Room, Files, Diff */}
-            <div className="flex items-center gap-0.5 bg-zinc-900/60 p-0.5 rounded border border-zinc-800/80">
-              {/* Terminal View (Click to toggle full-screen TUI) */}
-              <button
-                onClick={() => {
-                  setActiveTab('terminal');
-                  if (rightPanelOpen) {
-                    toggleRightPanel();
-                  }
-                }}
-                title={rightPanelOpen ? 'Maximize Terminal TUI (Close Side Panel) (Ctrl+1)' : 'Terminal Workspace (Ctrl+1)'}
-                className={`p-1 rounded transition-colors ${
-                  activeTab === 'terminal' && !rightPanelOpen
-                    ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                <Terminal className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Room Mesh View (Click to open, click again to close) */}
-              <button
-                onClick={() => {
-                  setActiveTab('terminal');
-                  if (rightPanelOpen && rightPanelView === 'room') {
-                    toggleRightPanel();
-                  } else {
-                    if (!rightPanelOpen) toggleRightPanel();
-                    setRightPanelView('room');
-                  }
-                }}
-                title={rightPanelOpen && rightPanelView === 'room' ? 'Close Room Panel (Ctrl+2)' : 'Open Agent Room Mesh (Ctrl+2)'}
-                className={`p-1 rounded transition-colors flex items-center gap-1 ${
-                  rightPanelOpen && rightPanelView === 'room'
-                    ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                {projectSessions.length > 0 && (
-                  <span className="text-[10px] font-mono text-zinc-400 font-bold px-0.5">
-                    {projectSessions.length}
-                  </span>
-                )}
-              </button>
-
-              {/* Files Explorer View (Click to open, click again to close) */}
-              <button
-                onClick={() => {
-                  setActiveTab('terminal');
-                  if (rightPanelOpen && rightPanelView === 'files') {
-                    toggleRightPanel();
-                  } else {
-                    if (!rightPanelOpen) toggleRightPanel();
-                    setRightPanelView('files');
-                  }
-                }}
-                title={rightPanelOpen && rightPanelView === 'files' ? 'Close Files Panel (Ctrl+3)' : 'Open Project File Tree (Ctrl+3)'}
-                className={`p-1 rounded transition-colors ${
-                  rightPanelOpen && rightPanelView === 'files'
-                    ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                <FolderTree className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Git Changes & Diff View (Click to open, click again to close) */}
-              <button
-                onClick={() => {
-                  setActiveTab('terminal');
-                  if (rightPanelOpen && rightPanelView === 'changes') {
-                    toggleRightPanel();
-                  } else {
-                    if (!rightPanelOpen) toggleRightPanel();
-                    setRightPanelView('changes');
-                  }
-                }}
-                title={rightPanelOpen && rightPanelView === 'changes' ? 'Close Diff Panel (Ctrl+4)' : 'Open Git Changes & Diff (Ctrl+4)'}
-                className={`p-1 rounded transition-colors flex items-center gap-1 ${
-                  rightPanelOpen && rightPanelView === 'changes'
-                    ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                <GitCompare className="w-3.5 h-3.5" />
-                {totalFilesChanged > 0 && (
-                  <span className="text-[10px] font-mono text-zinc-400 font-bold px-0.5">
-                    {totalFilesChanged}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
-
-            {/* Linux Terminal / Vim-style Command Palette Prompt (Ctrl+P / :) */}
-            <button
-              onClick={() => setIsCommandPaletteOpen(true)}
-              title="Command Palette & Shell (Ctrl+P / :)"
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-            >
-              <Command className="w-3.5 h-3.5" />
-            </button>
-
-            <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
-
-            {/* Terminal Actions (Split View, Restart, Copy, Clear) */}
+          {/* Right: Clean Minimal Essential Controls */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* 1. Split Terminal Side-by-Side */}
             <button
               onClick={toggleSplitView}
-              title={isSplitView ? 'Single View' : 'Split Terminals Side-by-Side'}
-              className={`p-1 rounded transition-colors ${
+              title={isSplitView ? 'Switch to Single Terminal' : 'Split Terminals Side-by-Side'}
+              className={`p-1.5 rounded transition-colors ${
                 isSplitView
-                  ? 'bg-zinc-800 text-zinc-200 border border-zinc-700'
-                  : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900'
+                  ? 'bg-zinc-800 text-zinc-100 font-semibold border border-zinc-700 shadow-xs'
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
               }`}
             >
               <Columns2 className="w-3.5 h-3.5" />
             </button>
 
-            <button
-              onClick={() => dispatchTerminal('restart')}
-              title="Restart Shell Process"
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
-
-            <button
-              onClick={() => dispatchTerminal('copy')}
-              title="Copy Terminal Logs"
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-            >
-              {copiedAction ? <Check className="w-3.5 h-3.5 text-zinc-200" /> : <Copy className="w-3.5 h-3.5" />}
-            </button>
-
-            <button
-              onClick={() => dispatchTerminal('clear')}
-              title="Clear Terminal Buffer"
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-
-            <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
-
-            {/* Quick External IDE Button */}
-            <button
-              onClick={() => handleLaunch('cursor')}
-              disabled={launchingEditor === 'cursor'}
-              title="Open in External IDE (Cursor / Zed)"
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-            >
-              <Code2 className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Settings & Themes Button */}
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              title="Preferences & Themes (Ctrl+,)"
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-            >
-              <Palette className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Right Panel Toggle Button */}
+            {/* 2. Toggle Agent Room / Side Panel */}
             <button
               onClick={toggleRightPanel}
-              title={rightPanelOpen ? 'Collapse Right Panel (Ctrl+Alt+B)' : 'Expand Right Panel (Ctrl+Alt+B)'}
-              className={`p-1 rounded transition-colors relative flex items-center ${
+              title={rightPanelOpen ? 'Collapse Agent Room Panel (Ctrl+Alt+B)' : 'Expand Agent Room Panel (Ctrl+Alt+B)'}
+              className={`p-1.5 rounded transition-colors relative flex items-center ${
                 rightPanelOpen
-                  ? 'bg-zinc-800 text-zinc-200'
-                  : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900'
+                  ? 'bg-zinc-800 text-zinc-100 font-semibold border border-zinc-700 shadow-xs'
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
               }`}
             >
               {rightPanelOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRight className="w-3.5 h-3.5" />}
-              {(totalFilesChanged > 0 || roomMessages.length > 0) && !rightPanelOpen && (
-                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-zinc-400" />
+              {roomMessages.length > 0 && !rightPanelOpen && (
+                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-400" />
               )}
+            </button>
+
+            {/* 3. Settings & Themes */}
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              title="Settings & Themes (Ctrl+,)"
+              className="p-1.5 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
+            >
+              <Settings className="w-3.5 h-3.5" />
             </button>
           </div>
         </header>
