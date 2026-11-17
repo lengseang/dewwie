@@ -479,6 +479,21 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
         const geo = geoRef.current;
         const { LW, LH, renderScale } = dimsRef.current;
 
+        // When window is minimized or hidden, skip expensive 2D rasterization
+        if (document.hidden) {
+          agentsRef.current.forEach((ag) => {
+            if (ag.speechTimer && ag.speechTimer > 0) ag.speechTimer--;
+          });
+          popupsRef.current = popupsRef.current.filter((p) => {
+            p.life -= 0.05;
+            p.y -= 0.3;
+            return p.life > 0;
+          });
+          lastRenderTsRef.current = now;
+          animId = requestAnimationFrame(render);
+          return;
+        }
+
         const canvas = canvasRef.current;
         if (canvas) {
           const ctx = canvas.getContext('2d');
@@ -766,8 +781,19 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
       animId = requestAnimationFrame(render);
     };
 
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        lastRenderTsRef.current = performance.now();
+        animId = requestAnimationFrame(render);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     animId = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(animId);
+    return () => {
+      cancelAnimationFrame(animId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [activeRoomId, focusedSessionId, ecoModeFps]);
 
   // ResizeObserver for canvas dimensions

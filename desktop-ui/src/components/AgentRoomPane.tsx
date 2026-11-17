@@ -467,6 +467,7 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
               leadSessionId={leadSessionId}
               ecoModeFps={ecoModeFps}
               onFocusSession={handleFocusSession}
+              handoffTriggerKey={currentRoomMessages.length}
             />
 
             {/* If room is completely empty, render a non-intrusive floating helper overlay */}
@@ -503,15 +504,17 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
             ) : (
               currentRoomMessages.map((msg, idx) => {
                 const senderWs = allSessions.find((s) => s.id === msg.fromSessionId);
-                const tag = msg.type?.toUpperCase() || 'INFO';
+                const tag = msg.type?.toUpperCase() || 'CHAT';
                 const tagColor =
                   tag === 'DELEGATE'
-                    ? 'border-amber-700 text-amber-300 bg-amber-950/40'
+                    ? 'border-amber-600/80 text-amber-300 bg-amber-950/40'
                     : tag === 'REVIEW'
-                    ? 'border-purple-700 text-purple-300 bg-purple-950/40'
+                    ? 'border-emerald-600/80 text-emerald-300 bg-emerald-950/40'
+                    : tag === 'SIGNAL'
+                    ? 'border-rose-600/80 text-rose-300 bg-rose-950/40'
                     : tag === 'TOOL'
-                    ? 'border-teal-700 text-teal-300 bg-teal-950/40'
-                    : 'border-zinc-700 text-zinc-400 bg-zinc-900/40';
+                    ? 'border-sky-600/80 text-sky-300 bg-sky-950/40'
+                    : 'border-zinc-700 text-zinc-300 bg-zinc-900/60';
 
                 return (
                   <div
@@ -521,19 +524,25 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
                     className="p-2.5 rounded-lg border border-zinc-800/80 bg-zinc-950/60 hover:bg-zinc-900/50 hover:border-zinc-700 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center justify-between text-[10px] mb-1">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-semibold text-zinc-200">
                           @{msg.fromSessionName || senderWs?.name || 'agent'}
                         </span>
-                        <span className={`px-1 py-0.2 rounded border text-[8.5px] font-semibold ${tagColor}`}>
+                        {msg.target && msg.target !== '@all' && (
+                          <span className="text-zinc-500 font-mono text-[9px] flex items-center gap-1">
+                            <span>➔</span>
+                            <span className="text-zinc-300 font-semibold">{msg.target}</span>
+                          </span>
+                        )}
+                        <span className={`px-1.5 py-0.5 rounded border text-[8.5px] font-semibold tracking-wider ${tagColor}`}>
                           {tag}
                         </span>
                       </div>
-                      <span className="text-[9px] text-zinc-600">
+                      <span className="text-[9px] text-zinc-500 font-mono">
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
                     </div>
-                    <div className="text-[11px] text-zinc-300 break-words leading-relaxed">
+                    <div className="text-[11px] text-zinc-300 break-words leading-relaxed font-mono">
                       {msg.content}
                     </div>
                   </div>

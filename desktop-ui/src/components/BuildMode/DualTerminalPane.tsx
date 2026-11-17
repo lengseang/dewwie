@@ -199,10 +199,19 @@ export const DualTerminalPane: React.FC = () => {
     if (leftContainerRef.current) ro.observe(leftContainerRef.current);
     if (rightContainerRef.current) ro.observe(rightContainerRef.current);
 
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        setTimeout(handleResize, 50);
+        setTimeout(handleResize, 200);
+      }
+    };
+
     window.addEventListener('resize', handleResize);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', handleResize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [activeWorkspaceId, isSplitView, isSplitView ? secondaryWs?.id : null, attachPty]);
 
