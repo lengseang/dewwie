@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { SessionMode } from '../../types';
+import { getAgentIcon } from '../AgentIcons';
 import {
   ChevronDown,
   ChevronRight,
@@ -14,6 +15,7 @@ import {
   Terminal,
   FolderGit2,
   Bot,
+  Folder,
 } from 'lucide-react';
 
 interface WorkspaceSidebarProps {
@@ -38,6 +40,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     deleteWorkspace,
     leadSessionId,
     sidebarWidth,
+    theme,
   } = useWorkspaceStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -87,7 +90,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     setIsCreating(true);
     try {
       const targetProjId = selectedProjectId || activeProjectId || projectList[0]?.id;
-      await createSession({
+      const newId = await createSession({
         projectId: targetProjId,
         name: sessionName.trim(),
         sessionMode,
@@ -95,12 +98,39 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         baseBranch: 'main',
         agentType,
       });
+      if (newId) {
+        setActiveWorkspace(newId);
+        setActiveTab('terminal');
+      }
       setSessionName('');
       setBranchName('');
       setIsModalOpen(false);
     } finally {
       setIsCreating(false);
     }
+  };
+
+  const handleSelectProject = (projectId: string) => {
+    setActiveProject(projectId);
+    if (collapsedProjects[projectId]) {
+      toggleProject(projectId);
+    }
+    // Find project's root session
+    const projectSessions = allSessions.filter(
+      (w) => w.projectId === projectId || w.repository === projects[projectId]?.name
+    );
+    const rootSession = projectSessions.find(
+      (s) => s.sessionMode === 'local' && (s.id.startsWith('ws-local-') || s.name.toLowerCase().includes('shell'))
+    ) || projectSessions[0];
+    if (rootSession) {
+      setActiveWorkspace(rootSession.id);
+      setActiveTab('terminal');
+    }
+  };
+
+  const handleSelectSession = (sessionId: string) => {
+    setActiveWorkspace(sessionId);
+    setActiveTab('terminal');
   };
 
   return (
@@ -111,7 +141,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       }}
       className="w-full h-full flex flex-col border-r text-zinc-300 select-none shrink-0 font-mono"
     >
-      {/* 1. Header: Dewwie Logo + Setting + Command Palette + New Session */}
+      {/* 1. Header: Dewwie Logo + Brand + New Session Quick Button */}
       <div
         style={{ borderColor: 'var(--app-border)' }}
         className={`h-9 border-b flex items-center justify-between gap-1.5 shrink-0 ${isNarrow ? 'px-1.5 justify-center' : 'px-3'}`}
@@ -119,126 +149,93 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         {!isNarrow ? (
           <>
             <div className="flex items-center gap-2 min-w-0">
-              <button
-                onClick={onOpenSettings}
-                title="Settings & Themes (Ctrl+,)"
-                className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors shrink-0"
-              >
-                <img src="/logo.png" alt="Dewwie" className="w-4 h-4 rounded object-contain" />
-              </button>
-              <span className="text-xs font-bold tracking-wider text-zinc-200 uppercase truncate">
-                Dewwie
+              <img src="/logo.png" alt="Dewwie" className="w-4 h-4 rounded object-contain shrink-0" />
+              <span className="text-xs font-bold tracking-wider text-zinc-100 uppercase truncate">
+                DEWWIE
               </span>
             </div>
 
-            <div className="flex items-center gap-1">
-              {onOpenCommandPalette && (
-                <button
-                  onClick={onOpenCommandPalette}
-                  title="Command Palette & Shell (Ctrl+P / :)"
-                  className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors"
-                >
-                  <Command className="w-3 h-3" />
-                </button>
-              )}
-
-              {onOpenSettings && (
-                <button
-                  onClick={onOpenSettings}
-                  title="Preferences & Themes"
-                  className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors"
-                >
-                  <Settings className="w-3 h-3" />
-                </button>
-              )}
-
-              <button
-                onClick={() => {
-                  setSelectedProjectId(activeProjectId || projectList[0]?.id || '');
-                  setIsModalOpen(true);
-                }}
-                title="Create New Agent Session"
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 text-[11px] transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-                <span>New</span>
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                setSelectedProjectId(activeProjectId || projectList[0]?.id || '');
+                setIsModalOpen(true);
+              }}
+              title="Create New Custom Agent Session"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 text-[11px] font-medium transition-colors"
+            >
+              <Plus className="w-3 h-3 text-zinc-400" />
+              <span>New</span>
+            </button>
           </>
         ) : (
-          <div className="flex flex-col items-center gap-1 py-1">
-            <button
-              onClick={onOpenSettings}
-              title="Settings & Themes"
-              className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors"
-            >
-              <img src="/logo.png" alt="Dewwie" className="w-3.5 h-3.5 rounded object-contain" />
-            </button>
+          <div className="flex flex-col items-center py-1">
+            <img src="/logo.png" alt="Dewwie" className="w-4 h-4 rounded object-contain" />
           </div>
         )}
       </div>
 
-      {/* 2. Open Directory Shortcut Bar */}
-      <div
-        style={{ borderColor: 'var(--app-border)' }}
-        className={`p-1.5 border-b shrink-0 ${isNarrow ? 'flex justify-center' : ''}`}
-      >
-        <button
-          onClick={handlePickFolder}
-          title="Open Any Directory from your PC (Ctrl+O)"
-          className={`rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center ${
-            isNarrow ? 'p-1.5 justify-center' : 'w-full px-2 py-1 justify-between'
-          }`}
-        >
-          <div className="flex items-center gap-1.5">
-            <FolderPlus className="w-3.5 h-3.5 text-zinc-400" />
-            {!isNarrow && <span className="font-medium text-[11px]">Open Directory</span>}
+      {/* 2. Projects & Sessions Tree */}
+      <div className={`flex-1 overflow-y-auto no-scrollbar space-y-3 ${isNarrow ? 'p-1' : 'p-2'}`}>
+        {!isNarrow && (
+          <div className="px-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-500 flex items-center justify-between">
+            <span>Workspaces & Sessions</span>
+            <span className="text-zinc-600 font-mono">{allSessions.length} active</span>
           </div>
-          {!isNarrow && <span className="text-[9px] text-zinc-600">Ctrl+O</span>}
-        </button>
-      </div>
+        )}
 
-      {/* 3. Projects & Sessions Tree with Number Badges & Hollow Dots */}
-      <div className={`flex-1 overflow-y-auto no-scrollbar space-y-2 ${isNarrow ? 'p-1' : 'p-2'}`}>
         {projectList.map((proj, projIdx) => {
           const projectSessions = allSessions.filter(
             (w) => w.projectId === proj.id || w.repository === proj.name
           );
+          const isProjectActive = activeProjectId === proj.id;
           const isCollapsed = collapsedProjects[proj.id];
+
+          // Differentiate: Project Root Workspace vs Custom Sessions
+          const rootSession = projectSessions.find(
+            (s) => s.sessionMode === 'local' && (s.id.startsWith('ws-local-') || s.name.toLowerCase().includes('shell'))
+          ) || projectSessions[0];
+          const customSessions = projectSessions.filter((s) => s.id !== rootSession?.id);
 
           return (
             <div key={proj.id} className="space-y-1">
-              {/* Project Row: Numbered Badge [1], [2] */}
+              {/* Project Row: Numbered Badge [1], Name, and Toggle */}
               <div
-                onClick={() => {
-                  setActiveProject(proj.id);
-                  toggleProject(proj.id);
-                }}
+                onClick={() => handleSelectProject(proj.id)}
                 className={`flex items-center rounded transition-colors cursor-pointer ${
                   isNarrow
                     ? 'justify-center p-1 hover:bg-zinc-900'
                     : 'justify-between px-2 py-1 text-xs hover:bg-zinc-900/40'
                 } ${
-                  activeProjectId === proj.id
-                    ? 'text-zinc-100 bg-zinc-900/60 font-semibold'
+                  isProjectActive
+                    ? 'text-zinc-100 bg-zinc-900/70 font-semibold border border-zinc-800/80'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
-                title={`${proj.name} (${proj.rootPath})`}
+                title={`${proj.name} (${proj.rootPath}) • Click to activate project workspace`}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  {/* Clean Number Badge [1] */}
-                  <span className="w-4 h-4 rounded bg-zinc-900 border border-zinc-700/80 flex items-center justify-center text-[10px] font-bold text-zinc-200 shrink-0 shadow-xs">
+                  <span className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                    isProjectActive ? 'bg-zinc-800 text-zinc-100 border border-zinc-700' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                  }`}>
                     {projIdx + 1}
                   </span>
 
                   {!isNarrow && (
                     <>
+                      <Folder className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                       <span className="truncate text-xs">{proj.name}</span>
-                      {isCollapsed ? (
-                        <ChevronRight className="w-3 h-3 text-zinc-600 shrink-0 ml-auto" />
-                      ) : (
-                        <ChevronDown className="w-3 h-3 text-zinc-600 shrink-0 ml-auto" />
-                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleProject(proj.id);
+                        }}
+                        className="p-0.5 text-zinc-600 hover:text-zinc-300 ml-1"
+                      >
+                        {isCollapsed ? (
+                          <ChevronRight className="w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3" />
+                        )}
+                      </button>
                     </>
                   )}
                 </div>
@@ -250,122 +247,110 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 )}
               </div>
 
-              {/* Sessions Tree with Hollow Circles (○) & Clean Guide Lines */}
+              {/* Workspaces List Under Project */}
               {!isCollapsed && (
-                <div className={isNarrow ? 'flex flex-col items-center gap-2 py-1' : 'relative ml-4 pl-3.5 space-y-1 py-0.5'}>
-                  {projectSessions.map((ws) => {
+                <div className={isNarrow ? 'flex flex-col items-center gap-1.5 py-1' : 'relative ml-3 pl-3 space-y-1 py-0.5 border-l border-zinc-800/80'}>
+                  {/* A. Project Root Workspace (Project Shell) */}
+                  {rootSession && (
+                    <div
+                      key={rootSession.id}
+                      onClick={() => handleSelectSession(rootSession.id)}
+                      title={`${rootSession.name} • Project Root Terminal Workspace`}
+                      className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer text-xs font-mono transition-all ${
+                        activeWorkspaceId === rootSession.id
+                          ? 'bg-zinc-900 text-white font-medium border border-zinc-700/80 shadow-xs'
+                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Terminal className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        {!isNarrow && (
+                          <span className="truncate text-[11px]">
+                            {rootSession.name}
+                          </span>
+                        )}
+                      </div>
+                      {!isNarrow && (
+                        <span className="text-[8.5px] px-1 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 font-mono">
+                          ROOT
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* B. Custom Sessions & AI Agent Workspaces */}
+                  {customSessions.map((ws) => {
                     const isActive = activeWorkspaceId === ws.id;
                     const isLead = ws.agentRole === 'lead' || ws.id === leadSessionId;
 
-                    if (isNarrow) {
-                      // Ultra-compact Narrow Rail: Hollow Dot (○) or Filled (●)
-                      return (
-                        <div
-                          key={ws.id}
-                          onClick={() => {
-                            setActiveWorkspace(ws.id);
-                            setActiveTab('terminal');
-                          }}
-                          title={`${ws.name} (${ws.agentType || 'shell'})\nStatus: ${ws.agentStatus?.message || 'idle'}`}
-                          className="relative flex items-center justify-center cursor-pointer py-0.5 group"
-                        >
-                          <span
-                            className={`rounded-full transition-all ${
-                              isActive
-                                ? 'w-2.5 h-2.5 bg-zinc-100 ring-2 ring-zinc-700'
-                                : ws.agentStatus?.state === 'blocked'
-                                ? 'w-2 h-2 bg-rose-500'
-                                : ws.agentStatus?.state === 'working'
-                                ? 'w-2 h-2 border border-zinc-300 bg-zinc-500 animate-pulse'
-                                : 'w-2 h-2 border border-zinc-600 bg-transparent group-hover:border-zinc-300'
-                            }`}
-                          />
-                        </div>
-                      );
-                    }
-
-                    // Full Width Mode: Hollow Dot + Title + Diff & Actions
                     return (
                       <div
                         key={ws.id}
-                        onClick={() => {
-                          setActiveWorkspace(ws.id);
-                          setActiveTab('terminal');
-                        }}
-                        className={`group relative flex items-center justify-between px-2 py-1 rounded cursor-pointer text-xs font-mono transition-all ${
+                        onClick={() => handleSelectSession(ws.id)}
+                        title={`${ws.name} (${ws.agentType || 'shell'})\nWorktree: ${ws.worktreePath}`}
+                        className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer text-xs font-mono transition-all ${
                           isActive
-                            ? 'bg-zinc-900 text-white font-medium border border-zinc-800 shadow-xs'
+                            ? 'bg-zinc-900 text-white font-medium border border-zinc-700/80 shadow-xs'
                             : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
                         }`}
                       >
-                        {/* Vertical tree trunk through this item */}
-                        <span className="absolute -left-3.5 top-0 bottom-0 w-px bg-zinc-800/80" />
-
-                        {/* Horizontal connector tick from vertical guide line */}
-                        <span
-                          className={`absolute -left-3.5 top-1/2 -translate-y-1/2 w-2.5 h-px ${
-                            isActive ? 'bg-zinc-400' : 'bg-zinc-800/80'
-                          }`}
-                        />
-
-                        {/* Hollow Circle Dot (○) / Filled (●) & Session Name */}
-                        <div className="flex items-center gap-2 min-w-0 pr-1">
-                          <span
-                            className={`rounded-full shrink-0 transition-colors ${
-                              isActive
-                                ? 'w-2 h-2 bg-zinc-200 border border-zinc-200 shadow-xs'
-                                : ws.agentStatus?.state === 'blocked'
-                                ? 'w-2 h-2 bg-rose-500 border border-rose-500'
-                                : 'w-2 h-2 border border-zinc-600 bg-transparent group-hover:border-zinc-300'
-                            }`}
-                          />
-                          <span className="truncate text-[11px]">{ws.name}</span>
-                        </div>
-
-                        {/* Right: Role, Diff & delete */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {isLead && (
-                            <span className="px-1 py-0.2 rounded text-[8px] uppercase font-mono text-zinc-300 bg-zinc-800 border border-zinc-700">
-                              Lead
-                            </span>
-                          )}
-
-                          {ws.diffSummary && (ws.diffSummary.additions > 0 || ws.diffSummary.deletions > 0) && (
-                            <span className="text-[9px] font-mono text-zinc-500">
-                              <span className="text-emerald-500">+{ws.diffSummary.additions}</span>{' '}
-                              <span className="text-rose-500">-{ws.diffSummary.deletions}</span>
-                            </span>
-                          )}
-
-                          {ws.id !== 'ws-local-proj-dewwie' && ws.id !== 'ws-local-proj-exbytelab' && !ws.id.startsWith('ws-local-proj-') && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteWorkspace(ws.id);
-                              }}
-                              title="Delete Session"
-                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-600 hover:text-rose-400 hover:bg-zinc-800 transition-opacity"
-                            >
-                              <Trash2 className="w-2.5 h-2.5" />
-                            </button>
+                        <div className="flex items-center gap-2 min-w-0">
+                          {getAgentIcon(ws.agentType, 'w-3.5 h-3.5 shrink-0')}
+                          {!isNarrow && (
+                            <span className="truncate text-[11px]">{ws.name}</span>
                           )}
                         </div>
+
+                        {!isNarrow && (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isLead && (
+                              <span className="px-1 py-0.2 rounded text-[8px] uppercase font-mono text-amber-300 bg-amber-950/60 border border-amber-800">
+                                Lead
+                              </span>
+                            )}
+
+                            {ws.sessionMode === 'branch' && (
+                              <span className="text-[8.5px] px-1 rounded bg-cyan-950/60 border border-cyan-800 text-cyan-300 font-mono">
+                                WT
+                              </span>
+                            )}
+
+                            {ws.diffSummary && (ws.diffSummary.additions > 0 || ws.diffSummary.deletions > 0) && (
+                              <span className="text-[9px] font-mono text-zinc-500">
+                                <span className="text-emerald-400">+{ws.diffSummary.additions}</span>{' '}
+                                <span className="text-rose-400">-{ws.diffSummary.deletions}</span>
+                              </span>
+                            )}
+
+                            {ws.id !== 'ws-local-proj-dewwie' && ws.id !== 'ws-local-proj-exbytelab' && !ws.id.startsWith('ws-local-proj-') && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteWorkspace(ws.id);
+                                }}
+                                title="Delete Session"
+                                className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-600 hover:text-rose-400 hover:bg-zinc-800 transition-opacity"
+                              >
+                                <Trash2 className="w-2.5 h-2.5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
 
+                  {/* + New Session Shortcut under project */}
                   {!isNarrow && (
                     <div
                       onClick={() => {
                         setSelectedProjectId(proj.id);
                         setIsModalOpen(true);
                       }}
-                      className="group relative flex items-center gap-2 px-2 py-0.5 text-xs font-mono text-zinc-600 hover:text-zinc-300 cursor-pointer transition-colors"
+                      className="group flex items-center gap-1.5 px-2 py-0.5 text-xs font-mono text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors"
                     >
-                      <span className="absolute -left-3.5 top-0 w-2.5 h-1/2 border-b border-l border-zinc-800/80 rounded-bl-sm" />
-                      <span className="text-[10px] text-zinc-600 group-hover:text-zinc-400 select-none">
-                        + session
-                      </span>
+                      <Plus className="w-2.5 h-2.5 text-zinc-600 group-hover:text-zinc-400" />
+                      <span className="text-[10px] select-none">+ session</span>
                     </div>
                   )}
                 </div>
@@ -375,7 +360,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         })}
       </div>
 
-      {/* 4. Live Session Process Status Tray (Bottom Section from User Sketch) */}
+      {/* 3. Live Session Process Status Tray */}
       <div
         style={{
           backgroundColor: 'var(--app-surface)',
@@ -402,10 +387,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             return (
               <button
                 key={s.id}
-                onClick={() => {
-                  setActiveWorkspace(s.id);
-                  setActiveTab('terminal');
-                }}
+                onClick={() => handleSelectSession(s.id)}
                 title={`[${idx + 1}] ${s.name}\nState: ${state || 'idle'}\n${s.agentStatus?.message || ''}`}
                 className={`flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all ${
                   isActive
@@ -414,8 +396,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 }`}
               >
                 <span className="font-bold">{idx + 1}</span>
-
-                {/* Status Indicator Icon from User Sketch */}
                 {isWorking && (
                   <RotateCw className="w-2.5 h-2.5 text-zinc-200 animate-spin" />
                 )}
@@ -437,24 +417,66 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         </div>
       </div>
 
-      {/* 5. Bottom Add Project / Repository Action */}
+      {/* 4. Bottom Utility Bar: Add Repository, Command Palette, and Settings (Moved to the Below!) */}
       <div
         style={{
           backgroundColor: 'var(--app-surface)',
           borderColor: 'var(--app-border)',
         }}
-        className={`border-t shrink-0 ${isNarrow ? 'p-1 flex justify-center' : 'p-2'}`}
+        className={`border-t shrink-0 p-1.5 space-y-1 ${isNarrow ? 'flex flex-col items-center' : ''}`}
       >
+        {/* Open Directory / Add Repository */}
         <button
-          onClick={() => setIsAddProjectOpen(true)}
-          className={`flex items-center rounded bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors ${
-            isNarrow ? 'p-1.5 justify-center' : 'w-full justify-center gap-1.5 py-1.5 px-3 text-xs'
+          onClick={handlePickFolder}
+          title="Open Any Directory from your PC (Ctrl+O)"
+          className={`rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center ${
+            isNarrow ? 'p-1.5 justify-center' : 'w-full px-2 py-1 justify-between'
           }`}
-          title="Add Repository / Folder"
         >
-          <FolderPlus className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-          {!isNarrow && <span>+ Add Repository</span>}
+          <div className="flex items-center gap-1.5">
+            <FolderPlus className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+            {!isNarrow && <span className="font-medium text-[11px]">Open Directory</span>}
+          </div>
+          {!isNarrow && <span className="text-[9px] text-zinc-600">Ctrl+O</span>}
         </button>
+
+        {/* Command Palette Button */}
+        {onOpenCommandPalette && (
+          <button
+            onClick={onOpenCommandPalette}
+            title="Command Palette (Ctrl+P / :)"
+            className={`rounded bg-zinc-900/60 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-mono transition-colors flex items-center ${
+              isNarrow ? 'p-1.5 justify-center' : 'w-full px-2 py-1 justify-between'
+            }`}
+          >
+            <div className="flex items-center gap-1.5">
+              <Command className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+              {!isNarrow && <span className="text-[11px]">Commands</span>}
+            </div>
+            {!isNarrow && <span className="text-[9px] text-zinc-600">Ctrl+P</span>}
+          </button>
+        )}
+
+        {/* Settings Button (Moved to the Below, as requested!) */}
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            title="Settings & Themes (Ctrl+,)"
+            className={`rounded bg-zinc-900/60 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-mono transition-colors flex items-center ${
+              isNarrow ? 'p-1.5 justify-center' : 'w-full px-2 py-1 justify-between'
+            }`}
+          >
+            <div className="flex items-center gap-1.5">
+              <Settings className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+              {!isNarrow && <span className="text-[11px]">Settings</span>}
+            </div>
+            {!isNarrow && (
+              <span className="text-[9px] text-zinc-500 font-mono capitalize">
+                {theme}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Add Project Modal */}
@@ -680,3 +702,5 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     </aside>
   );
 };
+
+export default WorkspaceSidebar;

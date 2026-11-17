@@ -111,7 +111,7 @@ export interface WorkspaceState {
   parentId?: string; // Sub-agent hierarchy
   agentRole?: AgentRole; // 'lead' | 'worker' | 'reviewer'
   roomId?: string; // Room mesh membership (e.g. 'room-1'). One session belongs to at most one room.
-  agentType?: 'claude-code' | 'codex' | 'aider' | 'gemini' | 'custom' | 'shell';
+  agentType?: 'claude-code' | 'codex' | 'aider' | 'gemini' | 'antigravity' | 'hermes' | 'terminal' | 'custom' | 'shell' | string;
   agentStatus: AgentStatus;
   metrics: WorkspaceMetrics;
   ports: PortAllocation[];

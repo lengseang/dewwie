@@ -286,6 +286,34 @@ export const App: React.FC = () => {
 
             <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
 
+            {/* Project & Workspace Scope Breadcrumb */}
+            <div
+              title={`Active Project: ${currentProject?.name || 'Project'} • ${currentProject?.rootPath || ''}`}
+              className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[10px] font-mono shrink-0"
+            >
+              <span className="text-zinc-500 font-medium">{currentProject?.name || 'Project'}:</span>
+              <span className={`font-semibold truncate max-w-[120px] ${
+                activeWs?.sessionMode === 'branch'
+                  ? 'text-cyan-400'
+                  : activeWs?.agentType && activeWs.agentType !== 'terminal'
+                  ? 'text-amber-400'
+                  : 'text-zinc-200'
+              }`}>
+                {activeWs?.sessionMode === 'branch' ? `🌿 ${activeWs.name}` : activeWs?.name || 'Root Shell'}
+              </span>
+              <span className={`text-[8.5px] px-1 py-0.2 rounded border font-semibold ${
+                activeWs?.sessionMode === 'branch'
+                  ? 'bg-cyan-950/60 border-cyan-800 text-cyan-300'
+                  : activeWs?.agentType && activeWs.agentType !== 'terminal'
+                  ? 'bg-amber-950/60 border-amber-800 text-amber-300'
+                  : 'bg-zinc-800 border-zinc-700 text-zinc-400'
+              }`}>
+                {activeWs?.sessionMode === 'branch' ? 'WORKTREE' : activeWs?.agentType && activeWs.agentType !== 'terminal' ? 'SESSION' : 'PROJECT'}
+              </span>
+            </div>
+
+            <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
+
             {/* Herdr-Style Agent Navigation Tabs Strip */}
             <div className="flex items-center gap-1 min-w-0 overflow-x-auto no-scrollbar">
               {projectSessions.map((ws) => {
@@ -333,6 +361,16 @@ export const App: React.FC = () => {
                         {ws.name}
                       </span>
                     )}
+
+                    {ws.sessionMode === 'branch' ? (
+                      <span className="text-[8px] px-1 py-0.2 rounded bg-cyan-950/60 text-cyan-400 border border-cyan-800/80 shrink-0 font-mono">
+                        WT
+                      </span>
+                    ) : ws.agentType && ws.agentType !== 'terminal' ? (
+                      <span className="text-[8px] px-1 py-0.2 rounded bg-amber-950/60 text-amber-400 border border-amber-800/80 shrink-0 font-mono uppercase">
+                        {ws.agentType === 'claude-code' ? 'CLAUDE' : ws.agentType === 'antigravity' ? 'AGY' : ws.agentType}
+                      </span>
+                    ) : null}
 
                     {/* Subtle Status Indicator */}
                     <span

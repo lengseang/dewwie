@@ -439,8 +439,14 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   setActiveProject: (id: string) => {
-    if (get().projects[id]) {
-      set({ activeProjectId: id });
+    const proj = get().projects[id];
+    if (proj) {
+      const allWs = Object.values(get().workspaces);
+      const projWs = allWs.find((w) => w.projectId === id || w.repository === proj.name);
+      set((state) => ({
+        activeProjectId: id,
+        activeWorkspaceId: projWs ? projWs.id : state.activeWorkspaceId,
+      }));
       get().persistState();
     }
   },
@@ -573,8 +579,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   setActiveWorkspace: (id: string) => {
-    if (get().workspaces[id]) {
-      set({ activeWorkspaceId: id });
+    const ws = get().workspaces[id];
+    if (ws) {
+      set({
+        activeWorkspaceId: id,
+        activeProjectId: ws.projectId || get().activeProjectId,
+      });
       get().persistState();
     }
   },
