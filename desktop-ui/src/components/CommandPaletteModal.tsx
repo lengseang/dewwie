@@ -156,6 +156,42 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       },
     },
     {
+      id: 'cmd-theme-catppuccin',
+      prefix: ':theme catppuccin',
+      title: ':theme catppuccin',
+      description: 'Switch IDE to Catppuccin Macchiato Warm Espresso theme',
+      icon: <Palette className="w-3.5 h-3.5 text-zinc-300" />,
+      category: 'theme',
+      action: () => {
+        setTheme('catppuccin');
+        onClose();
+      },
+    },
+    {
+      id: 'cmd-theme-transparent',
+      prefix: ':theme transparent',
+      title: ':theme transparent',
+      description: 'Switch IDE to Frosted Glass Translucent Acrylic theme',
+      icon: <Palette className="w-3.5 h-3.5 text-zinc-300" />,
+      category: 'theme',
+      action: () => {
+        setTheme('transparent');
+        onClose();
+      },
+    },
+    {
+      id: 'cmd-theme-nord',
+      prefix: ':theme nord',
+      title: ':theme nord',
+      description: 'Switch IDE to Nordic Arctic Ice & Polar Night theme',
+      icon: <Palette className="w-3.5 h-3.5 text-zinc-300" />,
+      category: 'theme',
+      action: () => {
+        setTheme('nord');
+        onClose();
+      },
+    },
+    {
       id: 'cmd-view-room',
       prefix: ':room',
       title: ':room',

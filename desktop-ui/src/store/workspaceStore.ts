@@ -36,8 +36,16 @@ interface WorkspaceStore {
   rightPanelWidth: number;
   setSidebarWidth: (width: number) => void;
   setRightPanelWidth: (width: number) => void;
-  theme: 'zinc' | 'oled' | 'slate' | 'tokyo' | 'monokai';
+  theme: 'zinc' | 'oled' | 'slate' | 'tokyo' | 'monokai' | 'catppuccin' | 'transparent' | 'nord';
   setTheme: (theme: string) => void;
+  restoreSessionsOnStartup: boolean;
+  setRestoreSessionsOnStartup: (enable: boolean) => void;
+  restoreScrollback: boolean;
+  setRestoreScrollback: (enable: boolean) => void;
+  persistActiveMesh: boolean;
+  setPersistActiveMesh: (enable: boolean) => void;
+  ecoModeFps: 15 | 60;
+  setEcoModeFps: (fps: 15 | 60) => void;
   pickAndOpenFolder: () => Promise<string | null>;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
@@ -181,6 +189,26 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setTheme: (theme) => {
     if (typeof window !== 'undefined') localStorage.setItem('dewwie_theme', theme);
     set({ theme: theme as any });
+  },
+  restoreSessionsOnStartup: typeof window === 'undefined' || localStorage.getItem('dewwie_restore_sessions') !== 'false',
+  setRestoreSessionsOnStartup: (enable) => {
+    if (typeof window !== 'undefined') localStorage.setItem('dewwie_restore_sessions', String(enable));
+    set({ restoreSessionsOnStartup: enable });
+  },
+  restoreScrollback: typeof window === 'undefined' || localStorage.getItem('dewwie_restore_scrollback') !== 'false',
+  setRestoreScrollback: (enable) => {
+    if (typeof window !== 'undefined') localStorage.setItem('dewwie_restore_scrollback', String(enable));
+    set({ restoreScrollback: enable });
+  },
+  persistActiveMesh: typeof window === 'undefined' || localStorage.getItem('dewwie_persist_mesh') !== 'false',
+  setPersistActiveMesh: (enable) => {
+    if (typeof window !== 'undefined') localStorage.setItem('dewwie_persist_mesh', String(enable));
+    set({ persistActiveMesh: enable });
+  },
+  ecoModeFps: (typeof window !== 'undefined' && localStorage.getItem('dewwie_eco_fps') === '60') ? 60 : 15,
+  setEcoModeFps: (fps) => {
+    if (typeof window !== 'undefined') localStorage.setItem('dewwie_eco_fps', String(fps));
+    set({ ecoModeFps: fps });
   },
   pickAndOpenFolder: async () => {
     if (typeof window !== 'undefined' && window.swarmherdNative?.pickFolder) {
@@ -492,15 +520,16 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
     const newWs: WorkspaceState = {
       id: newId,
-      projectId: targetProj?.id || 'proj-exbytelab',
-      projectName: targetProj?.name || 'exbytelab',
-      repository: targetProj?.name || 'exbytelab',
+      projectId: targetProj?.id || get().activeProjectId || 'proj-dewwie',
+      projectName: targetProj?.name || 'Dewwie',
+      repository: targetProj?.name || 'Dewwie',
       name: name.trim() || (isBranch ? branch! : 'Local Session'),
       sessionMode,
       branch: isBranch ? branch : 'main',
       baseBranch: baseBranch || 'main',
       worktreePath,
       agentType: (agentType as any) || 'claude-code',
+      roomId: get().activeRoomId || 'room-1',
       agentStatus: {
         state: 'idle',
         message: sessionMode === 'local' ? 'Local shell ready' : 'Branch worktree ready',
@@ -517,9 +546,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
     set((state) => ({
       workspaces: { ...state.workspaces, [newId]: newWs },
-      workspaceOrder: [newId, ...state.workspaceOrder],
+      workspaceOrder: [newId, ...state.workspaceOrder.filter((id) => id !== newId)],
       activeWorkspaceId: newId,
+      activeTab: 'terminal',
     }));
+    get().persistState();
     return newId;
   },
 

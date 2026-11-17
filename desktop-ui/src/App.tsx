@@ -92,8 +92,18 @@ export const App: React.FC = () => {
   // Synchronize dynamic active theme with document and xterm viewports
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    const activeColor = THEMES_CONFIG[theme]?.bg || '#09090b';
-    document.body.style.backgroundColor = activeColor;
+    const tDef = THEMES_CONFIG[theme] || THEMES_CONFIG.zinc;
+    document.body.style.backgroundColor = tDef.bg;
+    const root = document.documentElement;
+    root.style.setProperty('--app-bg', tDef.bg);
+    root.style.setProperty('--app-surface', tDef.surface);
+    root.style.setProperty('--app-surface-elevated', tDef.surfaceElevated);
+    root.style.setProperty('--app-nav-bg', tDef.navBg);
+    root.style.setProperty('--app-border', tDef.border);
+    root.style.setProperty('--app-border-subtle', tDef.borderSubtle);
+    root.style.setProperty('--app-text', tDef.text);
+    root.style.setProperty('--app-text-muted', tDef.textMuted);
+    root.style.setProperty('--app-accent', tDef.accent);
   }, [theme]);
 
   // Window resize mouse drag listener
@@ -137,7 +147,7 @@ export const App: React.FC = () => {
     (w) => !workspaceOrder.includes(w.id)
   );
   const projectSessions = [...orderedList, ...remainingWorkspaces].filter(
-    (w) => !activeProjectId || w.projectId === activeProjectId || w.repository === currentProject?.name
+    (w) => !activeProjectId || w.projectId === activeProjectId || w.repository === currentProject?.name || w.id === activeWorkspaceId
   );
 
   // Keyboard shortcut routing
@@ -278,7 +288,7 @@ export const App: React.FC = () => {
 
             {/* Herdr-Style Agent Navigation Tabs Strip */}
             <div className="flex items-center gap-1 min-w-0 overflow-x-auto no-scrollbar">
-              {projectSessions.map((ws, idx) => {
+              {projectSessions.map((ws) => {
                 const isActive = activeWs?.id === ws.id;
 
                 return (
@@ -319,8 +329,8 @@ export const App: React.FC = () => {
                         className="w-20 px-1 py-0 bg-zinc-950 border border-zinc-600 rounded text-[11px] font-mono text-zinc-100 focus:outline-none"
                       />
                     ) : (
-                      <span className="font-mono text-[11px] font-medium max-w-[120px] truncate">
-                        {ws.name.toLowerCase().startsWith('terminal') || ws.name.toLowerCase().startsWith(ws.agentType?.toLowerCase() || '') ? idx + 1 : ws.name}
+                      <span className="font-mono text-[11px] font-medium max-w-[140px] truncate">
+                        {ws.name}
                       </span>
                     )}
 

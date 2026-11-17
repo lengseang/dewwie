@@ -102,8 +102,17 @@ export const DualTerminalPane: React.FC = () => {
       }
     };
 
+    let inputBuf = '';
+    const currentWs = workspaces[workspaceId];
+    const workingDir = currentWs?.worktreePath || 'D:\\1111-Works\\Dewwie';
+
     ws.onerror = () => {
       console.warn(`[PTY Client] WebSocket error for ${workspaceId}.`);
+      if (typeof window !== 'undefined' && !window.swarmherdNative) {
+        term.writeln('\x1b[38;5;244m[Dewwie Web Mode] PTY shell simulation ready • ' + workingDir + '\x1b[0m');
+        term.writeln('\x1b[38;5;248mPowerShell 7.5.0\x1b[0m');
+        term.write(`\r\n\x1b[38;5;39mPS ${workingDir}>\x1b[0m `);
+      }
     };
 
     ws.onclose = () => {
@@ -114,6 +123,26 @@ export const DualTerminalPane: React.FC = () => {
     term.onData((data) => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(data);
+      } else if (typeof window !== 'undefined' && !window.swarmherdNative) {
+        if (data === '\r') {
+          term.writeln('');
+          const trimmed = inputBuf.trim();
+          if (trimmed === 'clear' || trimmed === 'cls') {
+            term.clear();
+          } else if (trimmed) {
+            term.writeln(`\x1b[38;5;245m[sim] ${trimmed}\x1b[0m`);
+          }
+          inputBuf = '';
+          term.write(`\r\n\x1b[38;5;39mPS ${workingDir}>\x1b[0m `);
+        } else if (data === '\u007F' || data === '\b') {
+          if (inputBuf.length > 0) {
+            inputBuf = inputBuf.slice(0, -1);
+            term.write('\b \b');
+          }
+        } else {
+          inputBuf += data;
+          term.write(data);
+        }
       }
     });
 
