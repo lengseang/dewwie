@@ -140,7 +140,7 @@ const INITIAL_WORKSPACES: Record<string, WorkspaceState> = {
     branch: 'main',
     baseBranch: 'main',
     repository: 'Dewwie',
-    agentType: 'claude-code',
+    agentType: 'terminal',
     worktreePath: 'D:\\1111-Works\\Dewwie',
     agentStatus: {
       state: 'idle',
@@ -410,7 +410,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
                 activeProjectId: validProject,
                 activeWorkspaceId: validWs,
                 activeTab: savedState.activeTab || state.activeTab,
-                isSplitView: typeof savedState.isSplitView === 'boolean' ? savedState.isSplitView : state.isSplitView,
+                isSplitView: false, // Cold start always prioritizes single manual terminal view
                 sidebarOpen: typeof savedState.sidebarOpen === 'boolean' ? savedState.sidebarOpen : state.sidebarOpen,
                 rightPanelOpen: typeof savedState.rightPanelOpen === 'boolean' ? savedState.rightPanelOpen : state.rightPanelOpen,
                 rightPanelView: savedState.rightPanelView || state.rightPanelView,
@@ -534,7 +534,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       branch: isBranch ? branch : 'main',
       baseBranch: baseBranch || 'main',
       worktreePath,
-      agentType: (agentType as any) || 'claude-code',
+      agentType: (agentType as any) || 'terminal',
+      autoLaunch: Boolean(agentType && agentType !== 'terminal'),
       roomId: get().activeRoomId || 'room-1',
       agentStatus: {
         state: 'idle',

@@ -334,7 +334,7 @@ async function getWorkspaces(forceRefresh = false) {
       branch: 'main',
       baseBranch: 'main',
       worktreePath: proj.rootPath,
-      agentType: existingLocal?.agentType || 'claude-code',
+      agentType: (existingLocal?.agentType && existingLocal.agentType !== 'claude-code') ? existingLocal.agentType : 'terminal',
       agentStatus: existingLocal?.agentStatus || {
         state: 'idle',
         message: 'Active PowerShell shell ready in project folder',
@@ -438,7 +438,7 @@ async function getWorkspaces(forceRefresh = false) {
               branch: branch,
               baseBranch: 'main',
               worktreePath: worktreePath,
-              agentType: existing?.agentType || 'codex',
+              agentType: (existing?.agentType && existing.agentType !== 'codex') ? existing.agentType : 'terminal',
               agentStatus: existing?.agentStatus || {
                 state: 'idle',
                 message: 'Branch worktree ready',
@@ -635,32 +635,27 @@ function getOrCreatePty(workspaceId, cwd) {
     }
   });
 
-  // Auto-launch CLI agent if specified
-  let detectedAgent = 'terminal';
+  // Prioritize manual opening: Only launch CLI agent if explicitly requested by user on session spawn (autoLaunch === true)
   if (workspacesCache && Array.isArray(workspacesCache)) {
     const matched = workspacesCache.find(w => w.id === workspaceId);
-    if (matched?.agentType) detectedAgent = matched.agentType;
-  }
-  if (detectedAgent === 'claude-code' || detectedAgent === 'claude') {
-    setTimeout(() => {
-      try { ptyProcess.write('claude\r'); } catch (_) {}
-    }, 700);
-  } else if (detectedAgent === 'antigravity' || detectedAgent === 'agy') {
-    setTimeout(() => {
-      try { ptyProcess.write('agy\r'); } catch (_) {}
-    }, 700);
-  } else if (detectedAgent === 'gemini') {
-    setTimeout(() => {
-      try { ptyProcess.write('gemini\r'); } catch (_) {}
-    }, 700);
-  } else if (detectedAgent === 'codex') {
-    setTimeout(() => {
-      try { ptyProcess.write('codex\r'); } catch (_) {}
-    }, 700);
-  } else if (detectedAgent === 'hermes') {
-    setTimeout(() => {
-      try { ptyProcess.write('hermes\r'); } catch (_) {}
-    }, 700);
+    if (matched && matched.autoLaunch && matched.agentType && matched.agentType !== 'terminal') {
+      matched.autoLaunch = false; // Consume so it runs only once and reconnects stay manual
+      const cmdMap = {
+        'claude-code': 'claude\r',
+        'claude': 'claude\r',
+        'antigravity': 'agy\r',
+        'agy': 'agy\r',
+        'gemini': 'gemini\r',
+        'codex': 'codex\r',
+        'hermes': 'hermes\r',
+      };
+      const toSend = cmdMap[matched.agentType];
+      if (toSend) {
+        setTimeout(() => {
+          try { ptyProcess.write(toSend); } catch (_) {}
+        }, 600);
+      }
+    }
   }
 
   const scrollbackStream = fs.createWriteStream(scrollbackPath, { flags: 'a' });

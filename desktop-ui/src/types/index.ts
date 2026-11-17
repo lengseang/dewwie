@@ -112,6 +112,7 @@ export interface WorkspaceState {
   agentRole?: AgentRole; // 'lead' | 'worker' | 'reviewer'
   roomId?: string; // Room mesh membership (e.g. 'room-1'). One session belongs to at most one room.
   agentType?: 'claude-code' | 'codex' | 'aider' | 'gemini' | 'antigravity' | 'hermes' | 'terminal' | 'custom' | 'shell' | string;
+  autoLaunch?: boolean; // Set true ONLY when user explicitly spawns an AI agent CLI session
   agentStatus: AgentStatus;
   metrics: WorkspaceMetrics;
   ports: PortAllocation[];
