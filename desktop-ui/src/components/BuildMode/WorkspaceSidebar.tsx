@@ -16,6 +16,7 @@ import {
   FolderGit2,
   Bot,
   Folder,
+  PenLine,
 } from 'lucide-react';
 
 interface WorkspaceSidebarProps {
@@ -320,7 +321,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                                 title={ws.diffSummary.isUncommitted ? 'Uncommitted working changes' : `${ws.diffSummary.aheadCount || 1} commits ahead of main`}
                                 className="text-[9px] font-mono text-zinc-500 flex items-center gap-0.5"
                               >
-                                {ws.diffSummary.isUncommitted && <span className="text-amber-400">✎</span>}
+                                {ws.diffSummary.isUncommitted && <PenLine className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
                                 {!ws.diffSummary.isUncommitted && ws.diffSummary.aheadCount && (
                                   <span className="text-cyan-400 text-[8px]">↑{ws.diffSummary.aheadCount}</span>
                                 )}

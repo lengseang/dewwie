@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
-import { Plus, Bot, GitBranch, FolderGit2, X, Terminal, ArrowRight } from 'lucide-react';
+import { isLightTheme } from '../theme/themes';
+import { Plus, Bot, GitBranch, FolderGit2, X, ArrowRight } from 'lucide-react';
 
 interface DelegateTaskModalProps {
   isOpen: boolean;
@@ -8,7 +9,7 @@ interface DelegateTaskModalProps {
 }
 
 export const DelegateTaskModal: React.FC<DelegateTaskModalProps> = ({ isOpen, onClose }) => {
-  const { delegateTask, activeProjectId, projects } = useWorkspaceStore();
+  const { delegateTask, activeProjectId, projects, theme } = useWorkspaceStore();
   const currentProject = activeProjectId ? projects[activeProjectId] : null;
 
   const [task, setTask] = useState('');
@@ -64,42 +65,44 @@ export const DelegateTaskModal: React.FC<DelegateTaskModalProps> = ({ isOpen, on
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs font-mono select-none">
       <div
-        className="w-full max-w-lg bg-[#09090b] border border-zinc-800 rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+        className="w-full max-w-lg border rounded-lg shadow-2xl overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
       >
         {/* Header */}
-        <div className="h-10 px-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
+        <div
+          style={{ backgroundColor: 'var(--app-nav-bg)', borderColor: 'var(--app-border)' }}
+          className="h-9 px-3 border-b flex items-center justify-between"
+        >
           <div className="flex items-center gap-2">
-            <Plus className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+            <Plus className="w-3.5 h-3.5" style={{ color: 'var(--app-text-muted)' }} />
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--app-text)' }}>
               Delegate Task
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-500">
-              Herdr Engine
             </span>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
+            className="p-1 rounded transition-colors hover:opacity-80"
+            style={{ color: 'var(--app-text-muted)' }}
           >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-3.5 space-y-3">
           {error && (
-            <div className="px-3 py-2 rounded bg-rose-950/40 border border-rose-900/60 text-rose-400 text-xs">
+            <div className="px-2.5 py-1.5 rounded bg-rose-950/40 border border-rose-900/60 text-rose-400 text-xs">
               {error}
             </div>
           )}
 
           {/* Goal Prompt Input */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-zinc-300 flex items-center justify-between">
-              <span>Agent Goal / Instructions</span>
-              <span className="text-[10px] text-zinc-500">Ctrl+Enter to run</span>
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold uppercase tracking-wider flex items-center justify-between" style={{ color: 'var(--app-text-muted)' }}>
+              <span>Task Instructions</span>
+              <span className="text-[9px]">Ctrl+Enter to run</span>
             </label>
             <textarea
               value={task}
@@ -110,90 +113,108 @@ export const DelegateTaskModal: React.FC<DelegateTaskModalProps> = ({ isOpen, on
                   handleSubmit();
                 }
               }}
-              placeholder="e.g. Implement resilient retry loop with exponential backoff for database queries"
+              placeholder="e.g. Implement resilient retry loop with exponential backoff"
               rows={3}
               autoFocus
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-700 resize-none font-mono"
+              style={{
+                backgroundColor: 'var(--app-surface-elevated)',
+                borderColor: 'var(--app-border)',
+                color: 'var(--app-text)',
+              }}
+              className="w-full px-2.5 py-1.5 border rounded text-xs focus:outline-none resize-none font-mono"
             />
           </div>
 
           {/* Settings Grid */}
-          <div className="grid grid-cols-2 gap-3 text-xs">
+          <div className="grid grid-cols-2 gap-2 text-xs">
             {/* Agent Template */}
             <div className="space-y-1">
-              <label className="text-[10px] text-zinc-400 flex items-center gap-1">
-                <Bot className="w-3 h-3 text-zinc-500" />
-                <span>Agent Template</span>
+              <label className="text-[10px] flex items-center gap-1" style={{ color: 'var(--app-text-muted)' }}>
+                <Bot className="w-3 h-3" />
+                <span>Agent</span>
               </label>
               <select
                 value={agent}
                 onChange={(e) => setAgent(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
+                style={{
+                  backgroundColor: 'var(--app-surface-elevated)',
+                  borderColor: 'var(--app-border)',
+                  color: 'var(--app-text)',
+                }}
+                className="w-full px-2 py-1 border rounded text-xs focus:outline-none"
               >
-                <option value="dewwie-worker">dewwie-worker (Autonomous Executor)</option>
-                <option value="dewwie-lead">dewwie-lead (Task Decomposer)</option>
-                <option value="dewwie-reviewer">dewwie-reviewer (Adversarial Quality)</option>
+                <option value="dewwie-worker">Worker (Executor)</option>
+                <option value="dewwie-lead">Lead (Planner)</option>
+                <option value="dewwie-reviewer">Reviewer (QA)</option>
               </select>
             </div>
 
             {/* Target Repository */}
             <div className="space-y-1">
-              <label className="text-[10px] text-zinc-400 flex items-center gap-1">
-                <FolderGit2 className="w-3 h-3 text-zinc-500" />
-                <span>Target Repository</span>
+              <label className="text-[10px] flex items-center gap-1" style={{ color: 'var(--app-text-muted)' }}>
+                <FolderGit2 className="w-3 h-3" />
+                <span>Repository</span>
               </label>
               <select
                 value={repo}
                 onChange={(e) => setRepo(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
+                style={{
+                  backgroundColor: 'var(--app-surface-elevated)',
+                  borderColor: 'var(--app-border)',
+                  color: 'var(--app-text)',
+                }}
+                className="w-full px-2 py-1 border rounded text-xs focus:outline-none"
               >
-                <option value="exbytelab">exbytelab (D:\1111-Works\exbytelab)</option>
-                <option value="Dewwie">Dewwie (D:\1111-Works\Dewwie)</option>
+                <option value="exbytelab">exbytelab</option>
+                <option value="Dewwie">Dewwie</option>
               </select>
             </div>
           </div>
 
           {/* Auto-Isolation Summary Preview */}
-          <div className="p-2.5 bg-zinc-950 rounded border border-zinc-900 text-[11px] space-y-1 text-zinc-400">
-            <div className="flex items-center justify-between text-zinc-500 text-[10px]">
-              <span>ISOLATION PLAN</span>
-              <span className="text-zinc-500 font-mono">Managed</span>
+          <div
+            style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)' }}
+            className="p-2 rounded border text-[11px] space-y-1"
+          >
+            <div className="flex items-center justify-between text-[10px]" style={{ color: 'var(--app-text-muted)' }}>
+              <span>WORKTREE PLAN</span>
+              <span className="font-mono">Isolated</span>
             </div>
-            <div className="flex items-center gap-1.5 text-zinc-300">
-              <GitBranch className="w-3 h-3 text-zinc-500 shrink-0" />
-              <span className="text-zinc-500">Branch:</span>
-              <span className="font-mono text-zinc-300 truncate">{previewBranch}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-zinc-300">
-              <Terminal className="w-3 h-3 text-zinc-500 shrink-0" />
-              <span className="text-zinc-500">Worktree:</span>
-              <span className="font-mono text-zinc-400 truncate">.worktrees/{computedSlug}</span>
+            <div className="flex items-center gap-1.5" style={{ color: 'var(--app-text)' }}>
+              <GitBranch className="w-3 h-3 shrink-0" style={{ color: 'var(--app-text-muted)' }} />
+              <span style={{ color: 'var(--app-text-muted)' }}>Branch:</span>
+              <span className="font-mono truncate">{previewBranch}</span>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-zinc-800/60">
+          <div className="pt-2 flex items-center justify-end gap-2 border-t" style={{ borderColor: 'var(--app-border)' }}>
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-3 py-1.5 rounded text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent transition-colors"
+              className="px-3 py-1 rounded text-xs transition-colors hover:opacity-80"
+              style={{ color: 'var(--app-text-muted)' }}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !task.trim()}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-medium bg-zinc-100 text-zinc-950 hover:bg-white active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none transition-all"
+              style={{
+                backgroundColor: 'var(--app-accent)',
+                color: isLightTheme(theme) ? '#ffffff' : '#000000',
+              }}
+              className="inline-flex items-center gap-1 px-3 py-1 rounded text-xs font-semibold active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none transition-all"
             >
               {isSubmitting ? (
                 <>
-                  <span className="w-3 h-3 border-2 border-zinc-400 border-t-zinc-950 rounded-full animate-spin" />
+                  <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   <span>Provisioning...</span>
                 </>
               ) : (
                 <>
-                  <span>Delegate Task</span>
+                  <span>Run Agent</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}

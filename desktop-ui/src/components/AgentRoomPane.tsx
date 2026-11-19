@@ -445,18 +445,21 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
             {/* If room has zero assigned sessions, render clear invitation card */}
             {roomSessions.length === 0 && (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-4 text-center">
-                <div className="pointer-events-auto max-w-xs p-4 rounded-xl bg-zinc-950/90 border border-zinc-800 backdrop-blur-md shadow-2xl">
-                  <Users className="w-8 h-8 text-amber-400/80 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-zinc-100 mb-1">Room Deck Standing By</p>
-                  <p className="text-[11px] text-zinc-400 mb-3 leading-relaxed">
-                    Assign existing sessions or spawn agents to populate the workstations in <span className="text-amber-300">"{currentRoom.name}"</span>.
+                <div
+                  style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+                  className="pointer-events-auto max-w-xs p-3.5 rounded-lg border backdrop-blur-md shadow-lg"
+                >
+                  <Users className="w-6 h-6 text-amber-400 mx-auto mb-1.5" />
+                  <p className="text-xs font-semibold mb-1" style={{ color: 'var(--app-text)' }}>Empty Room</p>
+                  <p className="text-[11px] mb-2.5" style={{ color: 'var(--app-text-muted)' }}>
+                    No agents in <span className="font-semibold text-amber-400">{currentRoom.name}</span>
                   </p>
                   <button
                     onClick={() => setIsAssignModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/60 text-amber-300 text-xs font-semibold transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/60 text-amber-300 text-xs font-semibold transition-colors cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Assign Sessions</span>
+                    <span>Add Agent</span>
                   </button>
                 </div>
               </div>
@@ -466,12 +469,10 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
           /* Stream View Panel: Passive Chronological Room Activity Feed */
           <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
             {currentRoomMessages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center p-6 text-center text-zinc-500">
-                <Radio className="w-8 h-8 text-zinc-700 mb-2" />
-                <p className="text-xs font-semibold text-zinc-400 mb-1">No Room Activity Yet</p>
-                <p className="text-[11px] text-zinc-600 max-w-xs">
-                  Agents in {currentRoom.name} will stream lifecycle state transitions, tool calls, and delegations here.
-                </p>
+              <div className="h-full flex flex-col items-center justify-center p-6 text-center" style={{ color: 'var(--app-text-muted)' }}>
+                <Radio className="w-6 h-6 mb-1.5 opacity-60" />
+                <p className="text-xs font-semibold mb-0.5" style={{ color: 'var(--app-text)' }}>No Activity</p>
+                <p className="text-[11px]">Room messages will stream here</p>
               </div>
             ) : (
               currentRoomMessages.map((msg, idx) => {
@@ -590,35 +591,42 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
         </div>
       </div>
 
-      {/* 6. High-Clarity Session Assignment Modal */}
+      {/* 6. Clean Session Assignment Modal */}
       {isAssignModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh] overflow-hidden font-mono text-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs font-mono text-xs">
+          <div
+            style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+            className="border rounded-lg shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh] overflow-hidden"
+          >
             {/* Modal Header */}
-            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/60">
+            <div
+              style={{ backgroundColor: 'var(--app-nav-bg)', borderColor: 'var(--app-border)' }}
+              className="px-3.5 py-2.5 border-b flex items-center justify-between"
+            >
               <div className="flex items-center gap-2 min-w-0">
                 <Users className="w-4 h-4 text-amber-400 shrink-0" />
                 <div className="min-w-0">
-                  <h3 className="font-semibold text-zinc-100 text-sm truncate">
-                    Room Roster • {currentRoom.name}
+                  <h3 className="font-semibold text-xs truncate" style={{ color: 'var(--app-text)' }}>
+                    Agents • {currentRoom.name}
                   </h3>
-                  <p className="text-[10px] text-zinc-400">
-                    Assign or move sessions into this room (1 room max)
+                  <p className="text-[10px]" style={{ color: 'var(--app-text-muted)' }}>
+                    Assign sessions to this room (1 room max)
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsAssignModalOpen(false)}
-                className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                className="p-1 rounded transition-colors hover:opacity-80"
+                style={{ color: 'var(--app-text-muted)' }}
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {/* Modal Body: Available Sessions */}
-            <div className="p-4 overflow-y-auto space-y-3 flex-1">
-              <div className="flex items-center justify-between pb-1 text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
-                <span>Available Sessions ({allSessions.length})</span>
+            <div className="p-3.5 overflow-y-auto space-y-3 flex-1">
+              <div className="flex items-center justify-between pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--app-text-muted)' }}>
+                <span>Sessions ({allSessions.length})</span>
                 <button
                   onClick={() => {
                     allSessions.forEach((s) => {
@@ -629,7 +637,7 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
                   }}
                   className="text-amber-400 hover:text-amber-300 transition-colors"
                 >
-                  + Assign All in Project
+                  + Assign All
                 </button>
               </div>
 
@@ -641,29 +649,32 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
                   return (
                     <div
                       key={s.id}
-                      className={`p-2.5 rounded-lg border flex items-center justify-between transition-colors ${
-                        isCurrent
-                          ? 'bg-amber-950/30 border-amber-500/60 text-zinc-100'
-                          : 'bg-zinc-900/40 border-zinc-800 hover:border-zinc-700 text-zinc-300'
-                      }`}
+                      style={{
+                        backgroundColor: isCurrent ? 'var(--app-surface-elevated)' : 'var(--app-bg)',
+                        borderColor: isCurrent ? 'var(--app-accent)' : 'var(--app-border)',
+                      }}
+                      className="p-2 rounded border flex items-center justify-between transition-colors"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {getAgentIcon(s.agentType, 'w-4 h-4 shrink-0')}
+                      <div className="flex items-center gap-2 min-w-0">
+                        {getAgentIcon(s.agentType, 'w-3.5 h-3.5 shrink-0')}
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-semibold text-xs truncate">@{s.name}</span>
+                            <span className="font-semibold text-xs truncate" style={{ color: 'var(--app-text)' }}>@{s.name}</span>
                             {s.agentRole === 'lead' && (
                               <Crown className="w-3 h-3 text-amber-400 shrink-0" />
                             )}
-                            <span className="text-[9px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono">
+                            <span
+                              style={{ backgroundColor: 'var(--app-surface)', color: 'var(--app-text-muted)' }}
+                              className="text-[9px] px-1 py-0.2 rounded font-mono"
+                            >
                               {s.projectName || 'Default'}
                             </span>
                           </div>
-                          <div className="text-[10px] text-zinc-500 truncate flex items-center gap-1.5 mt-0.5">
+                          <div className="text-[10px] truncate flex items-center gap-1.5 mt-0.5" style={{ color: 'var(--app-text-muted)' }}>
                             <span>{s.branch ? `branch: ${s.branch}` : 'local'}</span>
                             <span>•</span>
-                            <span className={isCurrent ? 'text-emerald-400 font-semibold' : s.roomId ? 'text-amber-400' : 'text-zinc-500'}>
-                              {isCurrent ? `✓ In this Room` : otherRoomName ? `In ${otherRoomName}` : 'Unassigned'}
+                            <span className={isCurrent ? 'text-emerald-500 font-semibold' : s.roomId ? 'text-amber-500' : ''}>
+                              {isCurrent ? `In Room` : otherRoomName ? `In ${otherRoomName}` : 'Unassigned'}
                             </span>
                           </div>
                         </div>
@@ -674,7 +685,7 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
                         {isCurrent ? (
                           <button
                             onClick={() => setSessionRoom(s.id, null)}
-                            className="px-2.5 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                            className="px-2 py-0.5 rounded bg-rose-950/40 hover:bg-rose-900 border border-rose-800 text-rose-300 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
                           >
                             <X className="w-3 h-3" />
                             <span>Remove</span>
@@ -682,10 +693,10 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
                         ) : (
                           <button
                             onClick={() => setSessionRoom(s.id, currentRoomId)}
-                            className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/60 text-amber-300 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                            className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/60 text-amber-300 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
                           >
                             <Plus className="w-3 h-3" />
-                            <span>{s.roomId ? 'Move Here' : 'Add to Room'}</span>
+                            <span>{s.roomId ? 'Move' : 'Add'}</span>
                           </button>
                         )}
                       </div>
@@ -695,35 +706,39 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
               </div>
 
               {/* Quick Spawn New Agent Section */}
-              <div className="pt-3 border-t border-zinc-800/80">
-                <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-2">
-                  Spawn Agent Directly into {currentRoom.name}
+              <div className="pt-2.5 border-t" style={{ borderColor: 'var(--app-border)' }}>
+                <div className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--app-text-muted)' }}>
+                  Spawn New Agent
                 </div>
                 <div className="grid grid-cols-4 gap-1.5">
                   <button
                     onClick={() => handleSpawnNewSessionIntoRoom('terminal')}
-                    className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[10px] flex items-center justify-center gap-1 transition-colors"
+                    style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+                    className="p-1.5 rounded border text-[10px] flex items-center justify-center gap-1 transition-colors hover:opacity-80"
                   >
-                    <Terminal className="w-3 h-3 text-zinc-400" />
+                    <Terminal className="w-3 h-3" style={{ color: 'var(--app-text-muted)' }} />
                     <span>Terminal</span>
                   </button>
                   <button
                     onClick={() => handleSpawnNewSessionIntoRoom('claude-code')}
-                    className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[10px] flex items-center justify-center gap-1 transition-colors"
+                    style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+                    className="p-1.5 rounded border text-[10px] flex items-center justify-center gap-1 transition-colors hover:opacity-80"
                   >
                     {getAgentIcon('claude-code', 'w-3 h-3')}
                     <span>Claude</span>
                   </button>
                   <button
                     onClick={() => handleSpawnNewSessionIntoRoom('antigravity')}
-                    className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[10px] flex items-center justify-center gap-1 transition-colors"
+                    style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+                    className="p-1.5 rounded border text-[10px] flex items-center justify-center gap-1 transition-colors hover:opacity-80"
                   >
                     {getAgentIcon('antigravity', 'w-3 h-3')}
                     <span>Antigravity</span>
                   </button>
                   <button
                     onClick={() => handleSpawnNewSessionIntoRoom('gemini')}
-                    className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[10px] flex items-center justify-center gap-1 transition-colors"
+                    style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+                    className="p-1.5 rounded border text-[10px] flex items-center justify-center gap-1 transition-colors hover:opacity-80"
                   >
                     {getAgentIcon('gemini', 'w-3 h-3')}
                     <span>Gemini</span>
@@ -733,13 +748,17 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
             </div>
 
             {/* Modal Footer */}
-            <div className="px-4 py-2.5 border-t border-zinc-800 flex items-center justify-between bg-zinc-900/60">
-              <span className="text-[10px] text-zinc-500">
-                {roomSessions.length} session{roomSessions.length !== 1 ? 's' : ''} assigned to {currentRoom.name}
+            <div
+              style={{ backgroundColor: 'var(--app-nav-bg)', borderColor: 'var(--app-border)' }}
+              className="px-3.5 py-2 border-t flex items-center justify-between"
+            >
+              <span className="text-[10px]" style={{ color: 'var(--app-text-muted)' }}>
+                {roomSessions.length} session{roomSessions.length !== 1 ? 's' : ''} in room
               </span>
               <button
                 onClick={() => setIsAssignModalOpen(false)}
-                className="px-4 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold transition-colors"
+                style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+                className="px-3 py-1 rounded border text-xs font-semibold transition-colors"
               >
                 Done
               </button>

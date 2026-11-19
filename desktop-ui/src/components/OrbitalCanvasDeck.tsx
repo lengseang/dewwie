@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { WorkspaceState } from '../types';
+import { useWorkspaceStore } from '../store/workspaceStore';
+import { isLightTheme } from '../theme/themes';
 
 export type LifecycleState =
   | 'CODING'
@@ -86,6 +88,9 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
   onHandoffTriggered,
   handoffTriggerKey,
 }) => {
+  const { theme } = useWorkspaceStore();
+  const isLight = isLightTheme(theme);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -341,30 +346,32 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
     const geo = geoRef.current;
     bgCtx.clearRect(0, 0, W, H);
 
-    // 1. Titanium deck tiles
+    // 1. Deck tiles
     const tile = 12;
     for (let y = geo.wallH; y < H; y += tile) {
       for (let x = 0; x < W; x += tile) {
         const alt = ((x / tile) + (y / tile)) % 2 === 0;
-        bgCtx.fillStyle = alt ? '#121521' : '#151927';
+        bgCtx.fillStyle = isLight
+          ? (alt ? '#f8fafc' : '#f1f5f9')
+          : (alt ? '#121521' : '#151927');
         bgCtx.fillRect(x, y, tile, tile);
-        bgCtx.fillStyle = 'rgba(148, 163, 184, 0.12)';
+        bgCtx.fillStyle = isLight ? 'rgba(15, 23, 42, 0.05)' : 'rgba(148, 163, 184, 0.12)';
         bgCtx.fillRect(x + 1, y + 1, 1, 1);
       }
     }
 
-    // Glowing cyan & gold orbital power conduits
+    // Power conduits
     const cx = Math.round(W / 2);
-    bgCtx.fillStyle = 'rgba(56, 189, 248, 0.22)';
+    bgCtx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.25)' : 'rgba(56, 189, 248, 0.22)';
     bgCtx.fillRect(cx - 28, geo.wallH + 2, 1, geo.podY - geo.wallH - 4);
     bgCtx.fillRect(cx + 28, geo.wallH + 2, 1, geo.podY - geo.wallH - 4);
-    bgCtx.fillStyle = 'rgba(212, 175, 55, 0.3)';
+    bgCtx.fillStyle = isLight ? 'rgba(217, 119, 6, 0.3)' : 'rgba(212, 175, 55, 0.3)';
     bgCtx.fillRect(6, geo.podY - 4, W - 12, 1);
 
-    // 2. North panoramic bulkhead wall (Sleek panoramic window, zero faux CTX/MESH clutter)
-    bgCtx.fillStyle = '#0B0D15';
+    // 2. North bulkhead wall
+    bgCtx.fillStyle = isLight ? '#e2e8f0' : '#0B0D15';
     bgCtx.fillRect(0, 0, W, geo.wallH);
-    bgCtx.fillStyle = '#D4AF37';
+    bgCtx.fillStyle = isLight ? '#0284c7' : '#D4AF37';
     bgCtx.fillRect(0, geo.wallH - 2, W, 2);
 
     // Panoramic Space Viewport spanning across the bulkhead
@@ -501,7 +508,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
             const deskPairs = Math.max(1, Math.min(3, Math.ceil(occupants.length / 2)));
             const visibleDesks = deskPairs * 2;
 
-            const cacheKey = `${LW}x${LH}|${visibleDesks}`;
+            const cacheKey = `${LW}x${LH}|${visibleDesks}|${isLight ? 'light' : 'dark'}`;
             if (cacheKey !== lastBgKeyRef.current) {
               lastBgKeyRef.current = cacheKey;
               bakeStaticDeck(LW, LH, visibleDesks);

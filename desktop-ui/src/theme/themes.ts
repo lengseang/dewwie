@@ -1,9 +1,10 @@
-export type ThemeId = 'zinc' | 'oled' | 'slate' | 'tokyo' | 'monokai' | 'catppuccin' | 'transparent' | 'nord';
+export type ThemeId = 'zinc' | 'oled' | 'slate' | 'tokyo' | 'monokai' | 'catppuccin' | 'transparent' | 'nord' | 'light-clean' | 'light-nord';
 
 export interface ThemeDefinition {
   id: ThemeId;
   name: string;
   desc: string;
+  isLight?: boolean;
   bg: string;
   surface: string;
   surfaceElevated: string;
@@ -328,4 +329,89 @@ export const THEMES_CONFIG: Record<string, ThemeDefinition> = {
       brightWhite: '#eceff4',
     },
   },
+  'light-clean': {
+    id: 'light-clean',
+    name: 'Clean Light',
+    desc: 'Swiss Minimal Paper',
+    isLight: true,
+    bg: '#ffffff',
+    surface: '#f8fafc',
+    surfaceElevated: '#f1f5f9',
+    navBg: '#ffffff',
+    border: '#e2e8f0',
+    borderSubtle: '#f1f5f9',
+    text: '#0f172a',
+    textMuted: '#64748b',
+    accent: '#0284c7',
+    terminal: {
+      background: '#ffffff',
+      foreground: '#0f172a',
+      cursor: '#0284c7',
+      selectionBackground: 'rgba(2, 132, 199, 0.18)',
+      black: '#0f172a',
+      red: '#e11d48',
+      green: '#059669',
+      yellow: '#d97706',
+      blue: '#2563eb',
+      magenta: '#9333ea',
+      cyan: '#0891b2',
+      white: '#f8fafc',
+      brightBlack: '#94a3b8',
+      brightRed: '#f43f5e',
+      brightGreen: '#10b981',
+      brightYellow: '#f59e0b',
+      brightBlue: '#3b82f6',
+      brightMagenta: '#a855f7',
+      brightCyan: '#06b6d4',
+      brightWhite: '#ffffff',
+    },
+  },
+  'light-nord': {
+    id: 'light-nord',
+    name: 'Nord Day',
+    desc: 'Arctic Frost Light',
+    isLight: true,
+    bg: '#f4f6f9',
+    surface: '#e5e9f0',
+    surfaceElevated: '#eceff4',
+    navBg: '#eceff4',
+    border: '#d8dee9',
+    borderSubtle: '#e5e9f0',
+    text: '#2e3440',
+    textMuted: '#4c566a',
+    accent: '#5e81ac',
+    terminal: {
+      background: '#f4f6f9',
+      foreground: '#2e3440',
+      cursor: '#5e81ac',
+      selectionBackground: 'rgba(94, 129, 172, 0.2)',
+      black: '#2e3440',
+      red: '#bf616a',
+      green: '#a3be8c',
+      yellow: '#d08770',
+      blue: '#5e81ac',
+      magenta: '#b48ead',
+      cyan: '#88c0d0',
+      white: '#eceff4',
+      brightBlack: '#4c566a',
+      brightRed: '#bf616a',
+      brightGreen: '#a3be8c',
+      brightYellow: '#ebcb8b',
+      brightBlue: '#81a1c1',
+      brightMagenta: '#b48ead',
+      brightCyan: '#8fbcbb',
+      brightWhite: '#ffffff',
+    },
+  },
+};
+
+export const isLightTheme = (themeId: string): boolean => {
+  return THEMES_CONFIG[themeId]?.isLight === true;
+};
+
+export const getOppositeModeTheme = (currentTheme: string): string => {
+  if (isLightTheme(currentTheme)) {
+    return 'zinc';
+  }
+  return 'light-clean';
 };

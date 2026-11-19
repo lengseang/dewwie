@@ -23,8 +23,11 @@ import {
   Radio,
   ChevronDown,
   FolderOpen,
+  GitBranch,
+  Sun,
+  Moon,
 } from 'lucide-react';
-import { THEMES_CONFIG } from './theme/themes';
+import { THEMES_CONFIG, isLightTheme, getOppositeModeTheme } from './theme/themes';
 
 export const App: React.FC = () => {
   const {
@@ -50,6 +53,7 @@ export const App: React.FC = () => {
     initNativeSync,
     createSession,
     theme,
+    setTheme,
     sidebarWidth,
     setSidebarWidth,
     rightPanelWidth,
@@ -255,6 +259,15 @@ export const App: React.FC = () => {
             borderColor: 'var(--app-border)',
             WebkitAppRegion: 'drag',
           } as React.CSSProperties}
+          onDoubleClick={(e) => {
+            // Only trigger maximize/restore if double clicking empty drag area, not buttons/tabs/inputs
+            if ((e.target as HTMLElement).closest('button, input, select, textarea, [data-no-drag]')) return;
+            if (window.swarmherdNative?.maximizeWindow) {
+              window.swarmherdNative.maximizeWindow().then((newMax: any) => {
+                if (typeof newMax === 'boolean') setIsMaximized(newMax);
+              });
+            }
+          }}
           className="h-9 px-2 border-b flex items-center justify-between gap-2 shrink-0 z-20 font-mono select-none"
         >
           {/* Left: Left Sidebar Toggle + Herdr-Style Agent Navigation Tabs */}
@@ -289,10 +302,13 @@ export const App: React.FC = () => {
                       setEditingTabName(ws.name);
                     }}
                     title={`${ws.name} (${ws.agentType || 'terminal'})${ws.branch ? ` • ${ws.branch}` : ''} - Double click to rename`}
-                    className={`group flex items-center gap-1.5 px-2.5 py-1 rounded text-xs cursor-pointer transition-colors shrink-0 ${
-                      isActive
-                        ? 'bg-zinc-800 text-zinc-100 font-medium border border-zinc-700 shadow-xs'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60 border border-transparent'
+                    style={{
+                      backgroundColor: isActive ? 'var(--app-surface-elevated)' : 'transparent',
+                      borderColor: isActive ? 'var(--app-border)' : 'transparent',
+                      color: isActive ? 'var(--app-text)' : 'var(--app-text-muted)',
+                    }}
+                    className={`group flex items-center gap-1.5 px-2.5 py-1 rounded text-xs cursor-pointer transition-colors shrink-0 border ${
+                      isActive ? 'font-medium shadow-xs' : 'hover:opacity-100'
                     }`}
                   >
                     {getAgentIcon(ws.agentType, 'w-3.5 h-3.5 shrink-0')}
@@ -314,11 +330,17 @@ export const App: React.FC = () => {
                             setEditingTabId(null);
                           }
                         }}
-                        className="w-24 px-1 py-0 bg-zinc-950 border border-zinc-600 rounded text-[11px] font-mono text-zinc-100 focus:outline-none"
+                        style={{
+                          backgroundColor: 'var(--app-surface-elevated)',
+                          borderColor: 'var(--app-border)',
+                          color: 'var(--app-text)',
+                        }}
+                        className="w-24 px-1 py-0 border rounded text-[11px] font-mono focus:outline-none"
                       />
                     ) : (
-                      <span className="font-mono text-[11px] font-medium max-w-[200px] truncate">
-                        {ws.sessionMode === 'branch' ? `🌿 ${ws.name}` : ws.name}
+                      <span className="font-mono text-[11px] font-medium max-w-[200px] truncate flex items-center gap-1">
+                        {ws.sessionMode === 'branch' && <GitBranch className="w-3 h-3 text-cyan-400 shrink-0" />}
+                        <span>{ws.name}</span>
                       </span>
                     )}
 
@@ -419,57 +441,83 @@ export const App: React.FC = () => {
               )}
             </button>
 
-            {/* 3. Settings & Themes */}
+            {/* 3. Quick 1-Click Dark/Light Mode Toggle */}
+            <button
+              onClick={() => setTheme(getOppositeModeTheme(theme))}
+              title={isLightTheme(theme) ? 'Dark Mode' : 'Light Mode'}
+              className="p-1.5 rounded transition-colors text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
+            >
+              {isLightTheme(theme) ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* 4. Settings & Themes */}
             <button
               onClick={() => setIsSettingsOpen(true)}
-              title="Settings & Themes (Ctrl+,)"
-              className="p-1.5 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
+              title="Settings (Ctrl+,)"
+              className="p-1.5 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-colors"
             >
               <Settings className="w-3.5 h-3.5" />
             </button>
 
             {/* Native-Style Windows 11 Titlebar Window Controls */}
             {isNative && (
-              <div className="flex items-center h-full ml-1 -mr-2">
-                <div className="w-[1px] h-3.5 bg-zinc-800 mx-1" />
+              <div
+                className="flex items-center h-full ml-1 -mr-2 select-none"
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              >
+                <div className="w-[1px] h-3.5 bg-zinc-800/80 mx-0.5" />
 
-                {/* Minimize */}
+                {/* Minimize Button */}
                 <button
                   onClick={() => window.swarmherdNative?.minimizeWindow()}
                   title="Minimize"
-                  className="w-10 h-9 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/10 transition-colors"
+                  style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                  className="w-[46px] h-9 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/10 active:bg-white/15 transition-colors focus:outline-none"
                 >
-                  <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
-                    <path d="M1 5h8" />
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none">
+                    <path d="M 0.5 5.5 L 9.5 5.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
                   </svg>
                 </button>
 
-                {/* Maximize / Restore */}
+                {/* Maximize / Restore Button */}
                 <button
-                  onClick={() => window.swarmherdNative?.maximizeWindow()}
+                  onClick={async () => {
+                    if (window.swarmherdNative?.maximizeWindow) {
+                      const newMax = await window.swarmherdNative.maximizeWindow();
+                      if (typeof newMax === 'boolean') {
+                        setIsMaximized(newMax);
+                      } else {
+                        setIsMaximized((prev) => !prev);
+                      }
+                    }
+                  }}
                   title={isMaximized ? "Restore" : "Maximize"}
-                  className="w-10 h-9 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/10 transition-colors"
+                  style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                  className="w-[46px] h-9 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/10 active:bg-white/15 transition-colors focus:outline-none"
                 >
                   {isMaximized ? (
-                    <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
-                      <rect x="2.5" y="1.5" width="5.5" height="5.5" rx="0.5" />
-                      <path d="M1.5 3.5v5h5" />
+                    <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none">
+                      {/* Crisp double-box restore glyph */}
+                      <rect x="1" y="3" width="6" height="6" rx="0.5" stroke="currentColor" strokeWidth="1" />
+                      <path d="M 3 3 V 1.5 C 3 1.2 3.2 1 3.5 1 H 8.5 C 8.8 1 9 1.2 9 1.5 V 6.5 C 9 6.8 8.8 7 8.5 7 H 7" stroke="currentColor" strokeWidth="1" />
                     </svg>
                   ) : (
-                    <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
-                      <rect x="1.5" y="1.5" width="7" height="7" rx="0.5" />
+                    <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none">
+                      {/* Crisp single-box maximize glyph */}
+                      <rect x="1" y="1" width="8" height="8" rx="0.5" stroke="currentColor" strokeWidth="1" />
                     </svg>
                   )}
                 </button>
 
-                {/* Close */}
+                {/* Close Button */}
                 <button
                   onClick={() => window.swarmherdNative?.closeWindow()}
                   title="Close"
-                  className="w-10 h-9 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-rose-600 transition-colors"
+                  style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                  className="w-[46px] h-9 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-[#c42b1c] active:bg-[#a82315] transition-colors focus:outline-none"
                 >
-                  <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
-                    <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" />
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none">
+                    <path d="M 1 1 L 9 9 M 9 1 L 1 9" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
                   </svg>
                 </button>
               </div>

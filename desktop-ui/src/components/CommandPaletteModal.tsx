@@ -322,11 +322,15 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl bg-zinc-950 border border-zinc-800 rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+        className="w-full max-w-xl border rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100"
       >
         {/* Terminal Command Input Prompt */}
-        <div className="h-11 px-3 border-b border-zinc-800/80 bg-zinc-900/60 flex items-center gap-2.5">
-          <span className="text-zinc-400 text-xs font-bold font-mono">❯</span>
+        <div
+          style={{ backgroundColor: 'var(--app-nav-bg)', borderColor: 'var(--app-border)' }}
+          className="h-10 px-3 border-b flex items-center gap-2"
+        >
+          <span className="text-xs font-bold font-mono" style={{ color: 'var(--app-accent)' }}>❯</span>
           <input
             ref={inputRef}
             type="text"
@@ -336,20 +340,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command (:term, :split, :theme, :dir, :settings, @1)..."
-            className="flex-1 bg-transparent border-none text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none font-mono"
+            placeholder="Search command (:term, :split, :theme, :dir, :settings, @1)..."
+            style={{ color: 'var(--app-text)' }}
+            className="flex-1 bg-transparent border-none text-xs focus:outline-none font-mono"
           />
-          <div className="flex items-center gap-1.5 text-[10px] text-zinc-600">
-            <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">ESC</kbd>
-            <span>close</span>
+          <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--app-text-muted)' }}>
+            <kbd className="px-1 py-0.5 rounded border text-[9px] font-mono" style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)' }}>ESC</kbd>
           </div>
         </div>
 
         {/* Results List */}
         <div className="max-h-72 overflow-y-auto p-1.5 space-y-0.5">
           {filtered.length === 0 ? (
-            <div className="p-4 text-center text-xs text-zinc-600 font-mono">
-              No matching commands or sessions for "{input}"
+            <div className="p-4 text-center text-xs font-mono" style={{ color: 'var(--app-text-muted)' }}>
+              No commands found for "{input}"
             </div>
           ) : (
             filtered.map((item, idx) => {
@@ -359,20 +363,22 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
                   key={item.id}
                   onClick={() => item.action()}
                   onMouseEnter={() => setSelectedIndex(idx)}
+                  style={{
+                    backgroundColor: isSelected ? 'var(--app-surface-elevated)' : 'transparent',
+                    color: isSelected ? 'var(--app-text)' : 'var(--app-text-muted)',
+                  }}
                   className={`flex items-center justify-between px-2.5 py-1.5 rounded cursor-pointer text-xs font-mono transition-colors ${
-                    isSelected
-                      ? 'bg-zinc-800 text-zinc-100 font-medium'
-                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+                    isSelected ? 'font-medium' : 'hover:opacity-100'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className="shrink-0">{item.icon}</span>
-                    <span className="font-semibold text-zinc-200">{item.title}</span>
-                    <span className="text-[11px] text-zinc-500 truncate hidden sm:inline">
+                    <span className="font-semibold" style={{ color: 'var(--app-text)' }}>{item.title}</span>
+                    <span className="text-[11px] truncate hidden sm:inline" style={{ color: 'var(--app-text-muted)' }}>
                       — {item.description}
                     </span>
                   </div>
-                  <span className="text-[10px] text-zinc-600 shrink-0 uppercase tracking-wider">
+                  <span className="text-[9px] shrink-0 uppercase tracking-wider opacity-60">
                     {item.category}
                   </span>
                 </div>
@@ -381,13 +387,16 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           )}
         </div>
 
-        {/* Terminal Status Bar Footer */}
-        <div className="h-7 px-3 border-t border-zinc-800/80 bg-zinc-950 flex items-center justify-between text-[10px] text-zinc-600 font-mono">
+        {/* Status Bar Footer */}
+        <div
+          style={{ backgroundColor: 'var(--app-nav-bg)', borderColor: 'var(--app-border)', color: 'var(--app-text-muted)' }}
+          className="h-7 px-3 border-t flex items-center justify-between text-[10px] font-mono"
+        >
           <div className="flex items-center gap-3">
-            <span><kbd className="text-zinc-400">↑↓</kbd> navigate</span>
-            <span><kbd className="text-zinc-400">↵</kbd> run</span>
+            <span><kbd className="font-semibold">↑↓</kbd> navigate</span>
+            <span><kbd className="font-semibold">↵</kbd> run</span>
           </div>
-          <span>Dewwie Linux Shell Mode</span>
+          <span>Commands</span>
         </div>
       </div>
     </div>

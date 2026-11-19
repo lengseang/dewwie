@@ -61,6 +61,67 @@
     --app-accent: #ffd866;
   }
 
+  [data-theme="catppuccin"] {
+    --app-bg: #181926;
+    --app-surface: #1e2030;
+    --app-surface-elevated: #24273a;
+    --app-nav-bg: #141522;
+    --app-border: #363a4f;
+    --app-border-subtle: #24273a;
+    --app-text: #cad3f5;
+    --app-text-muted: #8087a2;
+    --app-accent: #8aadf4;
+  }
+
+  [data-theme="nord"] {
+    --app-bg: #242933;
+    --app-surface: #2e3440;
+    --app-surface-elevated: #3b4252;
+    --app-nav-bg: #1f232c;
+    --app-border: #434c5e;
+    --app-border-subtle: #3b4252;
+    --app-text: #eceff4;
+    --app-text-muted: #8892b0;
+    --app-accent: #88c0d0;
+  }
+
+  [data-theme="transparent"] {
+    --app-bg: rgba(12, 14, 20, 0.85);
+    --app-surface: rgba(20, 24, 34, 0.72);
+    --app-surface-elevated: rgba(30, 36, 50, 0.82);
+    --app-nav-bg: rgba(10, 12, 18, 0.88);
+    --app-border: rgba(255, 255, 255, 0.12);
+    --app-border-subtle: rgba(255, 255, 255, 0.06);
+    --app-text: #f1f5f9;
+    --app-text-muted: #94a3b8;
+    --app-accent: #38bdf8;
+  }
+
+  /* Full-Fledged Light Mode Presets */
+  [data-theme="light-clean"] {
+    --app-bg: #ffffff;
+    --app-surface: #f8fafc;
+    --app-surface-elevated: #f1f5f9;
+    --app-nav-bg: #ffffff;
+    --app-border: #e2e8f0;
+    --app-border-subtle: #f1f5f9;
+    --app-text: #0f172a;
+    --app-text-muted: #64748b;
+    --app-accent: #0284c7;
+  }
+
+  [data-theme="light-nord"] {
+    --app-bg: #f4f6f9;
+    --app-surface: #e5e9f0;
+    --app-surface-elevated: #eceff4;
+    --app-nav-bg: #eceff4;
+    --app-border: #d8dee9;
+    --app-border-subtle: #e5e9f0;
+    --app-text: #2e3440;
+    --app-text-muted: #4c566a;
+    --app-accent: #5e81ac;
+  }
+
   body {
     background-color: var(--app-bg);
     color: var(--app-text);
