@@ -5,8 +5,10 @@ package-lock.json
 # Build outputs
 dist/
 dist-electron/
+release/
 target/
 *.bin
+release/
 
 # Worktrees & Temporary Agent Environments
 .worktrees/

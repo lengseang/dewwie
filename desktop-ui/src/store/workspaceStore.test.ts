@@ -162,4 +162,46 @@ describe('useWorkspaceStore', () => {
     store.removeRoom(newRoomId);
     expect(useWorkspaceStore.getState().rooms.some((r) => r.id === newRoomId)).toBe(false);
   });
+
+  it('properly clamps sidebar and right panel widths to prevent broken layout scaling', () => {
+    const store = useWorkspaceStore.getState();
+
+    // Test sidebar min and max bounds
+    store.setSidebarWidth(50); // Under min
+    expect(useWorkspaceStore.getState().sidebarWidth).toBe(200);
+
+    store.setSidebarWidth(350); // Valid width
+    expect(useWorkspaceStore.getState().sidebarWidth).toBe(350);
+
+    store.setSidebarWidth(999); // Over max
+    expect(useWorkspaceStore.getState().sidebarWidth).toBe(480);
+
+    // Test right panel min and max bounds
+    store.setRightPanelWidth(100); // Under min
+    expect(useWorkspaceStore.getState().rightPanelWidth).toBe(260);
+
+    store.setRightPanelWidth(400); // Valid width
+    expect(useWorkspaceStore.getState().rightPanelWidth).toBe(400);
+
+    store.setRightPanelWidth(1200); // Over max
+    expect(useWorkspaceStore.getState().rightPanelWidth).toBe(650);
+  });
+
+  it('preserves tab strip state and handles closing tabs without deleting session', () => {
+    useWorkspaceStore.setState({
+      openTabIds: ['ws-1', 'ws-2', 'ws-3'],
+      activeWorkspaceId: 'ws-2',
+    });
+
+    const store = useWorkspaceStore.getState();
+    store.closeTab('ws-2');
+
+    const updated = useWorkspaceStore.getState();
+    expect(updated.openTabIds).not.toContain('ws-2');
+    expect(updated.openTabIds).toEqual(['ws-1', 'ws-3']);
+    // Session itself is still preserved in workspaces map
+    expect(updated.workspaces['ws-2']).toBeDefined();
+    // Active workspace switched to adjacent remaining tab
+    expect(updated.activeWorkspaceId).toBe('ws-3');
+  });
 });

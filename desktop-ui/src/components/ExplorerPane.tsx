@@ -232,25 +232,33 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
         </div>
 
         {/* Project Name Header */}
-        <div className="px-3 py-1.5 border-b border-zinc-900 bg-zinc-950/60 flex items-center justify-between">
-          <span className="text-xs font-bold text-zinc-200 tracking-wide uppercase truncate">
+        <div
+          style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+          className="px-3 py-1.5 border-b flex items-center justify-between"
+        >
+          <span className="text-xs font-bold tracking-wide uppercase truncate" style={{ color: 'var(--app-text)' }}>
             {activeWs?.projectName || activeWs?.repository || 'EXBYTELAB'}
           </span>
-          <span className="text-[10px] text-zinc-600 font-mono">
+          <span className="text-[10px] font-mono" style={{ color: 'var(--app-text-muted)' }}>
             {tree.length} items
           </span>
         </div>
 
         {/* Search */}
-        <div className="p-2 border-b border-zinc-900 shrink-0">
+        <div className="p-2 border-b shrink-0" style={{ borderColor: 'var(--app-border)' }}>
           <div className="relative">
-            <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600" />
+            <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
               type="text"
               placeholder="Filter files..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-7 pr-2 py-0.5 bg-zinc-900/60 border border-zinc-800 rounded text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-700"
+              style={{
+                backgroundColor: 'var(--app-bg)',
+                borderColor: 'var(--app-border)',
+                color: 'var(--app-text)',
+              }}
+              className="w-full pl-7 pr-2 py-0.5 border rounded text-xs placeholder-zinc-500 focus:outline-none"
             />
           </div>
         </div>
@@ -262,13 +270,19 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
 
         {/* Inline Quick File Preview Drawer in Inspector */}
         {selectedFilePath && (
-          <div className="h-64 border-t border-zinc-800/80 bg-[#09090b] flex flex-col shrink-0 font-mono select-text">
+          <div
+            style={{ backgroundColor: 'var(--app-bg)', borderColor: 'var(--app-border)' }}
+            className="h-64 border-t flex flex-col shrink-0 font-mono select-text"
+          >
             {/* Quick Viewer Header */}
-            <div className="h-7 px-2.5 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between text-[11px] text-zinc-300 shrink-0 select-none">
+            <div
+              style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+              className="h-7 px-2.5 border-b flex items-center justify-between text-[11px] shrink-0 select-none"
+            >
               <div className="flex items-center gap-1.5 truncate">
                 <FileCode className="w-3 h-3 text-zinc-400 shrink-0" />
-                <span className="truncate font-semibold text-zinc-200">{selectedFilePath.split('/').pop()}</span>
-                <span className="text-[10px] text-zinc-600 font-mono">
+                <span className="truncate font-semibold">{selectedFilePath.split('/').pop()}</span>
+                <span className="text-[10px] font-mono" style={{ color: 'var(--app-text-muted)' }}>
                   ({fileContent.split('\n').length}L)
                 </span>
               </div>
@@ -276,21 +290,21 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
                 <button
                   onClick={handleCopyCode}
                   title="Copy file text"
-                  className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+                  className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors"
                 >
                   {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 </button>
                 <button
                   onClick={() => launchEditor('cursor')}
                   title="Open in Cursor IDE"
-                  className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+                  className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors"
                 >
                   <ExternalLink className="w-3 h-3" />
                 </button>
                 <button
                   onClick={() => setSelectedFilePath('')}
                   title="Close preview"
-                  className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-zinc-900 transition-colors"
+                  className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-zinc-800/60 transition-colors"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -300,12 +314,12 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
             {/* Quick Viewer Body */}
             <div
               style={{ backgroundColor: 'var(--app-bg)' }}
-              className="flex-1 overflow-auto p-2 text-[11px] leading-relaxed text-zinc-300"
+              className="flex-1 overflow-auto p-2 text-[11px] leading-relaxed"
             >
               {isLoadingFile ? (
-                <div className="text-zinc-600 text-xs">Loading file...</div>
+                <div className="text-zinc-500 text-xs">Loading file...</div>
               ) : (
-                <pre className="font-mono whitespace-pre text-zinc-300 selection:bg-zinc-800">{fileContent}</pre>
+                <pre className="font-mono whitespace-pre" style={{ color: 'var(--app-text)' }}>{fileContent}</pre>
               )}
             </div>
           </div>
@@ -320,10 +334,16 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
       className="flex-1 flex h-full overflow-hidden font-mono select-none"
     >
       {/* Left Column: Explorer Directory Tree */}
-      <div className="w-72 border-r border-zinc-800/80 bg-zinc-950 flex flex-col h-full shrink-0">
+      <div
+        style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+        className="w-72 border-r flex flex-col h-full shrink-0"
+      >
         {/* Explorer Header */}
-        <div className="h-9 px-3 border-b border-zinc-800/80 flex items-center justify-between gap-2 shrink-0">
-          <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider truncate">
+        <div
+          style={{ borderColor: 'var(--app-border)' }}
+          className="h-9 px-3 border-b flex items-center justify-between gap-2 shrink-0"
+        >
+          <span className="text-xs font-semibold uppercase tracking-wider truncate" style={{ color: 'var(--app-text)' }}>
             {activeWs?.repository || 'exbytelab'}
           </span>
 
@@ -331,14 +351,14 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
             <button
               onClick={refreshTree}
               title="Refresh tree"
-              className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900"
+              className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
             >
               <RefreshCw className="w-3 h-3" />
             </button>
             <button
               onClick={() => launchEditor('cursor')}
               title="Open workspace in Cursor IDE"
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-zinc-800 transition-colors"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border border-zinc-700/60 transition-colors"
             >
               <span>IDE</span>
               <ExternalLink className="w-2.5 h-2.5 text-zinc-500" />
@@ -347,15 +367,20 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
         </div>
 
         {/* Search */}
-        <div className="p-2 border-b border-zinc-900 shrink-0">
+        <div className="p-2 border-b shrink-0" style={{ borderColor: 'var(--app-border)' }}>
           <div className="relative">
-            <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600" />
+            <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
               type="text"
               placeholder="Search files..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-7 pr-2.5 py-1 bg-zinc-900/60 border border-zinc-800 rounded text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-700"
+              style={{
+                backgroundColor: 'var(--app-bg)',
+                borderColor: 'var(--app-border)',
+                color: 'var(--app-text)',
+              }}
+              className="w-full pl-7 pr-2.5 py-1 border rounded text-xs placeholder-zinc-500 focus:outline-none"
             />
           </div>
         </div>
@@ -367,13 +392,19 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
       </div>
 
       {/* Right Column: Code Viewer & Editor Preview */}
-      <div className="flex-1 flex flex-col h-full bg-[#09090b] overflow-hidden">
+      <div
+        style={{ backgroundColor: 'var(--app-bg)' }}
+        className="flex-1 flex flex-col h-full overflow-hidden"
+      >
         {/* Code Header Bar */}
-        <div className="h-9 px-4 border-b border-zinc-800/80 bg-zinc-950 flex items-center justify-between gap-2 shrink-0">
-          <div className="flex items-center gap-2 text-xs text-zinc-300 truncate">
+        <div
+          style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+          className="h-9 px-4 border-b flex items-center justify-between gap-2 shrink-0"
+        >
+          <div className="flex items-center gap-2 text-xs truncate">
             <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <span className="font-semibold text-zinc-200">{selectedFilePath}</span>
-            <span className="text-[10px] text-zinc-600 font-mono">
+            <span className="font-semibold" style={{ color: 'var(--app-text)' }}>{selectedFilePath}</span>
+            <span className="text-[10px] font-mono" style={{ color: 'var(--app-text-muted)' }}>
               ({fileContent.split('\n').length} lines)
             </span>
           </div>

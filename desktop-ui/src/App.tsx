@@ -74,15 +74,16 @@ export const App: React.FC = () => {
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const [isResizingRight, setIsResizingRight] = useState(false);
 
-  const isNative = typeof window !== 'undefined' && !!window.swarmherdNative?.isNative;
+  const isNative = typeof window !== 'undefined' && !!(window.swarmherdNative?.isNative || (window as any).electronAPI);
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.swarmherdNative?.isWindowMaximized) {
-      window.swarmherdNative.isWindowMaximized().then(setIsMaximized);
+    const api = (window as any).swarmherdNative || (window as any).electronAPI;
+    if (api?.isWindowMaximized) {
+      api.isWindowMaximized().then(setIsMaximized);
     }
-    if (typeof window !== 'undefined' && window.swarmherdNative?.onWindowMaximized) {
-      return window.swarmherdNative.onWindowMaximized(setIsMaximized);
+    if (api?.onWindowMaximized) {
+      return api.onWindowMaximized(setIsMaximized);
     }
   }, []);
 
@@ -118,6 +119,9 @@ export const App: React.FC = () => {
     };
 
     const handleMouseUp = () => {
+      if (isResizingLeft || isResizingRight) {
+        useWorkspaceStore.getState().persistState();
+      }
       setIsResizingLeft(false);
       setIsResizingRight(false);
     };
@@ -465,14 +469,24 @@ export const App: React.FC = () => {
                 className="flex items-center h-full ml-1 -mr-2 select-none"
                 style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
               >
-                <div className="w-[1px] h-3.5 bg-zinc-800/80 mx-0.5" />
+                <div
+                  className="w-[1px] h-3.5 mx-0.5"
+                  style={{ backgroundColor: 'var(--app-border)' }}
+                />
 
                 {/* Minimize Button */}
                 <button
-                  onClick={() => window.swarmherdNative?.minimizeWindow()}
+                  onClick={() => {
+                    const api = (window as any).swarmherdNative || (window as any).electronAPI;
+                    api?.minimizeWindow?.();
+                  }}
                   title="Minimize"
                   style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className="w-[46px] h-9 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/10 active:bg-white/15 transition-colors focus:outline-none"
+                  className={`w-[46px] h-9 flex items-center justify-center transition-colors focus:outline-none ${
+                    isLightTheme(theme)
+                      ? 'text-zinc-600 hover:text-zinc-950 hover:bg-black/5 active:bg-black/10'
+                      : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10 active:bg-white/15'
+                  }`}
                 >
                   <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none">
                     <path d="M 0.5 5.5 L 9.5 5.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
@@ -482,8 +496,9 @@ export const App: React.FC = () => {
                 {/* Maximize / Restore Button */}
                 <button
                   onClick={async () => {
-                    if (window.swarmherdNative?.maximizeWindow) {
-                      const newMax = await window.swarmherdNative.maximizeWindow();
+                    const api = (window as any).swarmherdNative || (window as any).electronAPI;
+                    if (api?.maximizeWindow) {
+                      const newMax = await api.maximizeWindow();
                       if (typeof newMax === 'boolean') {
                         setIsMaximized(newMax);
                       } else {
@@ -493,7 +508,11 @@ export const App: React.FC = () => {
                   }}
                   title={isMaximized ? "Restore" : "Maximize"}
                   style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className="w-[46px] h-9 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/10 active:bg-white/15 transition-colors focus:outline-none"
+                  className={`w-[46px] h-9 flex items-center justify-center transition-colors focus:outline-none ${
+                    isLightTheme(theme)
+                      ? 'text-zinc-600 hover:text-zinc-950 hover:bg-black/5 active:bg-black/10'
+                      : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10 active:bg-white/15'
+                  }`}
                 >
                   {isMaximized ? (
                     <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none">
@@ -511,10 +530,15 @@ export const App: React.FC = () => {
 
                 {/* Close Button */}
                 <button
-                  onClick={() => window.swarmherdNative?.closeWindow()}
+                  onClick={() => {
+                    const api = (window as any).swarmherdNative || (window as any).electronAPI;
+                    api?.closeWindow?.();
+                  }}
                   title="Close"
                   style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className="w-[46px] h-9 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-[#c42b1c] active:bg-[#a82315] transition-colors focus:outline-none"
+                  className={`w-[46px] h-9 flex items-center justify-center transition-colors focus:outline-none hover:bg-[#e81123] hover:text-white active:bg-[#c42b1c] ${
+                    isLightTheme(theme) ? 'text-zinc-600' : 'text-zinc-400'
+                  }`}
                 >
                   <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none">
                     <path d="M 1 1 L 9 9 M 9 1 L 1 9" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />

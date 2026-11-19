@@ -243,8 +243,14 @@ export const DiffViewer: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
       {/* Main Diff Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: File Tree Sidebar */}
-        <aside className="w-64 h-full border-r border-zinc-800/80 bg-zinc-950 flex flex-col shrink-0">
-          <div className="h-8 px-3 border-b border-zinc-800/60 flex items-center justify-between text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
+        <aside
+          style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+          className="w-64 h-full border-r flex flex-col shrink-0"
+        >
+          <div
+            style={{ borderColor: 'var(--app-border)', color: 'var(--app-text-muted)' }}
+            className="h-8 px-3 border-b flex items-center justify-between text-[11px] font-mono uppercase tracking-wider"
+          >
             <span>Files Changed</span>
             <span>{currentDiffs.length}</span>
           </div>
@@ -258,10 +264,11 @@ export const DiffViewer: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
                 <div
                   key={file.id}
                   onClick={() => setSelectedFileId(file.id)}
+                  style={isSelected ? { backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)' } : undefined}
                   className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer font-mono text-xs transition-colors ${
                     isSelected
-                      ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-800'
-                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent'
+                      ? 'font-medium border'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-1.5 truncate min-w-0">
@@ -286,11 +293,20 @@ export const DiffViewer: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
         </aside>
 
         {/* Right: Code Diff Inspector */}
-        <div className="flex-1 h-full overflow-y-auto bg-zinc-950 p-3 font-mono text-xs">
+        <div
+          style={{ backgroundColor: 'var(--app-bg)' }}
+          className="flex-1 h-full overflow-y-auto p-3 font-mono text-xs"
+        >
           {activeFile ? (
-            <div className="border border-zinc-800/80 rounded bg-zinc-950 overflow-hidden">
+            <div
+              style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+              className="border rounded overflow-hidden"
+            >
               {/* File Title Bar */}
-              <div className="h-9 px-3 bg-zinc-900/60 border-b border-zinc-800/80 flex items-center justify-between">
+              <div
+                style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)' }}
+                className="h-9 px-3 border-b flex items-center justify-between"
+              >
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => toggleExpand(activeFile.id)}

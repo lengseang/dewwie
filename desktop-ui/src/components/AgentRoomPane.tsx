@@ -216,13 +216,16 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
       >
         {/* Brand Title */}
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-5 h-5 rounded bg-zinc-800/80 border border-amber-500/40 flex items-center justify-center shrink-0">
+          <div
+            style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)' }}
+            className="w-5 h-5 rounded border flex items-center justify-center shrink-0"
+          >
             <Radio className="w-3 h-3 text-amber-400" />
           </div>
-          <span className="font-bold text-[11px] tracking-wider text-zinc-100 truncate">
-            AGENT ROOM MESH
+          <span className="font-bold text-[11px] tracking-wider truncate" style={{ color: 'var(--app-text)' }}>
+            AGENT MESH
           </span>
-          <span className="text-[10px] text-zinc-500 font-normal">
+          <span className="text-[10px] font-normal" style={{ color: 'var(--app-text-muted)' }}>
             ({roomSessions.length})
           </span>
         </div>
@@ -243,12 +246,20 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
           </button>
 
           {/* Segmented View Switcher: Office | Stream */}
-          <div className="inline-flex bg-zinc-950/80 border border-zinc-800 p-0.5 rounded gap-0.5">
+          <div
+            style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)' }}
+            className="inline-flex border p-0.5 rounded gap-0.5"
+          >
             <button
               onClick={() => setViewMode('office')}
+              style={viewMode === 'office' ? {
+                backgroundColor: 'var(--app-bg)',
+                borderColor: 'var(--app-border)',
+                color: 'var(--app-text)',
+              } : undefined}
               className={`h-5 px-2 rounded text-[10px] font-semibold transition-colors ${
                 viewMode === 'office'
-                  ? 'bg-zinc-800 text-amber-300 border border-amber-500/30 shadow-xs'
+                  ? 'border shadow-xs'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
@@ -256,9 +267,14 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
             </button>
             <button
               onClick={() => setViewMode('stream')}
+              style={viewMode === 'stream' ? {
+                backgroundColor: 'var(--app-bg)',
+                borderColor: 'var(--app-border)',
+                color: 'var(--app-text)',
+              } : undefined}
               className={`h-5 px-2 rounded text-[10px] font-semibold transition-colors ${
                 viewMode === 'stream'
-                  ? 'bg-zinc-800 text-cyan-300 border border-cyan-500/30 shadow-xs'
+                  ? 'border shadow-xs'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
@@ -346,15 +362,23 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
 
       {/* New Room Inline Form */}
       {isNewRoomPromptOpen && (
-        <div className="p-2 border-b border-zinc-800 bg-zinc-950/95 z-20">
+        <div
+          style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
+          className="p-2 border-b z-20"
+        >
           <form onSubmit={handleCreateRoom} className="flex items-center gap-1.5">
             <input
               autoFocus
               type="text"
-              placeholder="Room name (e.g. Frontend Team, QA Sandbox)..."
+              placeholder="Room name (e.g. Frontend, QA, Core)..."
               value={newRoomName}
               onChange={(e) => setNewRoomName(e.target.value)}
-              className="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-xs text-zinc-100 focus:outline-none focus:border-amber-500"
+              style={{
+                backgroundColor: 'var(--app-bg)',
+                borderColor: 'var(--app-border)',
+                color: 'var(--app-text)',
+              }}
+              className="flex-1 px-2 py-1 border rounded text-xs placeholder-zinc-500 focus:outline-none"
             />
             <button
               type="submit"
@@ -387,11 +411,16 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
             <div
               key={ws.id}
               onClick={() => handleFocusSession(ws.id)}
-              title={`${ws.name} • Click to focus left terminal`}
+              title={`${ws.name} • Click to focus terminal`}
+              style={!isFocused ? {
+                backgroundColor: 'var(--app-surface-elevated)',
+                borderColor: 'var(--app-border)',
+                color: 'var(--app-text)',
+              } : undefined}
               className={`group flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] cursor-pointer transition-all shrink-0 ${
                 isFocused
                   ? 'bg-amber-950/40 border border-amber-500/70 text-zinc-100 shadow-xs'
-                  : 'bg-zinc-900 hover:bg-zinc-800/80 border border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  : 'hover:opacity-90 border'
               }`}
             >
               {isLead ? (

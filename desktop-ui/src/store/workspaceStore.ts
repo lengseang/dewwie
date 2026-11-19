@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { ThemeId } from '../theme/themes';
 import {
   WorkspaceState,
   ProjectState,
@@ -38,7 +39,7 @@ interface WorkspaceStore {
   rightPanelWidth: number;
   setSidebarWidth: (width: number) => void;
   setRightPanelWidth: (width: number) => void;
-  theme: 'zinc' | 'oled' | 'slate' | 'tokyo' | 'monokai' | 'catppuccin' | 'transparent' | 'nord';
+  theme: ThemeId;
   setTheme: (theme: string) => void;
   restoreSessionsOnStartup: boolean;
   setRestoreSessionsOnStartup: (enable: boolean) => void;
@@ -199,12 +200,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   rightPanelView: 'room',
   sidebarWidth: 240,
   rightPanelWidth: 320,
-  setSidebarWidth: (w) => set({ sidebarWidth: Math.max(52, Math.min(480, w)) }),
-  setRightPanelWidth: (w) => set({ rightPanelWidth: Math.max(220, Math.min(600, w)) }),
+  setSidebarWidth: (w) => set({ sidebarWidth: Math.max(200, Math.min(480, w)) }),
+  setRightPanelWidth: (w) => set({ rightPanelWidth: Math.max(260, Math.min(650, w)) }),
   theme: (typeof window !== 'undefined' && (localStorage.getItem('dewwie_theme') as any)) || 'zinc',
   setTheme: (theme) => {
     if (typeof window !== 'undefined') localStorage.setItem('dewwie_theme', theme);
     set({ theme: theme as any });
+    get().persistState();
   },
   restoreSessionsOnStartup: typeof window === 'undefined' || localStorage.getItem('dewwie_restore_sessions') !== 'false',
   setRestoreSessionsOnStartup: (enable) => {
@@ -317,12 +319,16 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       window.swarmherdNative.saveWorkspaceState({
         activeProjectId: s.activeProjectId,
         activeWorkspaceId: s.activeWorkspaceId,
+        openTabIds: s.openTabIds,
         activeTab: s.activeTab,
         isSplitView: s.isSplitView,
         sidebarOpen: s.sidebarOpen,
+        sidebarWidth: s.sidebarWidth,
         rightPanelOpen: s.rightPanelOpen,
+        rightPanelWidth: s.rightPanelWidth,
         rightPanelView: s.rightPanelView,
         leadSessionId: s.leadSessionId,
+        theme: s.theme,
       });
     }
   },
@@ -450,15 +456,23 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
                 ? savedState.activeWorkspaceId
                 : state.activeWorkspaceId;
 
+              const validTabs = Array.isArray(savedState.openTabIds) && savedState.openTabIds.length > 0
+                ? savedState.openTabIds.filter((id: string) => state.workspaces[id])
+                : state.openTabIds;
+
               return {
                 activeProjectId: validProject,
                 activeWorkspaceId: validWs,
+                openTabIds: validTabs.length > 0 ? validTabs : state.openTabIds,
                 activeTab: savedState.activeTab || state.activeTab,
-                isSplitView: false, // Cold start always prioritizes single manual terminal view
+                isSplitView: typeof savedState.isSplitView === 'boolean' ? savedState.isSplitView : state.isSplitView,
                 sidebarOpen: typeof savedState.sidebarOpen === 'boolean' ? savedState.sidebarOpen : state.sidebarOpen,
+                sidebarWidth: typeof savedState.sidebarWidth === 'number' ? savedState.sidebarWidth : state.sidebarWidth,
                 rightPanelOpen: typeof savedState.rightPanelOpen === 'boolean' ? savedState.rightPanelOpen : state.rightPanelOpen,
+                rightPanelWidth: typeof savedState.rightPanelWidth === 'number' ? savedState.rightPanelWidth : state.rightPanelWidth,
                 rightPanelView: savedState.rightPanelView || state.rightPanelView,
                 leadSessionId: savedState.leadSessionId || state.leadSessionId,
+                theme: (savedState.theme as ThemeId) || state.theme,
               };
             });
           }

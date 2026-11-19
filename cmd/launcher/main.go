@@ -62,9 +62,12 @@ func main() {
 	fmt.Printf("  %s• Storage:%s   Persistent Session Scrollback\n", green, reset)
 	fmt.Printf("\n%s▶ Launching Dewwie Desktop Software...%s\n\n", cyan, reset)
 
-	// Fast direct binary execution path with robust multi-location fallback
+	// Fast direct binary execution path with robust portable multi-location fallback
 	candidatePaths := []string{
 		filepath.Join(desktopDir, "node_modules", "electron", "dist", "electron.exe"),
+		filepath.Join(baseDir, "electron", "electron.exe"),
+		filepath.Join(baseDir, "desktop-ui", "node_modules", "electron", "dist", "electron.exe"),
+		filepath.Join(baseDir, "node_modules", "electron", "dist", "electron.exe"),
 		filepath.Join(`D:\1111-Works\Dewwie\desktop-ui`, "node_modules", "electron", "dist", "electron.exe"),
 		filepath.Join(`D:\1111-Works\exbytelab\desktop-ui`, "node_modules", "electron", "dist", "electron.exe"),
 	}

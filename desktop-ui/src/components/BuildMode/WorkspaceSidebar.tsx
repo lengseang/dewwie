@@ -151,7 +151,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           <>
             <div className="flex items-center gap-2 min-w-0">
               <img src="/logo.png" alt="Dewwie" className="w-4 h-4 rounded object-contain shrink-0" />
-              <span className="text-xs font-bold tracking-wider text-zinc-100 uppercase truncate">
+              <span className="text-xs font-bold tracking-wider uppercase truncate" style={{ color: 'var(--app-text)' }}>
                 DEWWIE
               </span>
             </div>
@@ -162,7 +162,12 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 setIsModalOpen(true);
               }}
               title="Create New Custom Agent Session"
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 text-[11px] font-medium transition-colors"
+              style={{
+                backgroundColor: 'var(--app-surface-elevated)',
+                borderColor: 'var(--app-border)',
+                color: 'var(--app-text)',
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium transition-colors hover:opacity-90"
             >
               <Plus className="w-3 h-3 text-zinc-400" />
               <span>New</span>
@@ -564,10 +569,20 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       {/* Create Agent Session Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl p-4 space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-              <span className="text-xs font-semibold text-zinc-200">
-                Create Agent Session
+          <div
+            style={{
+              backgroundColor: 'var(--app-surface)',
+              borderColor: 'var(--app-border)',
+              color: 'var(--app-text)',
+            }}
+            className="w-full max-w-md border rounded-lg shadow-xl p-4 space-y-4 font-mono text-xs"
+          >
+            <div
+              style={{ borderColor: 'var(--app-border)' }}
+              className="flex items-center justify-between border-b pb-2"
+            >
+              <span className="font-semibold" style={{ color: 'var(--app-text)' }}>
+                New Agent Session
               </span>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -579,13 +594,18 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
 
             <form onSubmit={handleCreateSessionSubmit} className="space-y-3">
               <div>
-                <label className="block text-[11px] text-zinc-400 mb-1">
+                <label className="block text-[11px] mb-1" style={{ color: 'var(--app-text-muted)' }}>
                   Target Project
                 </label>
                 <select
                   value={selectedProjectId}
                   onChange={(e) => setSelectedProjectId(e.target.value)}
-                  className="w-full px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-200 focus:outline-none"
+                  style={{
+                    backgroundColor: 'var(--app-bg)',
+                    borderColor: 'var(--app-border)',
+                    color: 'var(--app-text)',
+                  }}
+                  className="w-full px-2.5 py-1 border rounded text-xs focus:outline-none"
                 >
                   {projectList.map((p, idx) => (
                     <option key={p.id} value={p.id}>
@@ -596,7 +616,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] text-zinc-400 mb-1">
+                <label className="block text-[11px] mb-1" style={{ color: 'var(--app-text-muted)' }}>
                   Session Name
                 </label>
                 <input
@@ -605,45 +625,58 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                   value={sessionName}
                   onChange={(e) => setSessionName(e.target.value)}
                   placeholder="e.g. terminal 2, claude-code, codex"
-                  className="w-full px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-700"
+                  style={{
+                    backgroundColor: 'var(--app-bg)',
+                    borderColor: 'var(--app-border)',
+                    color: 'var(--app-text)',
+                  }}
+                  className="w-full px-2.5 py-1 border rounded text-xs placeholder-zinc-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-zinc-400 mb-1">
+                <label className="block text-[11px] mb-1" style={{ color: 'var(--app-text-muted)' }}>
                   Execution Mode
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <div
                     onClick={() => setSessionMode('local')}
-                    className={`flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors ${
-                      sessionMode === 'local'
-                        ? 'bg-zinc-900 border-zinc-700 text-zinc-100'
-                        : 'bg-zinc-950 border-zinc-800/80 text-zinc-400 hover:bg-zinc-900/40'
-                    }`}
+                    style={sessionMode === 'local' ? {
+                      backgroundColor: 'var(--app-surface-elevated)',
+                      borderColor: 'var(--app-border)',
+                      color: 'var(--app-text)',
+                    } : {
+                      borderColor: 'var(--app-border)',
+                      color: 'var(--app-text-muted)',
+                    }}
+                    className="flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors"
                   >
                     <Terminal className="w-3.5 h-3.5 mt-0.5 text-zinc-400 shrink-0" />
                     <div>
                       <div className="text-xs font-semibold">Local (In-Place)</div>
-                      <div className="text-[10px] text-zinc-500">
-                        Runs directly in project folder.
+                      <div className="text-[10px]" style={{ color: 'var(--app-text-muted)' }}>
+                        Runs in project folder.
                       </div>
                     </div>
                   </div>
 
                   <div
                     onClick={() => setSessionMode('branch')}
-                    className={`flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors ${
-                      sessionMode === 'branch'
-                        ? 'bg-zinc-900 border-zinc-700 text-zinc-100'
-                        : 'bg-zinc-950 border-zinc-800/80 text-zinc-400 hover:bg-zinc-900/40'
-                    }`}
+                    style={sessionMode === 'branch' ? {
+                      backgroundColor: 'var(--app-surface-elevated)',
+                      borderColor: 'var(--app-border)',
+                      color: 'var(--app-text)',
+                    } : {
+                      borderColor: 'var(--app-border)',
+                      color: 'var(--app-text-muted)',
+                    }}
+                    className="flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors"
                   >
                     <FolderGit2 className="w-3.5 h-3.5 mt-0.5 text-zinc-400 shrink-0" />
                     <div>
                       <div className="text-xs font-semibold">Branch (Worktree)</div>
-                      <div className="text-[10px] text-zinc-500">
-                        Isolated git branch worktree.
+                      <div className="text-[10px]" style={{ color: 'var(--app-text-muted)' }}>
+                        Isolated git worktree.
                       </div>
                     </div>
                   </div>
@@ -652,7 +685,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
 
               {sessionMode === 'branch' && (
                 <div>
-                  <label className="block text-[11px] text-zinc-400 mb-1">
+                  <label className="block text-[11px] mb-1" style={{ color: 'var(--app-text-muted)' }}>
                     Git Branch Name
                   </label>
                   <input
@@ -661,13 +694,18 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                     value={branchName}
                     onChange={(e) => setBranchName(e.target.value)}
                     placeholder="e.g. feat/my-agent-task"
-                    className="w-full px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-700"
+                    style={{
+                      backgroundColor: 'var(--app-bg)',
+                      borderColor: 'var(--app-border)',
+                      color: 'var(--app-text)',
+                    }}
+                    className="w-full px-2.5 py-1 border rounded text-xs placeholder-zinc-500 focus:outline-none"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-[11px] text-zinc-400 mb-1">
+                <label className="block text-[11px] mb-1" style={{ color: 'var(--app-text-muted)' }}>
                   Agent Tool / CLI
                 </label>
                 <div className="flex items-center gap-2">
@@ -675,7 +713,12 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                   <select
                     value={agentType}
                     onChange={(e) => setAgentType(e.target.value)}
-                    className="flex-1 px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-200 focus:outline-none"
+                    style={{
+                      backgroundColor: 'var(--app-bg)',
+                      borderColor: 'var(--app-border)',
+                      color: 'var(--app-text)',
+                    }}
+                    className="flex-1 px-2.5 py-1 border rounded text-xs focus:outline-none"
                   >
                     <option value="terminal">Terminal Shell (PowerShell)</option>
                     <option value="claude-code">Claude Code</option>
@@ -687,11 +730,12 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-900">
+              <div className="flex justify-end gap-2 pt-2 border-t" style={{ borderColor: 'var(--app-border)' }}>
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-3 py-1 rounded text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                  className="px-3 py-1 rounded text-xs hover:bg-zinc-800/40"
+                  style={{ color: 'var(--app-text-muted)' }}
                 >
                   Cancel
                 </button>

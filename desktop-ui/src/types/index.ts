@@ -196,12 +196,19 @@ export interface FileItem {
 export interface WorkspacePersistedState {
   activeProjectId?: string | null;
   activeWorkspaceId?: string | null;
+  openTabIds?: string[];
   activeTab?: 'terminal' | 'room' | 'files' | 'changes';
   isSplitView?: boolean;
   sidebarOpen?: boolean;
+  sidebarWidth?: number;
   rightPanelOpen?: boolean;
+  rightPanelWidth?: number;
   rightPanelView?: 'room' | 'files' | 'changes';
   leadSessionId?: string | null;
+  theme?: string;
+  windowWidth?: number;
+  windowHeight?: number;
+  isMaximized?: boolean;
   lastSaved?: number;
 }
 

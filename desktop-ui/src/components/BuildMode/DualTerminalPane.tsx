@@ -297,12 +297,15 @@ export const DualTerminalPane: React.FC = () => {
         style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text-muted)' }}
         className="flex-1 h-full flex flex-col items-center justify-center font-mono text-xs gap-3 select-none"
       >
-        <div className="w-10 h-10 rounded-lg border border-zinc-800 bg-zinc-900/60 flex items-center justify-center text-zinc-500">
+        <div
+          style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text-muted)' }}
+          className="w-10 h-10 rounded-lg border flex items-center justify-center"
+        >
           <TerminalIcon className="w-5 h-5" />
         </div>
         <div className="flex flex-col items-center gap-1">
-          <span className="text-zinc-300 font-semibold text-sm">Terminal Workspace Ready</span>
-          <span className="text-[11px] text-zinc-500">Select a session from the sidebar or click + to start a shell</span>
+          <span className="font-semibold text-sm" style={{ color: 'var(--app-text)' }}>Terminal Ready</span>
+          <span className="text-[11px]" style={{ color: 'var(--app-text-muted)' }}>Select a workspace or start a shell</span>
         </div>
       </div>
     );
@@ -341,7 +344,8 @@ export const DualTerminalPane: React.FC = () => {
             }, 50);
           }}
           title="Drag to resize split terminals (double-click to reset 50/50)"
-          className="w-1 hover:w-1.5 bg-zinc-800/80 hover:bg-zinc-500 active:bg-zinc-300 cursor-col-resize z-20 shrink-0 transition-colors"
+          style={{ backgroundColor: 'var(--app-border)' }}
+          className="w-1 hover:w-1.5 hover:bg-zinc-500 active:bg-zinc-300 cursor-col-resize z-20 shrink-0 transition-colors"
         />
       )}
 

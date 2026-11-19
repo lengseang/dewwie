@@ -64,12 +64,19 @@ let workspacesCache = null;
 // Active PTY sessions map: workspaceId -> { ptyProcess, scrollbackFile, subscribers: Set }
 const activePtys = new Map();
 
+// Helper: Resolve dynamic fallback root for portable execution on any machine
+function defaultFallbackDir() {
+  if (fs.existsSync('D:\\1111-Works\\Dewwie')) return 'D:\\1111-Works\\Dewwie';
+  if (fs.existsSync('D:\\1111-Works\\exbytelab')) return 'D:\\1111-Works\\exbytelab';
+  return path.resolve(__dirname, '../..');
+}
+
 // -------------------------------------------------------------
 // Real Git Operations Helper
 // -------------------------------------------------------------
 function execGit(args, cwd) {
   return new Promise((resolve) => {
-    const proc = spawn('git', args, { cwd: cwd || 'D:\\1111-Works\\exbytelab', shell: true });
+    const proc = spawn('git', args, { cwd: cwd || defaultFallbackDir(), shell: true });
     let stdout = '';
     let stderr = '';
     proc.stdout.on('data', d => stdout += d);
@@ -230,6 +237,21 @@ function getProjects() {
       name: 'exbytelab',
       rootPath: defaultRoot,
       isGitRepo: fs.existsSync(path.join(defaultRoot, '.git')),
+      createdAt: new Date().toISOString()
+    });
+    saveProjects(list);
+  }
+
+  // Ensure portable fallback project exists for other users
+  const validProjects = list.filter(p => p.rootPath && fs.existsSync(p.rootPath));
+  if (validProjects.length === 0) {
+    const fallbackRoot = path.resolve(__dirname, '../..');
+    const folderName = path.basename(fallbackRoot) || 'Dewwie Project';
+    list.push({
+      id: `proj-${Date.now().toString(36)}`,
+      name: folderName,
+      rootPath: fallbackRoot,
+      isGitRepo: fs.existsSync(path.join(fallbackRoot, '.git')),
       createdAt: new Date().toISOString()
     });
     saveProjects(list);
@@ -640,13 +662,10 @@ function getOrCreatePty(workspaceId, cwd) {
     return activePtys.get(workspaceId);
   }
 
-  const workDir = (cwd && fs.existsSync(cwd)) ? cwd : 'D:\\1111-Works\\exbytelab';
+  const workDir = (cwd && fs.existsSync(cwd)) ? cwd : defaultFallbackDir();
   const sessionDir = path.join(SESSIONS_DIR, workspaceId);
   fs.mkdirSync(sessionDir, { recursive: true });
   const scrollbackPath = path.join(sessionDir, 'scrollback.bin');
-
-  const hcBin = path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'herdr-core', 'hc.exe');
-  const hasHc = fs.existsSync(hcBin);
 
   let shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
   let shellArgs = process.platform === 'win32' ? ['-NoLogo'] : [];
@@ -677,32 +696,33 @@ function getOrCreatePty(workspaceId, cwd) {
     }
   });
 
-  // Prioritize manual opening: Only launch CLI agent if explicitly requested by user on session spawn (autoLaunch === true)
-  if (workspacesCache && Array.isArray(workspacesCache)) {
-    const matched = workspacesCache.find(w => w.id === workspaceId);
-    if (matched && matched.autoLaunch && matched.agentType && matched.agentType !== 'terminal') {
-      matched.autoLaunch = false; // Consume so it runs only once and reconnects stay manual
-      const cmdMap = {
-        'claude-code': 'claude\r',
-        'claude': 'claude\r',
-        'antigravity': 'agy\r',
-        'agy': 'agy\r',
-        'gemini': 'gemini\r',
-        'codex': 'codex\r',
-        'hermes': 'hermes\r',
-      };
-      const toSend = cmdMap[matched.agentType];
-      if (toSend) {
-        setTimeout(() => {
-          try { ptyProcess.write(toSend); } catch (_) {}
-        }, 600);
+  // Pre-load and cap historical scrollback into memory buffer (max 128KB, keeps app fast and lightweight)
+  let inMemoryBuffer = Buffer.alloc(0);
+  if (fs.existsSync(scrollbackPath)) {
+    try {
+      const stats = fs.statSync(scrollbackPath);
+      if (stats.size > 131072) {
+        const fd = fs.openSync(scrollbackPath, 'r');
+        const tempBuf = Buffer.alloc(65536);
+        fs.readSync(fd, tempBuf, 0, 65536, stats.size - 65536);
+        fs.closeSync(fd);
+        fs.writeFileSync(scrollbackPath, tempBuf);
+        inMemoryBuffer = tempBuf;
+      } else {
+        inMemoryBuffer = fs.readFileSync(scrollbackPath);
       }
-    }
+    } catch (_) {}
   }
 
   const scrollbackStream = fs.createWriteStream(scrollbackPath, { flags: 'a' });
-  const subscribers = new Set();
-  let inMemoryBuffer = Buffer.alloc(0);
+
+  const sessionObj = {
+    ptyProcess,
+    scrollbackPath,
+    cwd: workDir,
+    isAttached: false,
+    getBuffer: () => inMemoryBuffer,
+  };
 
   ptyProcess.onData((data) => {
     // 1. Write to append-only disk scrollback & in-memory rolling buffer
@@ -716,8 +736,8 @@ function getOrCreatePty(workspaceId, cwd) {
     // 2. Intercept OSC 7501
     parseOsc(data, workspaceId);
 
-    // 3. Direct in-memory IPC broadcast to renderer (ZERO NETWORK PORTS!)
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    // 3. Direct in-memory IPC broadcast to renderer (only if attached to prevent double-echo)
+    if (mainWindow && !mainWindow.isDestroyed() && sessionObj.isAttached) {
       mainWindow.webContents.send('terminal:data', { workspaceId, data: data.toString() });
     }
   });
@@ -726,13 +746,6 @@ function getOrCreatePty(workspaceId, cwd) {
     console.log(`[PTY] Shell for ${workspaceId} exited with code ${exitCode}`);
     activePtys.delete(workspaceId);
   });
-
-  const sessionObj = {
-    ptyProcess,
-    scrollbackPath,
-    cwd: workDir,
-    getBuffer: () => inMemoryBuffer,
-  };
 
   activePtys.set(workspaceId, sessionObj);
   return sessionObj;
@@ -745,7 +758,24 @@ ipcMain.handle('terminal:attach', async (_, { workspaceId }) => {
   if (!workspaceId) return '';
   const list = await getWorkspaces();
   const matched = list.find(w => w.id === workspaceId);
-  const cwd = matched ? matched.worktreePath : (list[0]?.worktreePath || 'D:\\1111-Works\\Dewwie');
+  const cwd = matched ? matched.worktreePath : (list[0]?.worktreePath || defaultFallbackDir());
+  const session = getOrCreatePty(workspaceId, cwd);
+
+  session.isAttached = true;
+  const memBuf = session.getBuffer ? session.getBuffer() : null;
+  if (memBuf && memBuf.length > 0) {
+    return memBuf.toString('utf-8');
+  } else if (fs.existsSync(session.scrollbackPath)) {
+    try {
+      const history = fs.readFileSync(session.scrollbackPath, 'utf-8');
+      if (history.length === 0) {
+        return `\x1b[38;5;244mDewwie Native PTY [${matched?.agentType || 'shell'}] • ${cwd}\x1b[0m\r\n`;
+      }
+      return history.slice(Math.max(0, history.length - 65536));
+    } catch (_) {}
+  }
+  return '';
+});
   const session = getOrCreatePty(workspaceId, cwd);
 
   const memBuf = session.getBuffer ? session.getBuffer() : null;
@@ -797,15 +827,19 @@ ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() || false);
 let mainWindow = null;
 
 function createWindow() {
+  const savedState = getWorkspaceState();
+  const width = (savedState.windowWidth && savedState.windowWidth >= 1024) ? savedState.windowWidth : 1440;
+  const height = (savedState.windowHeight && savedState.windowHeight >= 680) ? savedState.windowHeight : 920;
+
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 920,
+    width,
+    height,
     minWidth: 1024,
     minHeight: 680,
     backgroundColor: '#09090b',
     title: 'Dewwie - Autonomous AI Agent IDE',
     frame: false,
-    titleBarStyle: 'hidden',
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hidden' } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -815,11 +849,37 @@ function createWindow() {
     ...(fs.existsSync(path.join(__dirname, '../public/icon.png')) ? { icon: path.join(__dirname, '../public/icon.png') } : {}),
   });
 
+  if (savedState.isMaximized) {
+    mainWindow.maximize();
+  }
+
   mainWindow.on('maximize', () => {
     mainWindow?.webContents.send('window:maximizedChange', true);
   });
   mainWindow.on('unmaximize', () => {
     mainWindow?.webContents.send('window:maximizedChange', false);
+  });
+  mainWindow.on('restore', () => {
+    mainWindow?.webContents.send('window:maximizedChange', false);
+  });
+  mainWindow.on('resize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window:maximizedChange', mainWindow.isMaximized());
+    }
+  });
+
+  mainWindow.on('close', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        const isMax = mainWindow.isMaximized();
+        const bounds = mainWindow.getBounds();
+        saveWorkspaceState({
+          isMaximized: isMax,
+          windowWidth: isMax ? undefined : bounds.width,
+          windowHeight: isMax ? undefined : bounds.height,
+        });
+      } catch (_) {}
+    }
   });
 
   const distIndex = path.join(__dirname, '../dist/index.html');
@@ -894,12 +954,12 @@ function scanDir(dirPath, relativeRoot = '', maxDepth = 3, currentDepth = 0) {
 
 // IPC Handlers
 ipcMain.handle('fs:tree', (_, { targetPath }) => {
-  const root = (targetPath && fs.existsSync(targetPath)) ? targetPath : 'D:\\1111-Works\\exbytelab';
+  const root = (targetPath && fs.existsSync(targetPath)) ? targetPath : defaultFallbackDir();
   return scanDir(root);
 });
 
 ipcMain.handle('fs:read', (_, { filePath, basePath }) => {
-  const root = (basePath && fs.existsSync(basePath)) ? basePath : 'D:\\1111-Works\\exbytelab';
+  const root = (basePath && fs.existsSync(basePath)) ? basePath : defaultFallbackDir();
   const full = path.resolve(root, filePath);
   if (!full.startsWith(root) || !fs.existsSync(full)) {
     return { error: 'File not found or outside workspace' };
@@ -912,16 +972,26 @@ ipcMain.handle('fs:read', (_, { filePath, basePath }) => {
   }
 });
 
-ipcMain.handle('window:minimize', () => mainWindow?.minimize());
+ipcMain.handle('window:minimize', () => {
+  mainWindow?.minimize();
+  return true;
+});
+
 ipcMain.handle('window:maximize', () => {
-  if (!mainWindow) return;
+  if (!mainWindow) return false;
   if (mainWindow.isMaximized()) {
     mainWindow.unmaximize();
+    return false;
   } else {
     mainWindow.maximize();
+    return true;
   }
 });
-ipcMain.handle('window:close', () => mainWindow?.close());
+
+ipcMain.handle('window:close', () => {
+  mainWindow?.close();
+  return true;
+});
 
 // IPC Handlers: Projects
 ipcMain.handle('project:pickFolder', async () => {
@@ -1086,7 +1156,7 @@ ipcMain.handle('rooms:delete', async (_, { id }) => {
 
 ipcMain.handle('workspaces:create', async (_, { name, branch, baseBranch, repository }) => {
   const safeFolder = branch.replace(/[\/\\]/g, '-');
-  const baseDir = 'D:\\1111-Works\\exbytelab';
+  const baseDir = (repository && getProjects().find(p => p.name === repository)?.rootPath) || defaultFallbackDir();
   const worktreePath = path.join(baseDir, '.worktrees', safeFolder);
 
   // Run real git worktree add
@@ -1103,7 +1173,7 @@ ipcMain.handle('workspaces:create', async (_, { name, branch, baseBranch, reposi
 
   const newWs = {
     id: `ws-${Date.now().toString(36)}`,
-    repository: repository || 'exbytelab',
+    repository: repository || path.basename(baseDir),
     name: name || branch,
     sessionMode: 'branch',
     branch,
@@ -1126,7 +1196,7 @@ ipcMain.handle('workspaces:create', async (_, { name, branch, baseBranch, reposi
 });
 
 ipcMain.handle('git:diff', async (_, { worktreePath, baseBranch, sessionMode }) => {
-  const cwd = (worktreePath && fs.existsSync(worktreePath)) ? worktreePath : 'D:\\1111-Works\\exbytelab';
+  const cwd = (worktreePath && fs.existsSync(worktreePath)) ? worktreePath : defaultFallbackDir();
   const target = sessionMode === 'local' ? 'HEAD' : (baseBranch || 'main');
   const res = await execGit(['diff', target, '--numstat'], cwd);
   const patchRes = await execGit(['diff', '-u', target], cwd);
@@ -1138,9 +1208,9 @@ ipcMain.handle('git:diff', async (_, { worktreePath, baseBranch, sessionMode }) 
 });
 
 ipcMain.handle('git:merge', async (_, { worktreePath, branch, baseBranch, commitMsg, repo }) => {
-  const baseDir = (repo === 'Dewwie' || (worktreePath && worktreePath.includes('Dewwie'))) 
-    ? 'D:\\1111-Works\\Dewwie' 
-    : 'D:\\1111-Works\\exbytelab';
+  const baseDir = (repo && getProjects().find(p => p.name === repo)?.rootPath) || 
+    (worktreePath && path.dirname(path.dirname(worktreePath))) || 
+    defaultFallbackDir();
   await execGit(['checkout', baseBranch || 'main'], baseDir);
   const mergeRes = await execGit(['merge', '--no-ff', branch, '-m', commitMsg || `Merge ${branch}`], baseDir);
   if (mergeRes.code === 0 && worktreePath && fs.existsSync(worktreePath)) {
@@ -1153,7 +1223,7 @@ ipcMain.handle('git:merge', async (_, { worktreePath, branch, baseBranch, commit
 
 ipcMain.handle('ide:open', (_, { ide, targetPath }) => {
   const bin = ide === 'cursor' ? 'cursor' : ide === 'zed' ? 'zed' : 'code';
-  const p = targetPath || 'D:\\1111-Works\\exbytelab';
+  const p = targetPath || defaultFallbackDir();
   spawn('cmd', ['/C', bin, p], { detached: true, stdio: 'ignore' });
   return true;
 });
@@ -1211,11 +1281,15 @@ function getWorkspaceState() {
     activeProjectId: 'proj-dewwie',
     activeWorkspaceId: 'ws-local-proj-dewwie',
     activeTab: 'terminal',
+    openTabIds: ['ws-local-proj-dewwie'],
     isSplitView: false,
     sidebarOpen: true,
+    sidebarWidth: 260,
     rightPanelOpen: false,
+    rightPanelWidth: 320,
     rightPanelView: 'room',
     leadSessionId: null,
+    theme: 'zinc',
   };
 }
 
@@ -1259,7 +1333,7 @@ ipcMain.handle('task:delegate', async (_, { task, agent, repo, baseBranch }) => 
   const slug = cleanTask.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').substring(0, 24) || 'task';
   const branch = `feat/${slug}-${Math.floor(Date.now() / 1000) % 10000}`;
   const safeFolder = branch.replace(/[\/\\]/g, '-');
-  const baseDir = repository === 'Dewwie' ? 'D:\\1111-Works\\Dewwie' : 'D:\\1111-Works\\exbytelab';
+  const baseDir = (repo && getProjects().find(p => p.name === repo)?.rootPath) || defaultFallbackDir();
   const worktreePath = path.join(baseDir, '.worktrees', safeFolder);
 
   // 1. Git worktree creation
@@ -1332,7 +1406,7 @@ ipcMain.handle('task:delegate', async (_, { task, agent, repo, baseBranch }) => 
 // Quality Gate: Worktree Automated Test Runner
 // -------------------------------------------------------------
 ipcMain.handle('worktree:runTests', async (_, { worktreePath, repo }) => {
-  const targetDir = worktreePath || (repo === 'Dewwie' ? 'D:\\1111-Works\\Dewwie' : 'D:\\1111-Works\\exbytelab');
+  const targetDir = worktreePath || (repo && getProjects().find(p => p.name === repo)?.rootPath) || defaultFallbackDir();
   return new Promise((resolve) => {
     // Check whether tests/run_all_tests.py, package.json test, or cargo test applies
     let cmd = 'npm';
@@ -1391,7 +1465,7 @@ ipcMain.handle('terminal:sendInput', async (_, { workspaceId, text, pressEnter =
 // -------------------------------------------------------------
 ipcMain.handle('mesh:syncSkills', async (_, { projectPath }) => {
   const projects = getProjects();
-  const targetDir = projectPath || (projects[0]?.rootPath) || 'D:\\1111-Works\\exbytelab';
+  const targetDir = projectPath || (projects[0]?.rootPath) || defaultFallbackDir();
   try {
     const dewwieDir = path.join(targetDir, '.dewwie');
     const skillsDir = path.join(dewwieDir, 'skills', 'dewwie-mesh');

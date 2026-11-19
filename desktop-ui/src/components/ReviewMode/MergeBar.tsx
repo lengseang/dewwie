@@ -95,7 +95,14 @@ export const MergeBar: React.FC = () => {
   };
 
   return (
-    <div className="h-12 px-3 border-t border-zinc-800/80 bg-zinc-950 flex items-center justify-between gap-3 shrink-0 font-mono text-xs select-none">
+    <div
+      style={{
+        backgroundColor: 'var(--app-surface)',
+        borderColor: 'var(--app-border)',
+        color: 'var(--app-text)',
+      }}
+      className="h-12 px-3 border-t flex items-center justify-between gap-3 shrink-0 font-mono text-xs select-none"
+    >
       {/* Left: Commit message input */}
       <div className="flex-1 flex items-center gap-2 max-w-2xl">
         <GitMerge className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
@@ -104,7 +111,12 @@ export const MergeBar: React.FC = () => {
           value={commitMessage}
           onChange={(e) => setCommitMessage(e.target.value)}
           placeholder="Commit message..."
-          className="flex-1 px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-700 transition-colors"
+          style={{
+            backgroundColor: 'var(--app-bg)',
+            borderColor: 'var(--app-border)',
+            color: 'var(--app-text)',
+          }}
+          className="flex-1 px-2.5 py-1.5 border rounded text-xs placeholder-zinc-500 focus:outline-none transition-colors"
         />
       </div>
 
@@ -143,7 +155,12 @@ export const MergeBar: React.FC = () => {
         <button
           onClick={handleRebase}
           disabled={isRebasing}
-          className="px-2.5 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-xs transition-colors active:scale-[0.98]"
+          style={{
+            backgroundColor: 'var(--app-surface-elevated)',
+            borderColor: 'var(--app-border)',
+            color: 'var(--app-text)',
+          }}
+          className="px-2.5 py-1.5 rounded border text-xs transition-colors active:scale-[0.98] hover:opacity-90"
         >
           {isRebasing ? 'Rebasing...' : 'Rebase'}
         </button>
