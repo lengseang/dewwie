@@ -25,3 +25,8 @@ __pycache__/
 Thumbs.db
 .DS_Store
 *.tmp
+
+# Local testing scratch scripts
+check_sessions.ps1
+read_ws_scrollback.ps1
+send_to_agent.js

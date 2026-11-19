@@ -20,14 +20,14 @@ export const DualTerminalPane: React.FC = () => {
 
   const leftContainerRef = useRef<HTMLDivElement>(null);
   const rightContainerRef = useRef<HTMLDivElement>(null);
-  const leftWsRef = useRef<WebSocket | null>(null);
-  const rightWsRef = useRef<WebSocket | null>(null);
   const leftTermRef = useRef<Terminal | null>(null);
   const rightTermRef = useRef<Terminal | null>(null);
   const leftFitRef = useRef<FitAddon | null>(null);
   const rightFitRef = useRef<FitAddon | null>(null);
   const lastLeftWsId = useRef<string | null>(null);
   const lastRightWsId = useRef<string | null>(null);
+  const workspacesRef = useRef(workspaces);
+  workspacesRef.current = workspaces;
 
   const activeWs = activeWorkspaceId ? workspaces[activeWorkspaceId] : null;
 
@@ -35,7 +35,7 @@ export const DualTerminalPane: React.FC = () => {
   const allList = Object.values(workspaces);
   const secondaryWs = allList.find((w) => w.id !== activeWorkspaceId) || allList[0];
 
-  // Helper: Setup real PTY WebSocket connection for an xterm instance
+  // Helper: Setup real PTY in-memory IPC connection for an xterm instance
   const attachPty = useCallback(async (container: HTMLDivElement | null, workspaceId: string, isLeft: boolean) => {
     if (!container || !workspaceId) return;
     container.innerHTML = ''; // Ensure clean container with zero duplicate DOM artifacts
@@ -75,56 +75,44 @@ export const DualTerminalPane: React.FC = () => {
       lastRightWsId.current = workspaceId;
     }
 
-    const targetPort = (typeof window !== 'undefined' && window.swarmherdNative?.wsPort) || 7501;
-
-    // Connect to native PTY WebSocket server
-    const wsUrl = `ws://127.0.0.1:${targetPort}?workspaceId=${encodeURIComponent(workspaceId)}`;
-    const ws = new WebSocket(wsUrl);
-    ws.binaryType = 'arraybuffer';
-
-    ws.onopen = () => {
-      console.log(`[PTY Client] Connected live to ${workspaceId}`);
-      setTimeout(() => {
-        try {
-          fit.fit();
-          term.focus();
-        } catch (_) {}
-        if (term.cols > 0 && term.rows > 0) {
-          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    // 1. Attach to real Native PTY over In-Memory IPC (Zero network ports)
+    if (typeof window !== 'undefined' && window.swarmherdNative?.attachTerminal) {
+      try {
+        const initialScrollback = await window.swarmherdNative.attachTerminal(workspaceId);
+        if (initialScrollback) {
+          term.write(initialScrollback);
         }
-      }, 20);
-    };
-
-    ws.onmessage = (event) => {
-      if (typeof event.data === 'string') {
-        term.write(event.data);
-      } else if (event.data instanceof ArrayBuffer) {
-        term.write(new Uint8Array(event.data));
+        setTimeout(() => {
+          try {
+            fit.fit();
+            term.focus();
+          } catch (_) {}
+          if (term.cols > 0 && term.rows > 0) {
+            window.swarmherdNative?.resizeTerminal?.(workspaceId, term.cols, term.rows);
+          }
+        }, 30);
+      } catch (err) {
+        console.error(`[PTY IPC] Failed to attach workspace ${workspaceId}:`, err);
       }
-    };
+    } else {
+      // Browser fallback simulation if running outside Electron
+      const currentWs = workspacesRef.current[workspaceId];
+      const workingDir = currentWs?.worktreePath || 'D:\\1111-Works\\Dewwie';
+      term.writeln('\x1b[38;5;244m[Dewwie Web Mode] PTY shell simulation ready • ' + workingDir + '\x1b[0m');
+      term.writeln('\x1b[38;5;248mPowerShell 7.5.0\x1b[0m');
+      term.write(`\r\n\x1b[38;5;39mPS ${workingDir}>\x1b[0m `);
+    }
 
     let inputBuf = '';
-    const currentWs = workspaces[workspaceId];
+    const currentWs = workspacesRef.current[workspaceId];
     const workingDir = currentWs?.worktreePath || 'D:\\1111-Works\\Dewwie';
 
-    ws.onerror = () => {
-      console.warn(`[PTY Client] WebSocket error for ${workspaceId}.`);
-      if (typeof window !== 'undefined' && !window.swarmherdNative) {
-        term.writeln('\x1b[38;5;244m[Dewwie Web Mode] PTY shell simulation ready • ' + workingDir + '\x1b[0m');
-        term.writeln('\x1b[38;5;248mPowerShell 7.5.0\x1b[0m');
-        term.write(`\r\n\x1b[38;5;39mPS ${workingDir}>\x1b[0m `);
-      }
-    };
-
-    ws.onclose = () => {
-      console.log(`[PTY Client] Connection closed for ${workspaceId}.`);
-    };
-
-    // Forward raw keyboard data to real PTY stdin
+    // Forward raw keyboard data to real PTY stdin via direct in-memory IPC
     term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      } else if (typeof window !== 'undefined' && !window.swarmherdNative) {
+      if (typeof window !== 'undefined' && window.swarmherdNative?.writeTerminal) {
+        window.swarmherdNative.writeTerminal(workspaceId, data);
+      } else {
+        // Fallback simulation
         if (data === '\r') {
           term.writeln('');
           const trimmed = inputBuf.trim();
@@ -147,24 +135,31 @@ export const DualTerminalPane: React.FC = () => {
       }
     });
 
-    // Handle resize
+    // Handle resize over IPC
     term.onResize((size) => {
-      if (ws.readyState === WebSocket.OPEN && size.cols > 0 && size.rows > 0) {
-        ws.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
+      if (typeof window !== 'undefined' && window.swarmherdNative?.resizeTerminal && size.cols > 0 && size.rows > 0) {
+        window.swarmherdNative.resizeTerminal(workspaceId, size.cols, size.rows);
       }
     });
-
-    if (isLeft) {
-      leftWsRef.current = ws;
-    } else {
-      rightWsRef.current = ws;
-    }
   }, [theme]);
+
+  // Global listener for PTY data stream from Electron Main over in-memory IPC
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.swarmherdNative?.onTerminalData) return;
+    const unsub = window.swarmherdNative.onTerminalData(({ workspaceId, data }) => {
+      if (workspaceId === lastLeftWsId.current && leftTermRef.current) {
+        leftTermRef.current.write(data);
+      }
+      if (workspaceId === lastRightWsId.current && rightTermRef.current) {
+        rightTermRef.current.write(data);
+      }
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     // Only re-attach if workspace has actually changed
     if (activeWorkspaceId && activeWorkspaceId !== lastLeftWsId.current) {
-      leftWsRef.current?.close();
       leftTermRef.current?.dispose();
       if (leftContainerRef.current) leftContainerRef.current.innerHTML = '';
       attachPty(leftContainerRef.current, activeWorkspaceId, true);
@@ -174,23 +169,25 @@ export const DualTerminalPane: React.FC = () => {
 
     if (isSplitView && secondaryWs) {
       if (secondaryWs.id !== lastRightWsId.current || !rightTermRef.current) {
-        rightWsRef.current?.close();
         rightTermRef.current?.dispose();
         if (rightContainerRef.current) rightContainerRef.current.innerHTML = '';
         attachPty(rightContainerRef.current, secondaryWs.id, false);
       }
     } else {
-      rightWsRef.current?.close();
       rightTermRef.current?.dispose();
       lastRightWsId.current = null;
       if (rightContainerRef.current) rightContainerRef.current.innerHTML = '';
     }
 
+    let resizeTimer: any = null;
     const handleResize = () => {
-      try {
-        leftFitRef.current?.fit();
-        rightFitRef.current?.fit();
-      } catch (_) {}
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        try {
+          leftFitRef.current?.fit();
+          rightFitRef.current?.fit();
+        } catch (_) {}
+      }, 60);
     };
 
     const ro = new ResizeObserver(() => {
@@ -228,7 +225,6 @@ export const DualTerminalPane: React.FC = () => {
 
   const handleRestartShell = () => {
     if (activeWorkspaceId) {
-      leftWsRef.current?.close();
       leftTermRef.current?.dispose();
       if (leftContainerRef.current) leftContainerRef.current.innerHTML = '';
       attachPty(leftContainerRef.current, activeWorkspaceId, true);
@@ -259,10 +255,6 @@ export const DualTerminalPane: React.FC = () => {
       const relativeX = e.clientX - rect.left;
       const percentage = Math.max(20, Math.min(80, (relativeX / rect.width) * 100));
       setSplitRatio(percentage);
-      try {
-        leftFitRef.current?.fit();
-        rightFitRef.current?.fit();
-      } catch (_) {}
     };
 
     const handleMouseUp = () => {

@@ -23,6 +23,22 @@ contextBridge.exposeInMainWorld('swarmherdNative', {
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
   closeWindow: () => ipcRenderer.invoke('window:close'),
+  isWindowMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+  onWindowMaximized: (callback) => {
+    const handler = (_, isMax) => callback(isMax);
+    ipcRenderer.on('window:maximizedChange', handler);
+    return () => ipcRenderer.removeListener('window:maximizedChange', handler);
+  },
+
+  // Native In-Memory Terminal PTY IPC (Zero Network Ports)
+  attachTerminal: (workspaceId) => ipcRenderer.invoke('terminal:attach', { workspaceId }),
+  writeTerminal: (workspaceId, data) => ipcRenderer.send('terminal:write', { workspaceId, data }),
+  resizeTerminal: (workspaceId, cols, rows) => ipcRenderer.send('terminal:resize', { workspaceId, cols, rows }),
+  onTerminalData: (callback) => {
+    const handler = (_, payload) => callback(payload);
+    ipcRenderer.on('terminal:data', handler);
+    return () => ipcRenderer.removeListener('terminal:data', handler);
+  },
 
   onAgentStatus: (callback) => {
     ipcRenderer.on('agent:status', (_, data) => callback(data));
@@ -31,6 +47,16 @@ contextBridge.exposeInMainWorld('swarmherdNative', {
   postRoomMessage: (params) => ipcRenderer.invoke('room:postMessage', params),
   onRoomMessage: (callback) => {
     ipcRenderer.on('room:message', (_, data) => callback(data));
+  },
+  getRooms: () => ipcRenderer.invoke('rooms:get'),
+  addRoom: (name) => ipcRenderer.invoke('rooms:create', { name }),
+  removeRoom: (id) => ipcRenderer.invoke('rooms:delete', { id }),
+  setSessionRoom: (sessionId, roomId) => ipcRenderer.invoke('sessions:setRoom', { sessionId, roomId }),
+  onRoomsUpdated: (callback) => {
+    ipcRenderer.on('rooms:updated', (_, data) => callback(data));
+  },
+  onWorkspacesUpdated: (callback) => {
+    ipcRenderer.on('workspaces:updated', (_, data) => callback(data));
   },
   setSessionRole: (params) => ipcRenderer.invoke('session:setRole', params),
   getWorkspaceState: () => ipcRenderer.invoke('workspace:getState'),

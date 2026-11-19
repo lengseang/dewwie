@@ -19,6 +19,8 @@ interface WorkspaceStore {
   workspaces: Record<string, WorkspaceState>;
   workspaceOrder: string[];
   activeWorkspaceId: string | null;
+  openTabIds: string[];
+  closeTab: (tabId: string) => void;
   mode: UIMode;
   activeTab: 'terminal' | 'room' | 'files' | 'changes';
   isSplitView: boolean;
@@ -168,6 +170,20 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   workspaces: INITIAL_WORKSPACES,
   workspaceOrder: ['ws-local-proj-dewwie'],
   activeWorkspaceId: 'ws-local-proj-dewwie',
+  openTabIds: ['ws-local-proj-dewwie'],
+  closeTab: (tabId: string) => {
+    set((state) => {
+      const nextTabs = state.openTabIds.filter((id) => id !== tabId);
+      let nextActive = state.activeWorkspaceId;
+      if (nextActive === tabId) {
+        nextActive = nextTabs.length > 0 ? nextTabs[nextTabs.length - 1] : null;
+      }
+      return {
+        openTabIds: nextTabs,
+        activeWorkspaceId: nextActive,
+      };
+    });
+  },
   mode: 'build',
   activeTab: 'terminal',
   isSplitView: false,
@@ -243,8 +259,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   // Room & Inter-Agent Mesh Orchestration
   rooms: [
-    { id: 'room-1', name: 'Room 1' },
-    { id: 'room-2', name: 'Room 2' },
+    { id: 'room-1', name: 'Frontend Team' },
+    { id: 'room-2', name: 'Core Engine' },
   ],
   activeRoomId: 'room-1',
   setActiveRoomId: (roomId) => set({ activeRoomId: roomId }),
@@ -252,6 +268,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     const newId = `room-${Date.now().toString(36)}`;
     const newRoom = { id: newId, name: name.trim() || `Room ${get().rooms.length + 1}` };
     set((s) => ({ rooms: [...s.rooms, newRoom], activeRoomId: newId }));
+    if (typeof window !== 'undefined' && window.swarmherdNative?.addRoom) {
+      window.swarmherdNative.addRoom(name.trim()).catch(() => {});
+    }
     return newId;
   },
   removeRoom: (id) => {
@@ -265,11 +284,14 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         }
       });
       return {
-        rooms: filtered.length > 0 ? filtered : [{ id: 'room-1', name: 'Room 1' }],
+        rooms: filtered.length > 0 ? filtered : [{ id: 'room-1', name: 'Frontend Team' }],
         activeRoomId: nextActive,
         workspaces: updatedWorkspaces,
       };
     });
+    if (typeof window !== 'undefined' && window.swarmherdNative?.removeRoom) {
+      window.swarmherdNative.removeRoom(id).catch(() => {});
+    }
   },
   setSessionRoom: (sessionId, roomId) => {
     set((s) => {
@@ -282,7 +304,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         },
       };
     });
-    get().persistState();
+    if (typeof window !== 'undefined' && window.swarmherdNative?.setSessionRoom) {
+      window.swarmherdNative.setSessionRoom(sessionId, roomId).catch(() => {});
+    }
   },
   roomMessages: [],
   leadSessionId: 'ws-local-proj-dewwie',
@@ -373,17 +397,37 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
           const map: Record<string, WorkspaceState> = {};
           const order: string[] = [];
           for (const ws of nativeList) {
-            map[ws.id] = { ...ws, roomId: ws.roomId || 'room-1' };
+            map[ws.id] = { ...ws, roomId: ws.roomId || undefined };
             order.push(ws.id);
           }
           const currentActive = get().activeWorkspaceId;
-          const keepActive = (currentActive && map[currentActive]) ? currentActive : (order[0] || 'ws-local-proj-dewwie');
-          set(() => ({
-            workspaces: map,
-            workspaceOrder: order,
-            activeWorkspaceId: keepActive,
-            daemonStatus: 'connected',
-          }));
+          // Prioritize active working session if any has active work; otherwise prioritize first/clean
+          const workingWs = nativeList.find(w => w.agentStatus?.state === 'working');
+          const bestActive = workingWs ? workingWs.id : ((currentActive && map[currentActive]) ? currentActive : (order[0] || 'ws-local-proj-dewwie'));
+
+          set((state) => {
+            const currentTabs = state.openTabIds.filter(id => map[id]);
+            const finalTabs = currentTabs.length > 0 ? currentTabs : [bestActive];
+            return {
+              workspaces: map,
+              workspaceOrder: order,
+              activeWorkspaceId: bestActive,
+              openTabIds: finalTabs,
+              isSplitView: false, // Cold start always prioritizes single manual terminal view
+              daemonStatus: 'connected',
+            };
+          });
+        }
+
+        // 3. Fetch real persistent rooms
+        if (window.swarmherdNative.getRooms) {
+          const nativeRooms = await window.swarmherdNative.getRooms();
+          if (Array.isArray(nativeRooms) && nativeRooms.length > 0) {
+            set((s) => ({
+              rooms: nativeRooms,
+              activeRoomId: nativeRooms.some((r) => r.id === s.activeRoomId) ? s.activeRoomId : nativeRooms[0].id,
+            }));
+          }
         }
 
         // 3. Fetch room messages
@@ -430,6 +474,29 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
             set((state) => ({
               roomMessages: [...state.roomMessages, msg],
             }));
+          });
+        }
+
+        if (window.swarmherdNative.onRoomsUpdated) {
+          window.swarmherdNative.onRoomsUpdated((rooms) => {
+            if (Array.isArray(rooms) && rooms.length > 0) {
+              set((s) => ({
+                rooms,
+                activeRoomId: rooms.some((r) => r.id === s.activeRoomId) ? s.activeRoomId : rooms[0].id,
+              }));
+            }
+          });
+        }
+
+        if (window.swarmherdNative.onWorkspacesUpdated) {
+          window.swarmherdNative.onWorkspacesUpdated((list) => {
+            if (Array.isArray(list) && list.length > 0) {
+              const map: Record<string, WorkspaceState> = {};
+              for (const ws of list) {
+                map[ws.id] = { ...ws, roomId: ws.roomId || undefined };
+              }
+              set({ workspaces: map });
+            }
           });
         }
       } catch (e) {
@@ -555,6 +622,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       workspaces: { ...state.workspaces, [newId]: newWs },
       workspaceOrder: [newId, ...state.workspaceOrder.filter((id) => id !== newId)],
       activeWorkspaceId: newId,
+      openTabIds: state.openTabIds.includes(newId) ? state.openTabIds : [...state.openTabIds, newId],
       activeTab: 'terminal',
     }));
     get().persistState();
@@ -582,9 +650,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setActiveWorkspace: (id: string) => {
     const ws = get().workspaces[id];
     if (ws) {
-      set({
-        activeWorkspaceId: id,
-        activeProjectId: ws.projectId || get().activeProjectId,
+      set((state) => {
+        const nextTabs = state.openTabIds.includes(id) ? state.openTabIds : [...state.openTabIds, id];
+        return {
+          activeWorkspaceId: id,
+          activeProjectId: ws.projectId || state.activeProjectId,
+          openTabIds: nextTabs,
+        };
       });
       get().persistState();
     }
@@ -782,17 +854,19 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     }
     set((state) => {
       const remainingOrder = state.workspaceOrder.filter((wId) => wId !== id);
+      const remainingOpenTabs = state.openTabIds.filter((tId) => tId !== id);
       const remainingWorkspaces = { ...state.workspaces };
       delete remainingWorkspaces[id];
 
       const newActive =
         state.activeWorkspaceId === id
-          ? remainingOrder[0] || null
+          ? (remainingOpenTabs[remainingOpenTabs.length - 1] || remainingOrder[0] || null)
           : state.activeWorkspaceId;
 
       return {
         workspaces: remainingWorkspaces,
         workspaceOrder: remainingOrder,
+        openTabIds: remainingOpenTabs,
         activeWorkspaceId: newActive,
       };
     });

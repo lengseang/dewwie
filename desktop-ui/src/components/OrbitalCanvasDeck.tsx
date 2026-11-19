@@ -37,7 +37,7 @@ export interface OrbitalAgent {
   crown: boolean;
   accent: string;
   visor: string;
-  roomId: string | null;
+  roomId?: string | null;
   deskIdx: number;
   state: LifecycleState;
   tokenPct: number;
@@ -159,6 +159,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
     const list = Object.values(workspaces);
     const existingMap = new Map(agentsRef.current.map((a) => [a.id, a]));
 
+    const roomOccupantCounts: Record<string, number> = {};
     const updated: OrbitalAgent[] = list.map((ws, index) => {
       const existing = existingMap.get(ws.id);
       const isLead = ws.agentRole === 'lead' || ws.id === leadSessionId;
@@ -196,9 +197,18 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
         lifecycleState = 'IDLE';
       }
 
-      const deskIdx = existing ? existing.deskIdx : index % 6;
-      const x = existing ? existing.x : 40 + (index % 2) * 80;
-      const y = existing ? existing.y : 100 + Math.floor(index / 2) * 40;
+      const rId = ws.roomId;
+      let occupantIndex = 0;
+      if (rId) {
+        occupantIndex = roomOccupantCounts[rId] || 0;
+        roomOccupantCounts[rId] = occupantIndex + 1;
+      } else {
+        occupantIndex = index;
+      }
+
+      const deskIdx = existing ? existing.deskIdx : occupantIndex % 6;
+      const x = existing ? existing.x : 40 + (occupantIndex % 2) * 80;
+      const y = existing ? existing.y : 100 + Math.floor(occupantIndex / 2) * 40;
 
       return {
         id: ws.id,
@@ -208,7 +218,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
         crown: isLead,
         accent: colors.accent,
         visor: colors.visor,
-        roomId: ws.roomId || 'room-1',
+        roomId: ws.roomId || undefined,
         deskIdx,
         state: existing?.state && existing.state !== 'IDLE' && lifecycleState === 'IDLE' ? existing.state : lifecycleState,
         tokenPct: existing ? existing.tokenPct : Math.max(20, Math.min(96, 92 - index * 6)),
@@ -683,7 +693,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
                 const bw = tw + 6;
                 const bh = 10;
                 const bx = x - bw / 2;
-                const byy = inPod ? y - 18 : y + 6;
+                const byy = inPod ? y - 22 : y + 6;
 
                 ctx.fillStyle = 'rgba(11, 12, 18, 0.94)';
                 ctx.beginPath();

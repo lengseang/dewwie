@@ -437,6 +437,26 @@ def cmd_diff(args):
     print()
 
 ROOM_MESSAGES_PATH = Path.home() / ".swarmherd" / "room_messages.json"
+ROOMS_PATH = Path.home() / ".swarmherd" / "rooms.json"
+
+def load_local_rooms():
+    if ROOMS_PATH.exists():
+        try:
+            with open(ROOMS_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+        except Exception:
+            pass
+    return [
+        {"id": "room-1", "name": "Frontend Team"},
+        {"id": "room-2", "name": "Core Engine"}
+    ]
+
+def save_local_rooms(rooms):
+    ROOMS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(ROOMS_PATH, "w", encoding="utf-8") as f:
+        json.dump(rooms, f, indent=2)
 
 DEWWIE_MESH_PROTOCOL_DOC = """# Dewwie Multi-Agent Room Protocol
 
@@ -592,20 +612,105 @@ def cmd_room(args):
         sys.stdout.write(f"\033]7502;to={target};from={msg_obj['fromSessionName']};type={msg_type};msg={content}\007")
         sys.stdout.flush()
         print(f"{GREEN}✔ Message posted to Room -> {target} [{msg_type}]: {content}{RESET}")
+    elif action == "create":
+        name = args.name.strip()
+        rooms = load_local_rooms()
+        new_id = f"room-{int(time.time() * 1000)}"
+        new_room = {"id": new_id, "name": name, "createdAt": datetime.now().isoformat()}
+        rooms.append(new_room)
+        save_local_rooms(rooms)
+        sys.stdout.write(f"\033]7502;to=@all;from=cli;type=room_created;msg={name}\007")
+        sys.stdout.flush()
+        print(f"\n{GREEN}✔ Created Room '{name}' (ID: {new_id}).{RESET}\n")
+    elif action == "assign":
+        target_session = args.session.strip().lstrip("@")
+        target_room = getattr(args, "room", None)
+        workspaces = load_local_workspaces()
+        rooms = load_local_rooms()
+        
+        matched_session = next(
+            (w for w in workspaces if w.get("name", "").lower() == target_session.lower() or w.get("id", "").lower() == target_session.lower() or w.get("branch", "").lower() == target_session.lower()),
+            None
+        )
+        if not matched_session:
+            print(f"\n{RED}Error: Session '@{target_session}' not found.{RESET}\n")
+            return
+        
+        room_obj = None
+        if target_room:
+            room_obj = next(
+                (r for r in rooms if r.get("name", "").lower() == target_room.lower() or r.get("id", "").lower() == target_room.lower()),
+                None
+            )
+            if not room_obj:
+                print(f"\n{RED}Error: Room '{target_room}' not found.{RESET}\n")
+                return
+        else:
+            room_obj = rooms[0]
+        
+        matched_session["roomId"] = room_obj["id"]
+        REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
+            json.dump(workspaces, f, indent=2)
+            
+        sys.stdout.write(f"\033]7502;to=@all;from=cli;type=session_assigned;msg={matched_session['id']}:{room_obj['id']}\007")
+        sys.stdout.flush()
+        print(f"\n{GREEN}✔ Assigned session '@{matched_session.get('name', target_session)}' to Room '{room_obj['name']}'.{RESET}\n")
+    elif action == "remove":
+        target_session = args.session.strip().lstrip("@")
+        workspaces = load_local_workspaces()
+        matched_session = next(
+            (w for w in workspaces if w.get("name", "").lower() == target_session.lower() or w.get("id", "").lower() == target_session.lower() or w.get("branch", "").lower() == target_session.lower()),
+            None
+        )
+        if not matched_session:
+            print(f"\n{RED}Error: Session '@{target_session}' not found.{RESET}\n")
+            return
+            
+        matched_session.pop("roomId", None)
+        REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
+            json.dump(workspaces, f, indent=2)
+            
+        sys.stdout.write(f"\033]7502;to=@all;from=cli;type=session_removed;msg={matched_session['id']}\007")
+        sys.stdout.flush()
+        print(f"\n{GREEN}✔ Removed session '@{matched_session.get('name', target_session)}' from room.{RESET}\n")
     elif action == "list" or not action:
+        rooms = load_local_rooms()
+        workspaces = load_local_workspaces()
+        print(f"\n{CYAN}=== Dewwie Multi-Agent Rooms & Sessions ==={RESET}\n")
+        for idx, r in enumerate(rooms, 1):
+            r_sessions = [w for w in workspaces if w.get("roomId") == r["id"]]
+            print(f"  {BOLD}#{idx} {r['name']}{RESET} ({len(r_sessions)} sessions) [id: {r['id']}]")
+            if r_sessions:
+                for s in r_sessions:
+                    role_badge = f"{YELLOW}👑 LEAD{RESET}" if s.get("agentRole") == "lead" else f"{BLUE}AGENT{RESET}"
+                    print(f"    • @{s.get('name', s.get('id'))} [{role_badge}] ({s.get('agentType', 'terminal')}) - {s.get('agentStatus', {}).get('state', 'idle')}")
+            else:
+                print(f"    {DIM}(Empty room. Use 'dewwie room assign <session> --room \"{r['name']}\"'){RESET}")
+            print()
+        
+        unassigned = [w for w in workspaces if not w.get("roomId")]
+        if unassigned:
+            print(f"  {YELLOW}Unassigned Sessions ({len(unassigned)}):{RESET}")
+            for u in unassigned:
+                print(f"    • @{u.get('name', u.get('id'))} ({u.get('agentType', 'terminal')})")
+            print()
+
         msgs = []
         if ROOM_MESSAGES_PATH.exists():
             try:
                 with open(ROOM_MESSAGES_PATH, "r", encoding="utf-8") as f:
-                    msgs = json.load(f)
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        msgs = data
             except Exception:
                 pass
-        print(f"\n{CYAN}=== Dewwie Multi-Agent Room Stream (Last 10) ==={RESET}\n")
-        if not msgs:
-            print("  (Room empty. Use 'dewwie room send \"hello\"' to post)")
-        for m in msgs[-10:]:
-            print(f"  {BOLD}[{m.get('fromSessionName', 'Agent')}]{RESET} -> {CYAN}{m.get('target', '@all')}{RESET} ({m.get('type', 'chat')}): {m.get('content', '')}")
-        print()
+        if msgs:
+            print(f"  {CYAN}Recent Room Messages (Last 5):{RESET}")
+            for m in msgs[-5:]:
+                print(f"    {BOLD}[{m.get('fromSessionName', 'Agent')}]{RESET} -> {CYAN}{m.get('target', '@all')}{RESET} ({m.get('type', 'chat')}): {m.get('content', '')}")
+            print()
     elif action == "agents":
         workspaces = load_local_workspaces()
         print(f"\n{CYAN}=== Dewwie Active Agents in Room ==={RESET}\n")
@@ -655,8 +760,15 @@ def main():
     p_room_send.add_argument("message", help="Message body")
     p_room_send.add_argument("--target", "-t", default="@all", help="Target agent (@lead, @feat-name, @all)")
     p_room_send.add_argument("--type", choices=["chat", "task_delegate", "status_update", "review_request"], default="chat", help="Message type")
-    p_room_subs.add_parser("list", help="List recent room messages")
+    p_room_subs.add_parser("list", help="List recent room messages and assigned sessions")
     p_room_subs.add_parser("agents", help="List agents currently active in the room")
+    p_room_create = p_room_subs.add_parser("create", help="Create a new multi-agent room")
+    p_room_create.add_argument("name", help="Room name (e.g. 'Frontend Team', 'QA Sandbox')")
+    p_room_assign = p_room_subs.add_parser("assign", help="Assign or move a session to a room (1 room max)")
+    p_room_assign.add_argument("session", help="Session name, ID, or @branch")
+    p_room_assign.add_argument("--room", "-r", default=None, help="Target room name or ID (default: active room)")
+    p_room_remove = p_room_subs.add_parser("remove", help="Remove a session from its assigned room")
+    p_room_remove.add_argument("session", help="Session name, ID, or @branch")
     p_room_lead = p_room_subs.add_parser("lead", help="Inspect or promote session to Lead Agent")
     p_room_lead.add_argument("target", nargs="?", default=None, help="Target session name or ID to promote to Lead")
 

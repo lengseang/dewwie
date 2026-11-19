@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { OrbitalCanvasDeck, LIFECYCLE, LifecycleState } from './OrbitalCanvasDeck';
+import { getAgentIcon } from './AgentIcons';
 import {
   Users,
   Plus,
@@ -12,6 +13,8 @@ import {
   ArrowRight,
   RotateCw,
   Check,
+  Send,
+  Sparkles,
 } from 'lucide-react';
 
 interface AgentRoomPaneProps {
@@ -19,7 +22,7 @@ interface AgentRoomPaneProps {
   onClose?: () => void;
 }
 
-export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModal, onClose }) => {
+export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModal: _onOpenDelegateModal, onClose }) => {
   const {
     rooms,
     activeRoomId,
@@ -27,6 +30,8 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
     addRoom,
     removeRoom,
     setSessionRoom,
+    setSessionRole,
+    postRoomMessage,
     workspaces,
     activeWorkspaceId,
     activeProjectId,
@@ -43,23 +48,25 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
   } = useWorkspaceStore();
 
   const [viewMode, setViewMode] = useState<'office' | 'stream'>('office');
-  const [isAssignPopoverOpen, setIsAssignPopoverOpen] = useState(false);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isNewRoomPromptOpen, setIsNewRoomPromptOpen] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
   const [syncMessage, setSyncMessage] = useState('');
 
+  // In-room quick CLI & chat state
+  const [commandInput, setCommandInput] = useState('');
+  const [commandFeedback, setCommandFeedback] = useState<string | null>(null);
+
   const currentProject = activeProjectId ? projects[activeProjectId] : Object.values(projects)[0];
   const allSessions = Object.values(workspaces);
 
-  // Active room isolation: current room id
+  // Active room isolation
   const currentRoomId = activeRoomId || rooms[0]?.id || 'room-1';
-  const currentRoom = rooms.find((r) => r.id === currentRoomId) || rooms[0] || { id: 'room-1', name: 'Room 1' };
+  const currentRoom = rooms.find((r) => r.id === currentRoomId) || rooms[0] || { id: 'room-1', name: 'Frontend Team' };
 
-  // Sessions assigned to THIS room
-  const roomSessions = allSessions.filter((w) => (w.roomId || 'room-1') === currentRoomId);
-  // Sessions eligible to be assigned (1 room max: either unassigned or in another room)
-  const assignableSessions = allSessions.filter((w) => (w.roomId || 'room-1') !== currentRoomId);
+  // Sessions assigned to THIS room (strict 1-room-max)
+  const roomSessions = allSessions.filter((w) => w.roomId === currentRoomId);
 
   const focusedSession = activeWorkspaceId ? workspaces[activeWorkspaceId] : roomSessions[0] || allSessions[0];
 
@@ -87,7 +94,8 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRoomName.trim()) return;
-    addRoom(newRoomName.trim());
+    const newId = addRoom(newRoomName.trim());
+    if (newId) setActiveRoomId(newId);
     setNewRoomName('');
     setIsNewRoomPromptOpen(false);
   };
@@ -102,17 +110,11 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
     setSessionRoom(sessionId, null);
   };
 
-  const handleAssignSession = (sessionId: string) => {
-    setSessionRoom(sessionId, currentRoomId);
-    setIsAssignPopoverOpen(false);
-  };
-
   const handleSpawnNewSessionIntoRoom = async (agentType: string) => {
-    setIsAssignPopoverOpen(false);
     const targetProjId = activeProjectId || currentProject?.id;
     const newId = await createSession({
       projectId: targetProjId,
-      name: `${agentType === 'terminal' ? 'Terminal' : agentType} ${allSessions.length + 1}`,
+      name: `${agentType === 'terminal' ? 'terminal' : agentType} ${allSessions.length + 1}`,
       sessionMode: 'local',
       agentType,
     });
@@ -120,6 +122,7 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
       setSessionRoom(newId, currentRoomId);
       setActiveWorkspace(newId);
       setActiveTab('terminal');
+      setIsAssignModalOpen(false);
     }
   };
 
@@ -131,12 +134,68 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
     }
   };
 
+  // In-Room CLI command parser & chat dispatcher
+  const handleCommandSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const raw = commandInput.trim();
+    if (!raw) return;
+
+    if (raw.startsWith('/assign ') || raw.startsWith('/add ')) {
+      const targetName = raw.replace(/^\/(assign|add)\s+/, '').replace(/^@/, '').trim().toLowerCase();
+      const matched = allSessions.find(
+        (s) => s.name.toLowerCase() === targetName || s.id.toLowerCase() === targetName || s.branch?.toLowerCase() === targetName
+      );
+      if (matched) {
+        setSessionRoom(matched.id, currentRoomId);
+        setCommandFeedback(`✓ Assigned @${matched.name} to ${currentRoom.name}`);
+      } else {
+        setCommandFeedback(`⚠ Session '${targetName}' not found`);
+      }
+    } else if (raw.startsWith('/remove ') || raw.startsWith('/unassign ')) {
+      const targetName = raw.replace(/^\/(remove|unassign)\s+/, '').replace(/^@/, '').trim().toLowerCase();
+      const matched = allSessions.find(
+        (s) => s.name.toLowerCase() === targetName || s.id.toLowerCase() === targetName || s.branch?.toLowerCase() === targetName
+      );
+      if (matched) {
+        setSessionRoom(matched.id, null);
+        setCommandFeedback(`✓ Removed @${matched.name} from room`);
+      } else {
+        setCommandFeedback(`⚠ Session '${targetName}' not found`);
+      }
+    } else if (raw.startsWith('/room new ') || raw.startsWith('/create ') || raw.startsWith('/new ')) {
+      const roomName = raw.replace(/^\/(room new|create|new)\s+/, '').trim();
+      if (roomName) {
+        const newId = addRoom(roomName);
+        if (newId) setActiveRoomId(newId);
+        setCommandFeedback(`✓ Created room '${roomName}'`);
+      }
+    } else if (raw.startsWith('/lead ')) {
+      const targetName = raw.replace(/^\/lead\s+/, '').replace(/^@/, '').trim().toLowerCase();
+      const matched = allSessions.find(
+        (s) => s.name.toLowerCase() === targetName || s.id.toLowerCase() === targetName
+      );
+      if (matched) {
+        setSessionRole(matched.id, 'lead');
+        setCommandFeedback(`✓ Promoted @${matched.name} to Lead Agent`);
+      } else {
+        setCommandFeedback(`⚠ Session '${targetName}' not found`);
+      }
+    } else {
+      // Normal broadcast chat message into room stream
+      postRoomMessage({ content: raw, target: '@all', type: 'chat' });
+      setCommandFeedback(`✓ Broadcast sent to room`);
+    }
+
+    setCommandInput('');
+    setTimeout(() => setCommandFeedback(null), 3500);
+  };
+
   // Filter room stream messages
   const currentRoomMessages = roomMessages.filter(
     (m) => !m.roomId || m.roomId === 'all' || m.roomId === currentRoomId
   );
 
-  // Derive active status & lifecycle badge for bottom passive strip
+  // Derive active status & lifecycle badge
   const rawState = focusedSession?.agentStatus?.state;
   let derivedLifecycle: LifecycleState = 'IDLE';
   if (rawState === 'working') derivedLifecycle = 'CODING';
@@ -150,7 +209,7 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
       style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text)' }}
       className="flex-1 flex flex-col h-full overflow-hidden font-mono select-none relative"
     >
-      {/* 1. Top Header Bar: AGENT ROOM MESH + FPS + Segmented Switcher + Close */}
+      {/* 1. Top Header Bar: AGENT ROOM MESH + FPS + Segmented Switcher + Sync + Close */}
       <div
         style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
         className="h-10 px-2.5 border-b flex items-center justify-between gap-1.5 shrink-0"
@@ -168,7 +227,7 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
           </span>
         </div>
 
-        {/* Right Actions: FPS Eco/Ultra Switch + Office/Stream Segment + Sync + Close */}
+        {/* Right Actions */}
         <div className="flex items-center gap-1.5 shrink-0">
           {/* FPS Toggle Button (15fps Eco vs 60fps Ultra) */}
           <button
@@ -223,7 +282,7 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
             )}
           </button>
 
-          {/* Close Panel Button (Enables Fullscreen TUI with 1 click) */}
+          {/* Close Panel Button */}
           <button
             onClick={handleClosePane}
             title="Close Room Panel (Focus Fullscreen Terminal TUI)"
@@ -241,7 +300,7 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
       >
         {rooms.map((r, idx) => {
           const isActive = r.id === currentRoomId;
-          const count = allSessions.filter((s) => (s.roomId || 'room-1') === r.id).length;
+          const count = allSessions.filter((s) => s.roomId === r.id).length;
 
           return (
             <div
@@ -287,7 +346,7 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
 
       {/* New Room Inline Form */}
       {isNewRoomPromptOpen && (
-        <div className="p-2 border-b border-zinc-800 bg-zinc-950/90 z-20">
+        <div className="p-2 border-b border-zinc-800 bg-zinc-950/95 z-20">
           <form onSubmit={handleCreateRoom} className="flex items-center gap-1.5">
             <input
               autoFocus
@@ -299,7 +358,7 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
             />
             <button
               type="submit"
-              className="px-2.5 py-1 rounded bg-amber-500/20 border border-amber-500/60 text-amber-300 text-xs font-semibold"
+              className="px-2.5 py-1 rounded bg-amber-500/20 border border-amber-500/60 text-amber-300 text-xs font-semibold hover:bg-amber-500/30 transition-colors"
             >
               Add
             </button>
@@ -358,102 +417,15 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
           );
         })}
 
-        {/* + Assign (1 room max) Button */}
-        <div className="relative shrink-0">
-          <button
-            onClick={() => setIsAssignPopoverOpen(!isAssignPopoverOpen)}
-            className="h-5 px-2 rounded border border-dashed border-cyan-700/80 hover:border-cyan-400 text-cyan-400 hover:text-cyan-300 text-[10px] flex items-center gap-1 transition-colors"
-          >
-            <Plus className="w-2.5 h-2.5" />
-            <span>Assign (1 room max)</span>
-          </button>
-
-          {/* Exclusive Room Assignment Popover */}
-          {isAssignPopoverOpen && (
-            <div
-              className="absolute left-0 top-7 w-64 bg-zinc-950 border border-zinc-700 rounded-lg shadow-2xl p-2 z-50 text-xs font-mono"
-              onMouseLeave={() => setIsAssignPopoverOpen(false)}
-            >
-              <div className="flex items-center justify-between pb-1.5 border-b border-zinc-800 text-[9px] text-zinc-500 font-semibold uppercase tracking-wider">
-                <span>Assign Session to {currentRoom.name}</span>
-                <button onClick={() => setIsAssignPopoverOpen(false)} className="hover:text-zinc-300">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-
-              {/* Section A: Move Existing Sessions */}
-              <div className="py-1 max-h-36 overflow-y-auto no-scrollbar space-y-1">
-                {assignableSessions.length === 0 ? (
-                  <div className="py-2 text-[10px] text-zinc-500 text-center">
-                    All current sessions are in this room.
-                  </div>
-                ) : (
-                  assignableSessions.map((s) => {
-                    const otherRoomName = rooms.find((r) => r.id === s.roomId)?.name || 'Unassigned';
-                    return (
-                      <button
-                        key={s.id}
-                        onClick={() => handleAssignSession(s.id)}
-                        className="w-full px-2 py-1 flex items-center justify-between rounded bg-zinc-900/60 hover:bg-zinc-800 text-left text-zinc-300 hover:text-white transition-colors"
-                      >
-                        <span className="truncate text-[11px]">@{s.name}</span>
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-950 border border-zinc-800 text-amber-400 shrink-0 ml-1">
-                          {s.roomId ? `Move from ${otherRoomName}` : 'Assign'}
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-
-              {/* Section B: Spawn New Agent Directly */}
-              <div className="pt-2 border-t border-zinc-800/80 space-y-1">
-                <div className="text-[9px] text-zinc-500 font-semibold uppercase tracking-wider">
-                  Spawn Agent into {currentRoom.name}
-                </div>
-                <div className="grid grid-cols-2 gap-1 text-[10px]">
-                  <button
-                    onClick={() => handleSpawnNewSessionIntoRoom('claude-code')}
-                    className="p-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white truncate"
-                  >
-                    Claude Code
-                  </button>
-                  <button
-                    onClick={() => handleSpawnNewSessionIntoRoom('antigravity')}
-                    className="p-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white truncate"
-                  >
-                    Antigravity
-                  </button>
-                  <button
-                    onClick={() => handleSpawnNewSessionIntoRoom('gemini')}
-                    className="p-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white truncate"
-                  >
-                    Gemini
-                  </button>
-                  <button
-                    onClick={() => handleSpawnNewSessionIntoRoom('terminal')}
-                    className="p-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white truncate flex items-center justify-center gap-1"
-                  >
-                    <Terminal className="w-2.5 h-2.5" />
-                    <span>Terminal</span>
-                  </button>
-                </div>
-                {onOpenDelegateModal && (
-                  <button
-                    onClick={() => {
-                      setIsAssignPopoverOpen(false);
-                      onOpenDelegateModal();
-                    }}
-                    className="w-full mt-1 p-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-amber-300/90 hover:text-amber-200 text-[10px] flex items-center justify-center gap-1"
-                  >
-                    <Users className="w-3 h-3 text-amber-400" />
-                    <span>Delegate Task to Worktree...</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Dedicated Assign Sessions Button (Opens full modal) */}
+        <button
+          onClick={() => setIsAssignModalOpen(true)}
+          title="Assign or move sessions into this room"
+          className="h-5 px-2 rounded border border-dashed border-amber-500/60 hover:border-amber-400 text-amber-400 hover:text-amber-300 text-[10px] flex items-center gap-1 transition-colors shrink-0"
+        >
+          <Plus className="w-2.5 h-2.5" />
+          <span>Assign ({roomSessions.length})</span>
+        </button>
       </div>
 
       {/* 4. Main Body: Office (HTML5 Canvas Deck) OR Stream (Chronological Feed) */}
@@ -470,20 +442,20 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
               handoffTriggerKey={currentRoomMessages.length}
             />
 
-            {/* If room is completely empty, render a non-intrusive floating helper overlay */}
+            {/* If room has zero assigned sessions, render clear invitation card */}
             {roomSessions.length === 0 && (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-4 text-center">
-                <div className="pointer-events-auto max-w-xs p-4 rounded-xl bg-zinc-950/85 border border-zinc-800 backdrop-blur-md shadow-2xl">
-                  <Users className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-zinc-200 mb-1">Room Deck Standing By</p>
-                  <p className="text-[11px] text-zinc-500 mb-3">
-                    Assign existing sessions or spawn agents to populate the workstations in this room.
+                <div className="pointer-events-auto max-w-xs p-4 rounded-xl bg-zinc-950/90 border border-zinc-800 backdrop-blur-md shadow-2xl">
+                  <Users className="w-8 h-8 text-amber-400/80 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-zinc-100 mb-1">Room Deck Standing By</p>
+                  <p className="text-[11px] text-zinc-400 mb-3 leading-relaxed">
+                    Assign existing sessions or spawn agents to populate the workstations in <span className="text-amber-300">"{currentRoom.name}"</span>.
                   </p>
                   <button
-                    onClick={() => setIsAssignPopoverOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-medium transition-colors"
+                    onClick={() => setIsAssignModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/60 text-amber-300 text-xs font-semibold transition-colors cursor-pointer"
                   >
-                    <Plus className="w-3.5 h-3.5 text-cyan-400" />
+                    <Plus className="w-3.5 h-3.5" />
                     <span>Assign Sessions</span>
                   </button>
                 </div>
@@ -553,12 +525,42 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
         )}
       </div>
 
-      {/* 5. Bottom Passive Status Strip (Zero Chat Box, Zero Input Forms) */}
+      {/* 5. Interactive In-Room CLI Bar & Status Strip */}
       <div
         style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
-        className="h-10 px-3 border-t flex flex-col justify-center text-[10px] font-mono shrink-0"
+        className="border-t flex flex-col shrink-0 text-[10px] font-mono"
       >
-        <div className="flex items-center justify-between">
+        {/* CLI Command / Chat Input Bar */}
+        <form onSubmit={handleCommandSubmit} className="flex items-center gap-1.5 px-2 py-1.5 border-b border-zinc-800/80 bg-zinc-950/90">
+          <div className="flex items-center gap-1 text-[10px] text-amber-400 font-bold shrink-0">
+            <span>#{currentRoom.name.toLowerCase().replace(/\s+/g, '-')}&gt;</span>
+          </div>
+          <input
+            type="text"
+            placeholder="Type /assign @name, /remove @name, /create <room>, or broadcast..."
+            value={commandInput}
+            onChange={(e) => setCommandInput(e.target.value)}
+            className="flex-1 bg-transparent text-[11px] font-mono text-zinc-100 placeholder-zinc-600 focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-[10px] font-semibold flex items-center gap-1 transition-colors shrink-0"
+          >
+            <Send className="w-2.5 h-2.5" />
+            <span>Send</span>
+          </button>
+        </form>
+
+        {/* Command Feedback Banner */}
+        {commandFeedback && (
+          <div className="px-2.5 py-1 bg-amber-950/60 border-b border-amber-800/80 text-amber-300 text-[10px] flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+            <span>{commandFeedback}</span>
+          </div>
+        )}
+
+        {/* Status Strip: Active PTY & Lifecycle Badge */}
+        <div className="h-8 px-2.5 flex items-center justify-between">
           <div className="flex items-center gap-1.5 truncate">
             <span className="text-zinc-500">PTY:</span>
             <span className="text-zinc-200 font-semibold truncate">
@@ -586,11 +588,165 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
             </button>
           </div>
         </div>
-
-        <div className="text-[9px] text-zinc-500 truncate mt-0.5">
-          {focusedSession?.agentStatus?.message || `${focusedSession?.projectName || 'Project'} workspace ready`}
-        </div>
       </div>
+
+      {/* 6. High-Clarity Session Assignment Modal */}
+      {isAssignModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh] overflow-hidden font-mono text-xs">
+            {/* Modal Header */}
+            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/60">
+              <div className="flex items-center gap-2 min-w-0">
+                <Users className="w-4 h-4 text-amber-400 shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-zinc-100 text-sm truncate">
+                    Room Roster • {currentRoom.name}
+                  </h3>
+                  <p className="text-[10px] text-zinc-400">
+                    Assign or move sessions into this room (1 room max)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAssignModalOpen(false)}
+                className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body: Available Sessions */}
+            <div className="p-4 overflow-y-auto space-y-3 flex-1">
+              <div className="flex items-center justify-between pb-1 text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
+                <span>Available Sessions ({allSessions.length})</span>
+                <button
+                  onClick={() => {
+                    allSessions.forEach((s) => {
+                      if (s.projectId === currentProject?.id || !s.roomId) {
+                        setSessionRoom(s.id, currentRoomId);
+                      }
+                    });
+                  }}
+                  className="text-amber-400 hover:text-amber-300 transition-colors"
+                >
+                  + Assign All in Project
+                </button>
+              </div>
+
+              <div className="space-y-1.5">
+                {allSessions.map((s) => {
+                  const isCurrent = s.roomId === currentRoomId;
+                  const otherRoomName = rooms.find((r) => r.id === s.roomId)?.name;
+
+                  return (
+                    <div
+                      key={s.id}
+                      className={`p-2.5 rounded-lg border flex items-center justify-between transition-colors ${
+                        isCurrent
+                          ? 'bg-amber-950/30 border-amber-500/60 text-zinc-100'
+                          : 'bg-zinc-900/40 border-zinc-800 hover:border-zinc-700 text-zinc-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {getAgentIcon(s.agentType, 'w-4 h-4 shrink-0')}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-xs truncate">@{s.name}</span>
+                            {s.agentRole === 'lead' && (
+                              <Crown className="w-3 h-3 text-amber-400 shrink-0" />
+                            )}
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono">
+                              {s.projectName || 'Default'}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-zinc-500 truncate flex items-center gap-1.5 mt-0.5">
+                            <span>{s.branch ? `branch: ${s.branch}` : 'local'}</span>
+                            <span>•</span>
+                            <span className={isCurrent ? 'text-emerald-400 font-semibold' : s.roomId ? 'text-amber-400' : 'text-zinc-500'}>
+                              {isCurrent ? `✓ In this Room` : otherRoomName ? `In ${otherRoomName}` : 'Unassigned'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 1-Click Assign / Remove Button */}
+                      <div>
+                        {isCurrent ? (
+                          <button
+                            onClick={() => setSessionRoom(s.id, null)}
+                            className="px-2.5 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                            <span>Remove</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setSessionRoom(s.id, currentRoomId)}
+                            className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/60 text-amber-300 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>{s.roomId ? 'Move Here' : 'Add to Room'}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Quick Spawn New Agent Section */}
+              <div className="pt-3 border-t border-zinc-800/80">
+                <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-2">
+                  Spawn Agent Directly into {currentRoom.name}
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  <button
+                    onClick={() => handleSpawnNewSessionIntoRoom('terminal')}
+                    className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[10px] flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <Terminal className="w-3 h-3 text-zinc-400" />
+                    <span>Terminal</span>
+                  </button>
+                  <button
+                    onClick={() => handleSpawnNewSessionIntoRoom('claude-code')}
+                    className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[10px] flex items-center justify-center gap-1 transition-colors"
+                  >
+                    {getAgentIcon('claude-code', 'w-3 h-3')}
+                    <span>Claude</span>
+                  </button>
+                  <button
+                    onClick={() => handleSpawnNewSessionIntoRoom('antigravity')}
+                    className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[10px] flex items-center justify-center gap-1 transition-colors"
+                  >
+                    {getAgentIcon('antigravity', 'w-3 h-3')}
+                    <span>Antigravity</span>
+                  </button>
+                  <button
+                    onClick={() => handleSpawnNewSessionIntoRoom('gemini')}
+                    className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[10px] flex items-center justify-center gap-1 transition-colors"
+                  >
+                    {getAgentIcon('gemini', 'w-3 h-3')}
+                    <span>Gemini</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-4 py-2.5 border-t border-zinc-800 flex items-center justify-between bg-zinc-900/60">
+              <span className="text-[10px] text-zinc-500">
+                {roomSessions.length} session{roomSessions.length !== 1 ? 's' : ''} assigned to {currentRoom.name}
+              </span>
+              <button
+                onClick={() => setIsAssignModalOpen(false)}
+                className="px-4 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

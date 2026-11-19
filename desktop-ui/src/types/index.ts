@@ -62,6 +62,8 @@ export interface DiffSummary {
   filesChanged: number;
   additions: number;
   deletions: number;
+  isUncommitted?: boolean;
+  aheadCount?: number;
 }
 
 export type SessionMode = 'local' | 'branch';
@@ -233,6 +235,12 @@ declare global {
       minimizeWindow: () => Promise<void>;
       maximizeWindow: () => Promise<void>;
       closeWindow: () => Promise<void>;
+      isWindowMaximized?: () => Promise<boolean>;
+      onWindowMaximized?: (callback: (isMax: boolean) => void) => () => void;
+      attachTerminal?: (workspaceId: string) => Promise<string>;
+      writeTerminal?: (workspaceId: string, data: string) => void;
+      resizeTerminal?: (workspaceId: string, cols: number, rows: number) => void;
+      onTerminalData?: (callback: (payload: { workspaceId: string; data: string }) => void) => () => void;
       onAgentStatus: (callback: (data: { workspaceId: string; state: AgentState; message: string }) => void) => void;
       getRoomMessages: (params?: { roomId?: string }) => Promise<RoomMessage[]>;
       postRoomMessage: (params: {
@@ -245,6 +253,12 @@ declare global {
         content: string;
       }) => Promise<RoomMessage>;
       onRoomMessage: (callback: (data: RoomMessage) => void) => void;
+      getRooms?: () => Promise<Array<{ id: string; name: string }>>;
+      addRoom?: (name: string) => Promise<{ id: string; name: string }>;
+      removeRoom?: (id: string) => Promise<Array<{ id: string; name: string }>>;
+      setSessionRoom?: (sessionId: string, roomId: string | null) => Promise<{ success: boolean; workspace?: WorkspaceState }>;
+      onRoomsUpdated?: (callback: (rooms: Array<{ id: string; name: string }>) => void) => void;
+      onWorkspacesUpdated?: (callback: (workspaces: WorkspaceState[]) => void) => void;
       setSessionRole: (params: { sessionId: string; role: AgentRole }) => Promise<boolean>;
       getWorkspaceState: () => Promise<WorkspacePersistedState>;
       saveWorkspaceState: (state: WorkspacePersistedState) => Promise<WorkspacePersistedState>;

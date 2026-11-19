@@ -4,15 +4,14 @@ const fs = require('fs');
 const os = require('os');
 const { spawn } = require('child_process');
 const http = require('http');
-const WebSocket = require('ws');
 const pty = require('node-pty');
 
 // Configuration
-let currentWsPort = 7501;
 const SWARMHERD_DIR = path.join(os.homedir(), '.swarmherd');
 const SESSIONS_DIR = path.join(SWARMHERD_DIR, 'sessions');
 const WORKSPACES_FILE = path.join(SWARMHERD_DIR, 'workspaces.json');
 const PROJECTS_FILE = path.join(SWARMHERD_DIR, 'projects.json');
+const ROOMS_FILE = path.join(SWARMHERD_DIR, 'rooms.json');
 const ROOM_MESSAGES_FILE = path.join(SWARMHERD_DIR, 'room_messages.json');
 const WORKSPACE_STATE_FILE = path.join(SWARMHERD_DIR, 'workspace_state.json');
 const LOG_FILE = path.join(SWARMHERD_DIR, 'dewwie.log');
@@ -283,6 +282,53 @@ function removeProject(id) {
 }
 
 // -------------------------------------------------------------
+// Multi-Agent Rooms Management
+// -------------------------------------------------------------
+function getRooms() {
+  if (fs.existsSync(ROOMS_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(ROOMS_FILE, 'utf-8'));
+      if (Array.isArray(data) && data.length > 0) return data;
+    } catch (_) {}
+  }
+  const defaultRooms = [
+    { id: 'room-1', name: 'Frontend Team', createdAt: new Date().toISOString() },
+    { id: 'room-2', name: 'Core Engine', createdAt: new Date().toISOString() }
+  ];
+  try {
+    fs.writeFileSync(ROOMS_FILE, JSON.stringify(defaultRooms, null, 2), 'utf-8');
+  } catch (_) {}
+  return defaultRooms;
+}
+
+function saveRooms(rooms) {
+  try {
+    fs.writeFileSync(ROOMS_FILE, JSON.stringify(rooms, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[Dewwie] Failed to save rooms:', err);
+  }
+}
+
+function addRoom(name) {
+  const rooms = getRooms();
+  const safeName = name?.trim() || `Room ${rooms.length + 1}`;
+  const newId = `room-${Date.now().toString(36)}`;
+  const newRoom = { id: newId, name: safeName, createdAt: new Date().toISOString() };
+  rooms.push(newRoom);
+  saveRooms(rooms);
+  return newRoom;
+}
+
+function removeRoom(id) {
+  let rooms = getRooms().filter(r => r.id !== id);
+  if (rooms.length === 0) {
+    rooms = [{ id: 'room-1', name: 'General Room', createdAt: new Date().toISOString() }];
+  }
+  saveRooms(rooms);
+  return rooms;
+}
+
+// -------------------------------------------------------------
 // Sessions & Workspaces Management (Local vs Branch)
 // -------------------------------------------------------------
 function saveWorkspaces(list) {
@@ -334,7 +380,9 @@ async function getWorkspaces(forceRefresh = false) {
       branch: 'main',
       baseBranch: 'main',
       worktreePath: proj.rootPath,
-      agentType: (existingLocal?.agentType && existingLocal.agentType !== 'claude-code') ? existingLocal.agentType : 'terminal',
+      roomId: existingLocal?.roomId || undefined,
+      agentRole: existingLocal?.agentRole || undefined,
+      agentType: existingLocal?.agentType || 'terminal',
       agentStatus: existingLocal?.agentStatus || {
         state: 'idle',
         message: 'Active PowerShell shell ready in project folder',
@@ -396,10 +444,10 @@ async function getWorkspaces(forceRefresh = false) {
                       adds += parseInt(parts[0], 10) || 0;
                       dels += parseInt(parts[1], 10) || 0;
                     }
-                    diffSummary = { filesChanged: statLines.length, additions: adds, deletions: dels };
+                    diffSummary = { filesChanged: statLines.length, additions: adds, deletions: dels, isUncommitted: true, aheadCount: 0 };
                   } else {
                     const count = statusRes.stdout.trim().split('\n').filter(Boolean).length;
-                    diffSummary = { filesChanged: count, additions: 0, deletions: 0 };
+                    diffSummary = { filesChanged: count, additions: 0, deletions: 0, isUncommitted: true, aheadCount: 0 };
                   }
                 } else {
                   // 2. Clean worktree: check if branch has commits ahead of main
@@ -417,10 +465,10 @@ async function getWorkspaces(forceRefresh = false) {
                         adds += parseInt(parts[0], 10) || 0;
                         dels += parseInt(parts[1], 10) || 0;
                       }
-                      diffSummary = { filesChanged: statLines.length, additions: adds, deletions: dels };
+                      diffSummary = { filesChanged: statLines.length, additions: adds, deletions: dels, isUncommitted: false, aheadCount: ahead };
                     }
                   } else {
-                    diffSummary = { filesChanged: 0, additions: 0, deletions: 0 };
+                    diffSummary = { filesChanged: 0, additions: 0, deletions: 0, isUncommitted: false, aheadCount: 0 };
                   }
                 }
               } catch (_) {
@@ -438,7 +486,9 @@ async function getWorkspaces(forceRefresh = false) {
               branch: branch,
               baseBranch: 'main',
               worktreePath: worktreePath,
-              agentType: (existing?.agentType && existing.agentType !== 'codex') ? existing.agentType : 'terminal',
+              roomId: existing?.roomId || undefined,
+              agentRole: existing?.agentRole || undefined,
+              agentType: existing?.agentType || 'terminal',
               agentStatus: existing?.agentStatus || {
                 state: 'idle',
                 message: 'Branch worktree ready',
@@ -606,14 +656,6 @@ function getOrCreatePty(workspaceId, cwd) {
     shellArgs = ['-NoLogo', '-NoExit', '-Command', `if (Test-Path '${envPs1}') { . '${envPs1}' }`];
   }
 
-  if (hasHc) {
-    try {
-      const safeId = workspaceId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 32);
-      // Synchronously notify herdr-core if available without blocking interactive PTY
-      spawn(hcBin, ['run', '--bg', '--name', safeId, '--cwd', workDir, 'powershell.exe'], { stdio: 'ignore' });
-      console.log(`[PTY] Registered workspace ${workspaceId} in Herdr background registry`);
-    } catch (_) {}
-  }
   console.log(`[PTY] Spawning rock-solid native shell '${shell}' for ${workspaceId} in: ${workDir}`);
 
   const agentBinPath = `${path.join(os.homedir(), '.local', 'bin')};${path.join(os.homedir(), 'AppData', 'Local', 'agy', 'bin')};${path.join(__dirname, '../../cli')}`;
@@ -674,11 +716,9 @@ function getOrCreatePty(workspaceId, cwd) {
     // 2. Intercept OSC 7501
     parseOsc(data, workspaceId);
 
-    // 3. Broadcast to connected WebSocket clients
-    for (const ws of subscribers) {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
+    // 3. Direct in-memory IPC broadcast to renderer (ZERO NETWORK PORTS!)
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('terminal:data', { workspaceId, data: data.toString() });
     }
   });
 
@@ -690,7 +730,6 @@ function getOrCreatePty(workspaceId, cwd) {
   const sessionObj = {
     ptyProcess,
     scrollbackPath,
-    subscribers,
     cwd: workDir,
     getBuffer: () => inMemoryBuffer,
   };
@@ -700,91 +739,57 @@ function getOrCreatePty(workspaceId, cwd) {
 }
 
 // -------------------------------------------------------------
-// WebSocket Terminal Server (Port 7501)
+// Real Native In-Memory IPC Terminal Controller (Zero Ports)
 // -------------------------------------------------------------
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('SwarmHerd Native PTY Server Running');
-});
-
-const wss = new WebSocket.Server({ server });
-
-wss.on('connection', async (ws, req) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  let workspaceId = url.searchParams.get('workspaceId') || '';
+ipcMain.handle('terminal:attach', async (_, { workspaceId }) => {
+  if (!workspaceId) return '';
   const list = await getWorkspaces();
-  if ((!workspaceId || workspaceId === 'ws-main') && list.length > 0) {
-    workspaceId = list[0].id;
-  }
   const matched = list.find(w => w.id === workspaceId);
   const cwd = matched ? matched.worktreePath : (list[0]?.worktreePath || 'D:\\1111-Works\\Dewwie');
-
-  console.log(`[WS] Client attached to workspace: ${workspaceId} (${cwd})`);
   const session = getOrCreatePty(workspaceId, cwd);
 
-  // 1. Add subscriber FIRST so no live stream chunks are dropped during connection setup
-  session.subscribers.add(ws);
-
-  // 2. Send in-memory buffer or disk scrollback history
   const memBuf = session.getBuffer ? session.getBuffer() : null;
   if (memBuf && memBuf.length > 0) {
-    ws.send(memBuf);
+    return memBuf.toString('utf-8');
   } else if (fs.existsSync(session.scrollbackPath)) {
     try {
-      const history = fs.readFileSync(session.scrollbackPath);
+      const history = fs.readFileSync(session.scrollbackPath, 'utf-8');
       if (history.length === 0) {
-        const agentBanner = `\x1b[38;5;244mDewwie PTY [${matched?.agentType || 'shell'}] • ${cwd}\x1b[0m\r\n`;
-        ws.send(agentBanner);
-      } else {
-        // Send last 64KB if huge
-        const sliceStart = Math.max(0, history.length - 64 * 1024);
-        ws.send(history.subarray(sliceStart));
+        return `\x1b[38;5;244mDewwie Native PTY [${matched?.agentType || 'shell'}] • ${cwd}\x1b[0m\r\n`;
       }
-    } catch (e) {
-      console.error('Error reading scrollback:', e);
+      return history.slice(Math.max(0, history.length - 65536));
+    } catch (_) {}
+  }
+  return '';
+});
+
+ipcMain.on('terminal:write', (_, { workspaceId, data }) => {
+  if (!workspaceId || !data) return;
+  const session = activePtys.get(workspaceId);
+  if (session && session.ptyProcess) {
+    try {
+      session.ptyProcess.write(data);
+    } catch (err) {
+      console.error('[Dewwie PTY] Write error:', err);
     }
   }
+});
 
-  ws.on('message', (message) => {
-    const strMsg = message.toString();
+ipcMain.on('terminal:resize', (_, { workspaceId, cols, rows }) => {
+  if (!workspaceId || !cols || !rows) return;
+  const session = activePtys.get(workspaceId);
+  if (session && session.ptyProcess && cols > 0 && rows > 0) {
     try {
-      if (strMsg.startsWith('{')) {
-        const parsed = JSON.parse(strMsg);
-        if (parsed.type === 'resize' && parsed.cols > 0 && parsed.rows > 0) {
-          try {
-            session.ptyProcess.resize(parsed.cols, parsed.rows);
-          } catch (_) {}
-          return;
-        }
+      if (session.lastCols !== cols || session.lastRows !== rows) {
+        session.lastCols = cols;
+        session.lastRows = rows;
+        session.ptyProcess.resize(cols, rows);
       }
     } catch (_) {}
-
-    // Deliver raw keystrokes to real PTY stdin
-    session.ptyProcess.write(strMsg);
-  });
-
-  ws.on('close', () => {
-    session.subscribers.delete(ws);
-  });
-});
-
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    currentWsPort++;
-    if (currentWsPort <= 7515) {
-      console.warn(`[SWARMHERD] Port ${currentWsPort - 1} occupied, retrying on 127.0.0.1:${currentWsPort}...`);
-      server.listen(currentWsPort, '127.0.0.1');
-    } else {
-      console.error('[SWARMHERD] All fallback ports 7501-7515 occupied.');
-    }
-  } else {
-    console.error('[SWARMHERD WS Server Error]', err);
   }
 });
 
-server.listen(currentWsPort, '127.0.0.1', () => {
-  console.log(`[SWARMHERD] Native PTY & WebSocket server live on 127.0.0.1:${currentWsPort}`);
-});
+ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() || false);
 
 // -------------------------------------------------------------
 // Electron Window Creation
@@ -799,12 +804,8 @@ function createWindow() {
     minHeight: 680,
     backgroundColor: '#09090b',
     title: 'Dewwie - Autonomous AI Agent IDE',
+    frame: false,
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#09090b',
-      symbolColor: '#a1a1aa',
-      height: 40
-    },
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -812,6 +813,13 @@ function createWindow() {
       backgroundThrottling: false,
     },
     ...(fs.existsSync(path.join(__dirname, '../public/icon.png')) ? { icon: path.join(__dirname, '../public/icon.png') } : {}),
+  });
+
+  mainWindow.on('maximize', () => {
+    mainWindow?.webContents.send('window:maximizedChange', true);
+  });
+  mainWindow.on('unmaximize', () => {
+    mainWindow?.webContents.send('window:maximizedChange', false);
   });
 
   const distIndex = path.join(__dirname, '../dist/index.html');
@@ -933,10 +941,10 @@ ipcMain.handle('projects:add', (_, params) => addProject(params));
 ipcMain.handle('projects:remove', (_, { id }) => removeProject(id));
 
 // IPC Handlers: Workspaces & Sessions
-ipcMain.handle('app:getWsPort', () => currentWsPort);
-ipcMain.handle('workspaces:get', () => getWorkspaces());
+ipcMain.handle('app:getWsPort', () => 0);
+ipcMain.handle('workspaces:get', (_, forceRefresh) => getWorkspaces(forceRefresh));
 
-ipcMain.handle('sessions:create', async (_, { projectId, name, sessionMode, branch, baseBranch, agentType }) => {
+ipcMain.handle('sessions:create', async (_, { projectId, name, sessionMode, branch, baseBranch, agentType, roomId }) => {
   const projects = getProjects();
   let proj = projects.find(p => p.id === projectId);
   if (!proj) {
@@ -979,7 +987,8 @@ ipcMain.handle('sessions:create', async (_, { projectId, name, sessionMode, bran
     branch: mode === 'branch' ? branch : 'main',
     baseBranch: baseBranch || 'main',
     worktreePath: targetPath,
-    agentType: agentType || 'claude-code',
+    agentType: agentType || 'terminal',
+    roomId: roomId || undefined,
     agentStatus: {
       state: 'idle',
       message: mode === 'local' ? 'Local shell ready in project folder' : 'Branch worktree ready',
@@ -1033,6 +1042,46 @@ ipcMain.handle('sessions:rename', async (_, { sessionId, newName }) => {
     return true;
   }
   return false;
+});
+
+ipcMain.handle('sessions:setRoom', async (_, { sessionId, roomId }) => {
+  if (!sessionId) return { success: false, message: 'Missing sessionId' };
+  const list = await getWorkspaces();
+  const ws = list.find(w => w.id === sessionId);
+  if (ws) {
+    ws.roomId = roomId || undefined;
+    saveWorkspaces(list);
+    mainWindow?.webContents.send('workspaces:updated', list);
+    return { success: true, workspace: ws };
+  }
+  return { success: false, message: 'Session not found' };
+});
+
+ipcMain.handle('rooms:get', () => getRooms());
+
+ipcMain.handle('rooms:create', (_, { name }) => {
+  const newRoom = addRoom(name);
+  mainWindow?.webContents.send('rooms:updated', getRooms());
+  return newRoom;
+});
+
+ipcMain.handle('rooms:delete', async (_, { id }) => {
+  const rooms = removeRoom(id);
+  // Unassign any sessions that were assigned to this room
+  const list = await getWorkspaces();
+  let modified = false;
+  for (const ws of list) {
+    if (ws.roomId === id) {
+      delete ws.roomId;
+      modified = true;
+    }
+  }
+  if (modified) {
+    saveWorkspaces(list);
+    mainWindow?.webContents.send('workspaces:updated', list);
+  }
+  mainWindow?.webContents.send('rooms:updated', rooms);
+  return rooms;
 });
 
 ipcMain.handle('workspaces:create', async (_, { name, branch, baseBranch, repository }) => {
@@ -1380,8 +1429,38 @@ ipcMain.handle('mesh:syncSkills', async (_, { projectPath }) => {
   }
 });
 
+let fileWatchDebounce = null;
+function setupFileWatchers() {
+  const watchHandler = () => {
+    if (fileWatchDebounce) clearTimeout(fileWatchDebounce);
+    fileWatchDebounce = setTimeout(async () => {
+      try {
+        const list = await getWorkspaces(true);
+        const roomsList = getRooms();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('workspaces:updated', list);
+          mainWindow.webContents.send('rooms:updated', roomsList);
+        }
+      } catch (_) {}
+    }, 150);
+  };
+
+  try {
+    if (fs.existsSync(SWARMHERD_DIR)) {
+      fs.watch(SWARMHERD_DIR, (_, filename) => {
+        if (filename === 'workspaces.json' || filename === 'rooms.json') {
+          watchHandler();
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('[Dewwie] File watcher notice:', err);
+  }
+}
+
 app.whenReady().then(() => {
   createWindow();
+  setupFileWatchers();
   try {
     const id = powerSaveBlocker.start('prevent-app-suspension');
     console.log('[Dewwie] Background powerSaveBlocker active, suspension prevented (id: ' + id + ')');

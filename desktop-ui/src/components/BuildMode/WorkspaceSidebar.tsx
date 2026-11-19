@@ -183,7 +183,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           </div>
         )}
 
-        {projectList.map((proj) => {
+        {projectList.map((proj, projIdx) => {
           const projectSessions = allSessions.filter(
             (w) => w.projectId === proj.id || w.repository === proj.name
           );
@@ -198,7 +198,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
 
           return (
             <div key={proj.id} className="space-y-0.5">
-              {/* Flat Tree Project Header (Zero boxy borders) */}
+              {/* Flat Tree Project Header with Numbered Badge (1, 2, 3...) */}
               <div
                 onClick={() => handleSelectProject(proj.id)}
                 className={`group flex items-center rounded-md transition-colors cursor-pointer select-none ${
@@ -213,6 +213,12 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 title={`${proj.name} (${proj.rootPath}) • Click to activate project workspace`}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
+                  <span className={`w-3.5 text-center text-[10px] font-mono font-bold shrink-0 ${
+                    isProjectActive ? 'text-zinc-200' : 'text-zinc-500'
+                  }`}>
+                    {projIdx + 1}
+                  </span>
+
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -252,7 +258,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                       title={`${rootSession.name} • Project Root Terminal Workspace`}
                       className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer text-xs font-mono transition-all ${
                         activeWorkspaceId === rootSession.id
-                          ? 'bg-zinc-900 text-white font-medium border border-zinc-700/80 shadow-xs'
+                          ? 'bg-zinc-800/80 text-white font-medium'
                           : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
                       }`}
                     >
@@ -265,7 +271,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                         )}
                       </div>
                       {!isNarrow && (
-                        <span className="text-[8.5px] px-1 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 font-mono">
+                        <span className="text-[8.5px] px-1 rounded bg-zinc-800/60 text-zinc-400 font-mono">
                           ROOT
                         </span>
                       )}
@@ -284,7 +290,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                         title={`${ws.name} (${ws.agentType || 'shell'})\nWorktree: ${ws.worktreePath}`}
                         className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer text-xs font-mono transition-all ${
                           isActive
-                            ? 'bg-zinc-900 text-white font-medium border border-zinc-700/80 shadow-xs'
+                            ? 'bg-zinc-800/80 text-white font-medium'
                             : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
                         }`}
                       >
@@ -310,9 +316,16 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                             )}
 
                             {ws.diffSummary && (ws.diffSummary.additions > 0 || ws.diffSummary.deletions > 0) && (
-                              <span className="text-[9px] font-mono text-zinc-500">
-                                <span className="text-emerald-400">+{ws.diffSummary.additions}</span>{' '}
-                                <span className="text-rose-400">-{ws.diffSummary.deletions}</span>
+                              <span
+                                title={ws.diffSummary.isUncommitted ? 'Uncommitted working changes' : `${ws.diffSummary.aheadCount || 1} commits ahead of main`}
+                                className="text-[9px] font-mono text-zinc-500 flex items-center gap-0.5"
+                              >
+                                {ws.diffSummary.isUncommitted && <span className="text-amber-400">✎</span>}
+                                {!ws.diffSummary.isUncommitted && ws.diffSummary.aheadCount && (
+                                  <span className="text-cyan-400 text-[8px]">↑{ws.diffSummary.aheadCount}</span>
+                                )}
+                                <span className="text-emerald-400/90">+{ws.diffSummary.additions}</span>
+                                <span className="text-rose-400/90">-{ws.diffSummary.deletions}</span>
                               </span>
                             )}
 
@@ -383,10 +396,10 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 key={s.id}
                 onClick={() => handleSelectSession(s.id)}
                 title={`[${idx + 1}] ${s.name}\nState: ${state || 'idle'}\n${s.agentStatus?.message || ''}`}
-                className={`flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all ${
+                className={`flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
                   isActive
-                    ? 'ring-1 ring-zinc-500 bg-zinc-800 text-zinc-100 font-semibold'
-                    : 'bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+                    ? 'bg-zinc-800 text-zinc-100 font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
                 }`}
               >
                 <span className="font-bold">{idx + 1}</span>
@@ -411,19 +424,19 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         </div>
       </div>
 
-      {/* 4. Bottom Utility Bar: Add Repository, Command Palette, and Settings (Moved to the Below!) */}
+      {/* 4. Bottom Utility Bar: Add Repository, Command Palette, and Settings (Flat, unboxed developer aesthetic) */}
       <div
         style={{
           backgroundColor: 'var(--app-surface)',
           borderColor: 'var(--app-border)',
         }}
-        className={`border-t shrink-0 p-1.5 space-y-1 ${isNarrow ? 'flex flex-col items-center' : ''}`}
+        className={`border-t shrink-0 p-1.5 space-y-0.5 ${isNarrow ? 'flex flex-col items-center' : ''}`}
       >
         {/* Open Directory / Add Repository */}
         <button
           onClick={handlePickFolder}
           title="Open Any Directory from your PC (Ctrl+O)"
-          className={`rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center ${
+          className={`rounded hover:bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 text-xs font-mono transition-colors flex items-center ${
             isNarrow ? 'p-1.5 justify-center' : 'w-full px-2 py-1 justify-between'
           }`}
         >
@@ -439,7 +452,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           <button
             onClick={onOpenCommandPalette}
             title="Command Palette (Ctrl+P / :)"
-            className={`rounded bg-zinc-900/60 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-mono transition-colors flex items-center ${
+            className={`rounded hover:bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 text-xs font-mono transition-colors flex items-center ${
               isNarrow ? 'p-1.5 justify-center' : 'w-full px-2 py-1 justify-between'
             }`}
           >
@@ -456,7 +469,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           <button
             onClick={onOpenSettings}
             title="Settings & Themes (Ctrl+,)"
-            className={`rounded bg-zinc-900/60 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-mono transition-colors flex items-center ${
+            className={`rounded hover:bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 text-xs font-mono transition-colors flex items-center ${
               isNarrow ? 'p-1.5 justify-center' : 'w-full px-2 py-1 justify-between'
             }`}
           >

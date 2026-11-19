@@ -22,12 +22,15 @@ import {
   Settings,
   Radio,
   ChevronDown,
+  FolderOpen,
 } from 'lucide-react';
 import { THEMES_CONFIG } from './theme/themes';
 
 export const App: React.FC = () => {
   const {
     activeWorkspaceId,
+    openTabIds,
+    closeTab,
     activeProjectId,
     projects,
     workspaces,
@@ -44,7 +47,6 @@ export const App: React.FC = () => {
     setRightPanelView,
     roomMessages,
     setActiveWorkspace,
-    deleteWorkspace,
     initNativeSync,
     createSession,
     theme,
@@ -69,6 +71,16 @@ export const App: React.FC = () => {
   const [isResizingRight, setIsResizingRight] = useState(false);
 
   const isNative = typeof window !== 'undefined' && !!window.swarmherdNative?.isNative;
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.swarmherdNative?.isWindowMaximized) {
+      window.swarmherdNative.isWindowMaximized().then(setIsMaximized);
+    }
+    if (typeof window !== 'undefined' && window.swarmherdNative?.onWindowMaximized) {
+      return window.swarmherdNative.onWindowMaximized(setIsMaximized);
+    }
+  }, []);
 
   useEffect(() => {
     initNativeSync();
@@ -134,6 +146,12 @@ export const App: React.FC = () => {
   const projectSessions = [...orderedList, ...remainingWorkspaces].filter(
     (w) => !activeProjectId || w.projectId === activeProjectId || w.repository === currentProject?.name || w.id === activeWorkspaceId
   );
+
+  // Clean, focused active tab strip (Only actively opened tabs, matching minimal Image 1 aesthetic)
+  const renderedTabs = openTabIds
+    .map((id) => workspaces[id])
+    .filter((w): w is NonNullable<typeof w> => !!w);
+  const activeTabsList = renderedTabs.length > 0 ? renderedTabs : (activeWs ? [activeWs] : []);
 
   // Keyboard shortcut routing
   useEffect(() => {
@@ -235,13 +253,15 @@ export const App: React.FC = () => {
           style={{
             backgroundColor: 'var(--app-nav-bg)',
             borderColor: 'var(--app-border)',
-          }}
-          className={`h-9 px-2 border-b flex items-center justify-between gap-2 shrink-0 z-20 font-mono ${
-            isNative ? 'pr-36' : ''
-          }`}
+            WebkitAppRegion: 'drag',
+          } as React.CSSProperties}
+          className="h-9 px-2 border-b flex items-center justify-between gap-2 shrink-0 z-20 font-mono select-none"
         >
           {/* Left: Left Sidebar Toggle + Herdr-Style Agent Navigation Tabs */}
-          <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+          <div
+            className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
             {/* Left Sidebar Toggle Button */}
             <button
               onClick={toggleSidebar}
@@ -254,9 +274,9 @@ export const App: React.FC = () => {
             <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
 
             {/* Project & Workspace Scope Breadcrumb */}
-            {/* Clean Agent Navigation Tabs Strip (Zero Duplicate Breadcrumbs) */}
+            {/* Clean Focused Agent Navigation Tabs Strip (Only actively opened tabs, zero messy clutter) */}
             <div className="flex items-center gap-1 min-w-0 overflow-x-auto no-scrollbar">
-              {projectSessions.map((ws) => {
+              {activeTabsList.map((ws) => {
                 const isActive = activeWs?.id === ws.id;
 
                 return (
@@ -294,10 +314,10 @@ export const App: React.FC = () => {
                             setEditingTabId(null);
                           }
                         }}
-                        className="w-20 px-1 py-0 bg-zinc-950 border border-zinc-600 rounded text-[11px] font-mono text-zinc-100 focus:outline-none"
+                        className="w-24 px-1 py-0 bg-zinc-950 border border-zinc-600 rounded text-[11px] font-mono text-zinc-100 focus:outline-none"
                       />
                     ) : (
-                      <span className="font-mono text-[11px] font-medium max-w-[140px] truncate">
+                      <span className="font-mono text-[11px] font-medium max-w-[200px] truncate">
                         {ws.sessionMode === 'branch' ? `🌿 ${ws.name}` : ws.name}
                       </span>
                     )}
@@ -313,15 +333,15 @@ export const App: React.FC = () => {
                       }`}
                     />
 
-                    {/* Close Tab Button */}
-                    {ws.id !== 'ws-local-proj-dewwie' && ws.id !== 'ws-local-proj-exbytelab' && !ws.id.startsWith('ws-local-proj-') && (
+                    {/* Close Tab Button (Unpins tab from top strip, keeps session safe in sidebar) */}
+                    {activeTabsList.length > 1 && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          deleteWorkspace(ws.id);
+                          closeTab(ws.id);
                         }}
-                        title="Close session"
-                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-700 text-zinc-400 hover:text-rose-400 transition-opacity ml-0.5"
+                        title="Close tab (keeps session in sidebar)"
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-opacity ml-0.5"
                       >
                         <X className="w-2.5 h-2.5" />
                       </button>
@@ -330,7 +350,7 @@ export const App: React.FC = () => {
                 );
               })}
 
-              {/* Quick Add Terminal Tab (+) & Agent Dropdown */}
+              {/* Quick Add Terminal Tab (+) & Agent Dropdown & Folder Picker (Matching Image 1) */}
               <div className="relative shrink-0 flex items-center">
                 <button
                   onClick={() => handleSpawnAgent('terminal')}
@@ -346,6 +366,13 @@ export const App: React.FC = () => {
                 >
                   <ChevronDown className="w-3 h-3" />
                 </button>
+                <button
+                  onClick={pickAndOpenFolder}
+                  title="Open Project Directory (Ctrl+O)"
+                  className="p-1 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors ml-0.5"
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                </button>
                 <AgentMenuDropdown
                   isOpen={isAgentMenuOpen}
                   onClose={() => setIsAgentMenuOpen(false)}
@@ -359,7 +386,10 @@ export const App: React.FC = () => {
           </div>
 
           {/* Right: Clean Minimal Essential Controls */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div
+            className="flex items-center gap-1.5 shrink-0"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
             {/* 1. Split Terminal Side-by-Side */}
             <button
               onClick={toggleSplitView}
@@ -397,6 +427,53 @@ export const App: React.FC = () => {
             >
               <Settings className="w-3.5 h-3.5" />
             </button>
+
+            {/* Native-Style Windows 11 Titlebar Window Controls */}
+            {isNative && (
+              <div className="flex items-center h-full ml-1 -mr-2">
+                <div className="w-[1px] h-3.5 bg-zinc-800 mx-1" />
+
+                {/* Minimize */}
+                <button
+                  onClick={() => window.swarmherdNative?.minimizeWindow()}
+                  title="Minimize"
+                  className="w-10 h-9 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/10 transition-colors"
+                >
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
+                    <path d="M1 5h8" />
+                  </svg>
+                </button>
+
+                {/* Maximize / Restore */}
+                <button
+                  onClick={() => window.swarmherdNative?.maximizeWindow()}
+                  title={isMaximized ? "Restore" : "Maximize"}
+                  className="w-10 h-9 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/10 transition-colors"
+                >
+                  {isMaximized ? (
+                    <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
+                      <rect x="2.5" y="1.5" width="5.5" height="5.5" rx="0.5" />
+                      <path d="M1.5 3.5v5h5" />
+                    </svg>
+                  ) : (
+                    <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
+                      <rect x="1.5" y="1.5" width="7" height="7" rx="0.5" />
+                    </svg>
+                  )}
+                </button>
+
+                {/* Close */}
+                <button
+                  onClick={() => window.swarmherdNative?.closeWindow()}
+                  title="Close"
+                  className="w-10 h-9 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-rose-600 transition-colors"
+                >
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
+                    <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         </header>
 
@@ -485,20 +562,22 @@ export const App: React.FC = () => {
             <span><kbd className="text-zinc-400 font-semibold">^,</kbd> config</span>
           </div>
 
-          {/* Right: Telemetry & Port */}
+          {/* Right: Telemetry & Port (Zero Network Ports: Pure In-Memory PTY IPC) */}
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-1.5">
-              <Radio className="w-2.5 h-2.5 text-zinc-600" />
-              <span className="text-zinc-500">:7501</span>
+              <Radio className={`w-2.5 h-2.5 ${isNative ? 'text-emerald-500' : 'text-zinc-500'}`} />
+              <span className="text-zinc-400 font-mono text-[10px]">
+                {isNative ? 'In-Memory IPC' : 'Web Simulation'}
+              </span>
             </div>
             <div className="flex items-center gap-1.5">
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
-                  daemonStatus === 'connected' ? 'bg-zinc-400' : 'bg-rose-500'
+                  daemonStatus === 'connected' ? 'bg-emerald-400' : 'bg-rose-500'
                 }`}
               />
               <span className="text-zinc-400">
-                {daemonStatus === 'connected' ? 'Online' : 'Offline'}
+                {daemonStatus === 'connected' ? 'Ready' : 'Offline'}
               </span>
             </div>
           </div>
