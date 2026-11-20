@@ -106,6 +106,8 @@ export const App: React.FC = () => {
     root.style.setProperty('--app-text', tDef.text);
     root.style.setProperty('--app-text-muted', tDef.textMuted);
     root.style.setProperty('--app-accent', tDef.accent);
+    root.style.setProperty('--app-ok', tDef.terminal.green);
+    root.style.setProperty('--app-err', tDef.terminal.red);
   }, [theme]);
 
   // Window resize mouse drag listener
@@ -181,12 +183,13 @@ export const App: React.FC = () => {
       } else if (isCmdOrCtrl && e.key === '4') {
         e.preventDefault();
         setRightPanelView('changes');
+      } else if (isCmdOrCtrl && e.altKey && (e.key === 'b' || e.key === 'B')) {
+        // Must be checked before plain Ctrl+B, otherwise it is unreachable.
+        e.preventDefault();
+        toggleRightPanel();
       } else if (isCmdOrCtrl && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
         toggleSidebar();
-      } else if (isCmdOrCtrl && e.altKey && (e.key === 'b' || e.key === 'B')) {
-        e.preventDefault();
-        toggleRightPanel();
       } else if (isCmdOrCtrl && (e.key === 'o' || e.key === 'O')) {
         e.preventDefault();
         pickAndOpenFolder();
@@ -202,8 +205,29 @@ export const App: React.FC = () => {
       }
     };
 
+    // xterm cancels the keys it handles, so the bubble-phase listener above never fires while a terminal
+    // has focus. Claim only the two escape hatches (Ctrl+P palette, Ctrl+, settings) in capture phase;
+    // everything else stays with the shell/agent (Claude Code uses Ctrl+B and Ctrl+T itself).
+    const handleTerminalEscapeHatch = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      if (!(e.target as HTMLElement | null)?.classList?.contains('xterm-helper-textarea')) return;
+      if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsCommandPaletteOpen((prev) => !prev);
+      } else if (e.key === ',') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsSettingsOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleTerminalEscapeHatch, true);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleTerminalEscapeHatch, true);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [setActiveTab, toggleSidebar, toggleRightPanel, setRightPanelView, pickAndOpenFolder]);
 
   const handleSpawnAgent = async (agentType: string, isWorktree = false) => {
@@ -272,7 +296,7 @@ export const App: React.FC = () => {
               });
             }
           }}
-          className="h-9 px-2 border-b flex items-center justify-between gap-2 shrink-0 z-20 font-mono select-none"
+          className="h-9 pl-2 pr-0 border-b flex items-center justify-between gap-2 shrink-0 z-20 font-mono select-none"
         >
           {/* Left: Left Sidebar Toggle + Herdr-Style Agent Navigation Tabs */}
           <div
@@ -283,12 +307,13 @@ export const App: React.FC = () => {
             <button
               onClick={toggleSidebar}
               title={sidebarOpen ? 'Collapse Left Sidebar (Ctrl+B)' : 'Expand Left Sidebar (Ctrl+B)'}
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors shrink-0"
+              style={{ color: 'var(--app-text-muted)' }}
+              className="p-1 rounded transition-colors shrink-0 hover:opacity-80"
             >
               {sidebarOpen ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeft className="w-3.5 h-3.5" />}
             </button>
 
-            <span className="h-3.5 w-px bg-zinc-800/80 shrink-0" />
+            <span className="h-3.5 w-px shrink-0" style={{ backgroundColor: 'var(--app-border)' }} />
 
             {/* Project & Workspace Scope Breadcrumb */}
             {/* Clean Focused Agent Navigation Tabs Strip (Only actively opened tabs, zero messy clutter) */}
@@ -376,26 +401,29 @@ export const App: React.FC = () => {
                 );
               })}
 
-              {/* Quick Add Terminal Tab (+) & Agent Dropdown & Folder Picker (Matching Image 1) */}
+              {/* Quick Add Terminal Tab (+) & Agent Dropdown & Folder Picker */}
               <div className="relative shrink-0 flex items-center">
                 <button
                   onClick={() => handleSpawnAgent('terminal')}
                   title="New Terminal Tab (Ctrl+T)"
-                  className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors"
+                  style={{ color: 'var(--app-text-muted)' }}
+                  className="p-1 rounded transition-colors hover:opacity-80"
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => setIsAgentMenuOpen(!isAgentMenuOpen)}
                   title="Start AI Agent (Claude, Antigravity, Shell)..."
-                  className="p-1 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors -ml-0.5"
+                  style={{ color: 'var(--app-text-muted)' }}
+                  className="p-1 transition-colors -ml-0.5 hover:opacity-80"
                 >
                   <ChevronDown className="w-3 h-3" />
                 </button>
                 <button
                   onClick={pickAndOpenFolder}
                   title="Open Project Directory (Ctrl+O)"
-                  className="p-1 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors ml-0.5"
+                  style={{ color: 'var(--app-text-muted)' }}
+                  className="p-1 transition-colors ml-0.5 hover:opacity-80"
                 >
                   <FolderOpen className="w-3.5 h-3.5" />
                 </button>
@@ -411,66 +439,85 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Right: Clean Minimal Essential Controls */}
+          {/* Right: Clean Minimal Essential Controls & Titlebar Controls */}
           <div
-            className="flex items-center gap-1.5 shrink-0"
+            className={`flex items-stretch h-full shrink-0 ${!isNative ? 'pr-2' : ''}`}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
-            {/* 1. Split Terminal Side-by-Side */}
-            <button
-              onClick={toggleSplitView}
-              title={isSplitView ? 'Switch to Single Terminal' : 'Split Terminals Side-by-Side'}
-              className={`p-1.5 rounded transition-colors ${
-                isSplitView
-                  ? 'bg-zinc-800 text-zinc-100 font-semibold border border-zinc-700 shadow-xs'
-                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
-              }`}
-            >
-              <Columns2 className="w-3.5 h-3.5" />
-            </button>
+            {/* View Actions: Split, Agent Room, Dark/Light Mode, Settings */}
+            <div className="flex items-center gap-1.5 pr-1.5">
+              {/* 1. Split Terminal Side-by-Side */}
+              <button
+                onClick={toggleSplitView}
+                title={isSplitView ? 'Switch to Single Terminal' : 'Split Terminals Side-by-Side'}
+                style={isSplitView ? {
+                  backgroundColor: 'var(--app-surface-elevated)',
+                  borderColor: 'var(--app-border)',
+                  color: 'var(--app-text)',
+                } : {
+                  color: 'var(--app-text-muted)',
+                }}
+                className={`p-1.5 rounded transition-colors ${
+                  isSplitView
+                    ? 'font-semibold border shadow-xs'
+                    : 'hover:opacity-90'
+                }`}
+              >
+                <Columns2 className="w-3.5 h-3.5" />
+              </button>
 
-            {/* 2. Toggle Agent Room / Side Panel */}
-            <button
-              onClick={toggleRightPanel}
-              title={rightPanelOpen ? 'Collapse Agent Room Panel (Ctrl+Alt+B)' : 'Expand Agent Room Panel (Ctrl+Alt+B)'}
-              className={`p-1.5 rounded transition-colors relative flex items-center ${
-                rightPanelOpen
-                  ? 'bg-zinc-800 text-zinc-100 font-semibold border border-zinc-700 shadow-xs'
-                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
-              }`}
-            >
-              {rightPanelOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRight className="w-3.5 h-3.5" />}
-              {roomMessages.length > 0 && !rightPanelOpen && (
-                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-400" />
-              )}
-            </button>
+              {/* 2. Toggle Agent Room / Side Panel */}
+              <button
+                onClick={toggleRightPanel}
+                title={rightPanelOpen ? 'Collapse Agent Room Panel (Ctrl+Alt+B)' : 'Expand Agent Room Panel (Ctrl+Alt+B)'}
+                style={rightPanelOpen ? {
+                  backgroundColor: 'var(--app-surface-elevated)',
+                  borderColor: 'var(--app-border)',
+                  color: 'var(--app-text)',
+                } : {
+                  color: 'var(--app-text-muted)',
+                }}
+                className={`p-1.5 rounded transition-colors relative flex items-center ${
+                  rightPanelOpen
+                    ? 'font-semibold border shadow-xs'
+                    : 'hover:opacity-90'
+                }`}
+              >
+                {rightPanelOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRight className="w-3.5 h-3.5" />}
+                {roomMessages.length > 0 && !rightPanelOpen && (
+                  <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                )}
+              </button>
 
-            {/* 3. Quick 1-Click Dark/Light Mode Toggle */}
-            <button
-              onClick={() => setTheme(getOppositeModeTheme(theme))}
-              title={isLightTheme(theme) ? 'Dark Mode' : 'Light Mode'}
-              className="p-1.5 rounded transition-colors text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
-            >
-              {isLightTheme(theme) ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
-            </button>
+              {/* 3. Quick 1-Click Dark/Light Mode Toggle */}
+              <button
+                onClick={() => setTheme(getOppositeModeTheme(theme))}
+                title={isLightTheme(theme) ? 'Dark Mode' : 'Light Mode'}
+                style={{ color: 'var(--app-text-muted)' }}
+                className="p-1.5 rounded transition-colors hover:opacity-90"
+              >
+                {isLightTheme(theme) ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
+              </button>
 
-            {/* 4. Settings & Themes */}
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              title="Settings (Ctrl+,)"
-              className="p-1.5 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-colors"
-            >
-              <Settings className="w-3.5 h-3.5" />
-            </button>
+              {/* 4. Settings & Themes */}
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                title="Settings (Ctrl+,)"
+                style={{ color: 'var(--app-text-muted)' }}
+                className="p-1.5 rounded transition-colors hover:opacity-90"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
             {/* Native-Style Windows 11 Titlebar Window Controls */}
             {isNative && (
               <div
-                className="flex items-center h-full ml-1 -mr-2 select-none"
+                className="flex items-stretch h-full select-none"
                 style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
               >
                 <div
-                  className="w-[1px] h-3.5 mx-0.5"
+                  className="w-[1px] h-3.5 self-center mx-1"
                   style={{ backgroundColor: 'var(--app-border)' }}
                 />
 
@@ -482,7 +529,7 @@ export const App: React.FC = () => {
                   }}
                   title="Minimize"
                   style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className={`w-[46px] h-9 flex items-center justify-center transition-colors focus:outline-none ${
+                  className={`w-[46px] h-full flex items-center justify-center transition-colors focus:outline-none ${
                     isLightTheme(theme)
                       ? 'text-zinc-600 hover:text-zinc-950 hover:bg-black/5 active:bg-black/10'
                       : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10 active:bg-white/15'
@@ -508,7 +555,7 @@ export const App: React.FC = () => {
                   }}
                   title={isMaximized ? "Restore" : "Maximize"}
                   style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className={`w-[46px] h-9 flex items-center justify-center transition-colors focus:outline-none ${
+                  className={`w-[46px] h-full flex items-center justify-center transition-colors focus:outline-none ${
                     isLightTheme(theme)
                       ? 'text-zinc-600 hover:text-zinc-950 hover:bg-black/5 active:bg-black/10'
                       : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10 active:bg-white/15'
@@ -536,7 +583,7 @@ export const App: React.FC = () => {
                   }}
                   title="Close"
                   style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className={`w-[46px] h-9 flex items-center justify-center transition-colors focus:outline-none hover:bg-[#e81123] hover:text-white active:bg-[#c42b1c] ${
+                  className={`w-[46px] h-full flex items-center justify-center transition-colors focus:outline-none hover:bg-[#e81123] hover:text-white active:bg-[#c42b1c] ${
                     isLightTheme(theme) ? 'text-zinc-600' : 'text-zinc-400'
                   }`}
                 >
@@ -610,35 +657,36 @@ export const App: React.FC = () => {
           style={{
             backgroundColor: 'var(--app-nav-bg)',
             borderColor: 'var(--app-border)',
+            color: 'var(--app-text-muted)',
           }}
-          className="h-6 px-3 border-t flex items-center justify-between text-[10px] font-mono text-zinc-500 shrink-0 select-none"
+          className="h-6 px-3 border-t flex items-center justify-between text-[10px] font-mono shrink-0 select-none"
         >
           {/* Left: Active session & Agent stats */}
           <div className="flex items-center gap-2">
-            <span className="text-zinc-400">{currentProject?.name || 'Local'}</span>
-            <span className="text-zinc-700">|</span>
-            <span className="text-zinc-400 font-mono text-[9px] truncate max-w-[200px]">{currentProject?.rootPath}</span>
-            <span className="text-zinc-700">|</span>
-            <span className="text-zinc-400">{projectSessions.length} sessions</span>
+            <span style={{ color: 'var(--app-text)' }}>{currentProject?.name || 'Local'}</span>
+            <span style={{ color: 'var(--app-border)' }}>|</span>
+            <span className="font-mono text-[9px] truncate max-w-[200px]" style={{ color: 'var(--app-text-muted)' }}>{currentProject?.rootPath}</span>
+            <span style={{ color: 'var(--app-border)' }}>|</span>
+            <span style={{ color: 'var(--app-text-muted)' }}>{projectSessions.length} sessions</span>
             {blockedCount > 0 && (
               <span className="text-rose-400 font-medium">· {blockedCount} blocked</span>
             )}
           </div>
 
           {/* Center: Linux / tmux Hotkey Cheatline */}
-          <div className="hidden lg:flex items-center gap-3 text-[9px] text-zinc-600 font-mono">
-            <span><kbd className="text-zinc-400 font-semibold">^P</kbd> cmd</span>
-            <span><kbd className="text-zinc-400 font-semibold">^B</kbd> rail</span>
-            <span><kbd className="text-zinc-400 font-semibold">^⌥B</kbd> panel</span>
-            <span><kbd className="text-zinc-400 font-semibold">^O</kbd> dir</span>
-            <span><kbd className="text-zinc-400 font-semibold">^,</kbd> config</span>
+          <div className="hidden lg:flex items-center gap-3 text-[9px] font-mono" style={{ color: 'var(--app-text-muted)' }}>
+            <span><kbd className="font-semibold" style={{ color: 'var(--app-text)' }}>^P</kbd> cmd</span>
+            <span><kbd className="font-semibold" style={{ color: 'var(--app-text)' }}>^B</kbd> rail</span>
+            <span><kbd className="font-semibold" style={{ color: 'var(--app-text)' }}>^⌥B</kbd> panel</span>
+            <span><kbd className="font-semibold" style={{ color: 'var(--app-text)' }}>^O</kbd> dir</span>
+            <span><kbd className="font-semibold" style={{ color: 'var(--app-text)' }}>^,</kbd> config</span>
           </div>
 
           {/* Right: Telemetry & Port (Zero Network Ports: Pure In-Memory PTY IPC) */}
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-1.5">
               <Radio className={`w-2.5 h-2.5 ${isNative ? 'text-emerald-500' : 'text-zinc-500'}`} />
-              <span className="text-zinc-400 font-mono text-[10px]">
+              <span className="font-mono text-[10px]" style={{ color: 'var(--app-text-muted)' }}>
                 {isNative ? 'In-Memory IPC' : 'Web Simulation'}
               </span>
             </div>
@@ -648,7 +696,7 @@ export const App: React.FC = () => {
                   daemonStatus === 'connected' ? 'bg-emerald-400' : 'bg-rose-500'
                 }`}
               />
-              <span className="text-zinc-400">
+              <span style={{ color: 'var(--app-text-muted)' }}>
                 {daemonStatus === 'connected' ? 'Ready' : 'Offline'}
               </span>
             </div>

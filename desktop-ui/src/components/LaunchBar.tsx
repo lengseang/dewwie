@@ -20,7 +20,7 @@ export const LaunchBar: React.FC<LaunchBarProps> = ({ className = '' }) => {
   const [copiedPath, setCopiedPath] = useState(false);
 
   const activeWs = activeWorkspaceId ? workspaces[activeWorkspaceId] : null;
-  const targetPath = activeWs ? activeWs.worktreePath : 'D:\\1111-Works\\exbytelab';
+  const targetPath = activeWs?.worktreePath; // undefined -> main process uses the default project
 
   const handleLaunch = async (editor: ExternalEditor) => {
     setActiveEditorLaunching(editor);
@@ -34,6 +34,7 @@ export const LaunchBar: React.FC<LaunchBarProps> = ({ className = '' }) => {
   };
 
   const handleCopyPath = () => {
+    if (!targetPath) return; // no active session: nothing real to copy
     navigator.clipboard.writeText(targetPath);
     setCopiedPath(true);
     setTimeout(() => setCopiedPath(false), 1500);
@@ -78,7 +79,7 @@ export const LaunchBar: React.FC<LaunchBarProps> = ({ className = '' }) => {
           onClick={() => handleLaunch('cursor')}
           disabled={!!activeEditorLaunching}
           title="Open worktree directory in Cursor IDE"
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 active:scale-[0.98] border border-zinc-700/80 text-zinc-200 hover:text-white transition-all shadow-xs"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 active:scale-[0.98] border border-zinc-700/80 text-zinc-200 hover:text-zinc-50 transition-all shadow-xs"
         >
           <Code2 className="w-3.5 h-3.5 text-indigo-400" />
           <span className="font-medium">
@@ -91,7 +92,7 @@ export const LaunchBar: React.FC<LaunchBarProps> = ({ className = '' }) => {
           onClick={() => handleLaunch('zed')}
           disabled={!!activeEditorLaunching}
           title="Open worktree directory in Zed Editor"
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 active:scale-[0.98] border border-zinc-700/80 text-zinc-200 hover:text-white transition-all shadow-xs"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 active:scale-[0.98] border border-zinc-700/80 text-zinc-200 hover:text-zinc-50 transition-all shadow-xs"
         >
           <Zap className="w-3.5 h-3.5 text-amber-400" />
           <span className="font-medium">
@@ -104,7 +105,7 @@ export const LaunchBar: React.FC<LaunchBarProps> = ({ className = '' }) => {
           onClick={() => handleLaunch('vscode')}
           disabled={!!activeEditorLaunching}
           title="Open worktree directory in VS Code"
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 active:scale-[0.98] border border-zinc-700/80 text-zinc-200 hover:text-white transition-all shadow-xs"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 active:scale-[0.98] border border-zinc-700/80 text-zinc-200 hover:text-zinc-50 transition-all shadow-xs"
         >
           <Terminal className="w-3.5 h-3.5 text-sky-400" />
           <span className="font-medium">

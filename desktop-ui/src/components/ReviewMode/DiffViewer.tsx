@@ -200,14 +200,22 @@ export const DiffViewer: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
 
         {/* Right: View Mode Toggle & Close Panel Button */}
         <div className="flex items-center gap-1.5">
-          <div className="flex items-center bg-zinc-900/80 p-0.5 rounded border border-zinc-800">
+          <div
+            style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)' }}
+            className="flex items-center p-0.5 rounded border"
+          >
             <button
               onClick={() => setViewMode('unified')}
               title="Unified line-by-line view"
+              style={viewMode === 'unified' ? {
+                backgroundColor: 'var(--app-bg)',
+                borderColor: 'var(--app-border)',
+                color: 'var(--app-text)',
+              } : {
+                color: 'var(--app-text-muted)',
+              }}
               className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono transition-colors ${
-                viewMode === 'unified'
-                  ? 'bg-zinc-800 text-zinc-100 font-medium'
-                  : 'text-zinc-500 hover:text-zinc-300'
+                viewMode === 'unified' ? 'font-medium shadow-xs border' : 'hover:opacity-80'
               }`}
             >
               <AlignLeft className="w-3 h-3" />
@@ -217,10 +225,15 @@ export const DiffViewer: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
             <button
               onClick={() => setViewMode('split')}
               title="Side-by-side split view"
+              style={viewMode === 'split' ? {
+                backgroundColor: 'var(--app-bg)',
+                borderColor: 'var(--app-border)',
+                color: 'var(--app-text)',
+              } : {
+                color: 'var(--app-text-muted)',
+              }}
               className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono transition-colors ${
-                viewMode === 'split'
-                  ? 'bg-zinc-800 text-zinc-100 font-medium'
-                  : 'text-zinc-500 hover:text-zinc-300'
+                viewMode === 'split' ? 'font-medium shadow-xs border' : 'hover:opacity-80'
               }`}
             >
               <Columns2 className="w-3 h-3" />
@@ -231,8 +244,8 @@ export const DiffViewer: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
           {onClose && (
             <button
               onClick={onClose}
-              title="Close Diff Panel (Focus Fullscreen Terminal TUI)"
-              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+              title="Close Diff Panel"
+              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>

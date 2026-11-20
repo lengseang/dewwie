@@ -20,6 +20,7 @@ import subprocess
 import socket
 import re
 import time
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -37,6 +38,55 @@ DAEMON_HOST = "127.0.0.1"
 DAEMON_PORT = 7500
 REGISTRY_PATH = Path.home() / ".swarmherd" / "workspaces.json"
 SESSIONS_DIR = Path.home() / ".swarmherd" / "sessions"
+
+
+# --- Shared state file IO (mirror of desktop-ui/electron/jsonstore.cjs) -----------------------
+# The Electron app writes these files too. Temp + os.replace means no reader sees a half-written file,
+# a parse failure falls back to the last good .bak instead of [], and a corrupt file is moved aside
+# (never deleted) before being replaced.
+def read_json_safe(path):
+    """Parse `path`, falling back to `path.bak`. Raises ValueError if neither is readable."""
+    path = Path(path)
+    for p in (path, path.with_name(path.name + ".bak")):
+        if not p.exists():
+            continue
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (ValueError, OSError):
+            continue
+    raise ValueError(f"{path} and its .bak are unreadable")
+
+
+def write_json_atomic(path, data):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                json.load(f)
+            good = True
+        except (ValueError, OSError):
+            good = False
+        if good:
+            try:
+                shutil.copyfile(path, path.with_name(path.name + ".bak"))
+            except OSError:
+                pass
+        else:
+            os.replace(path, path.with_name(f"{path.name}.corrupt-{int(time.time() * 1000)}"))
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{int(time.time() * 1000)}.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    for attempt in range(9):  # Windows: replace can fail transiently while the app has the file open
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == 8:
+                tmp.unlink(missing_ok=True)
+                raise
+            time.sleep(0.015 * (attempt + 1))
 
 # ANSI Colors
 CYAN = "\033[1;36m"
@@ -80,8 +130,7 @@ def load_local_workspaces() -> list:
     """Fallback: read ~/.swarmherd/workspaces.json directly."""
     if REGISTRY_PATH.exists():
         try:
-            with open(REGISTRY_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
+            return read_json_safe(REGISTRY_PATH)
         except Exception:
             pass
     # Return sample seed workspaces if clean start
@@ -240,8 +289,7 @@ def cmd_spawn(args):
     }
     current.append(new_ws)
     REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
-        json.dump(current, f, indent=2)
+    write_json_atomic(REGISTRY_PATH, current)
 
     print(f"\n{BOLD}Ready!{RESET} View live in Desktop UI or launch with: {CYAN}swarmherd open {branch} --ide cursor{RESET}\n")
 
@@ -332,8 +380,7 @@ def cmd_delegate(args):
     }
     current.append(new_ws)
     REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
-        json.dump(current, f, indent=2)
+    write_json_atomic(REGISTRY_PATH, current)
 
     # 5. Broadcast task_delegate message into the Room Mesh
     msg_obj = {
@@ -350,17 +397,14 @@ def cmd_delegate(args):
     msgs = []
     if ROOM_MESSAGES_PATH.exists():
         try:
-            with open(ROOM_MESSAGES_PATH, "r", encoding="utf-8") as f:
-                msgs = json.load(f)
+            msgs = read_json_safe(ROOM_MESSAGES_PATH)
         except Exception:
             pass
     msgs.append(msg_obj)
-    with open(ROOM_MESSAGES_PATH, "w", encoding="utf-8") as f:
-        json.dump(msgs[-1000:], f, indent=2)
+    write_json_atomic(ROOM_MESSAGES_PATH, msgs[-1000:])
 
     # Emit OSC 7502 so connected terminal instances see it immediately
-    sys.stdout.write(f"\033]7502;to=@{branch};from=Local Main Shell;type=task_delegate;msg={task}\007")
-    sys.stdout.flush()
+    # (no OSC 7502 echo: already persisted to room_messages.json; echoing it would duplicate the message in the app)
 
     print(f"  {GREEN}✓ Room broadcast sent -> @{branch} (type: task_delegate){RESET}")
     print(f"\n{BOLD}{GREEN}Autonomous Delegation Complete.{RESET} Monitor live via: {CYAN}dewwie room list{RESET} or {CYAN}dewwie wait {branch}{RESET}\n")
@@ -442,10 +486,9 @@ ROOMS_PATH = Path.home() / ".swarmherd" / "rooms.json"
 def load_local_rooms():
     if ROOMS_PATH.exists():
         try:
-            with open(ROOMS_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, list) and len(data) > 0:
-                    return data
+            data = read_json_safe(ROOMS_PATH)
+            if isinstance(data, list) and len(data) > 0:
+                return data
         except Exception:
             pass
     return [
@@ -455,8 +498,7 @@ def load_local_rooms():
 
 def save_local_rooms(rooms):
     ROOMS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(ROOMS_PATH, "w", encoding="utf-8") as f:
-        json.dump(rooms, f, indent=2)
+    write_json_atomic(ROOMS_PATH, rooms)
 
 DEWWIE_MESH_PROTOCOL_DOC = """# Dewwie Multi-Agent Room Protocol
 
@@ -598,19 +640,16 @@ def cmd_room(args):
         msgs = []
         if ROOM_MESSAGES_PATH.exists():
             try:
-                with open(ROOM_MESSAGES_PATH, "r", encoding="utf-8") as f:
-                    msgs = json.load(f)
+                msgs = read_json_safe(ROOM_MESSAGES_PATH)
             except Exception:
                 pass
         msgs.append(msg_obj)
         try:
-            with open(ROOM_MESSAGES_PATH, "w", encoding="utf-8") as f:
-                json.dump(msgs[-1000:], f, indent=2)
+            write_json_atomic(ROOM_MESSAGES_PATH, msgs[-1000:])
         except Exception:
             pass
         # Emit OSC 7502 so running PTY captures it live
-        sys.stdout.write(f"\033]7502;to={target};from={msg_obj['fromSessionName']};type={msg_type};msg={content}\007")
-        sys.stdout.flush()
+        # (no OSC 7502 echo: already persisted to room_messages.json; echoing it would duplicate the message in the app)
         print(f"{GREEN}✔ Message posted to Room -> {target} [{msg_type}]: {content}{RESET}")
     elif action == "create":
         name = args.name.strip()
@@ -619,8 +658,7 @@ def cmd_room(args):
         new_room = {"id": new_id, "name": name, "createdAt": datetime.now().isoformat()}
         rooms.append(new_room)
         save_local_rooms(rooms)
-        sys.stdout.write(f"\033]7502;to=@all;from=cli;type=room_created;msg={name}\007")
-        sys.stdout.flush()
+        # (no OSC 7502 echo: already persisted to room_messages.json; echoing it would duplicate the message in the app)
         print(f"\n{GREEN}✔ Created Room '{name}' (ID: {new_id}).{RESET}\n")
     elif action == "assign":
         target_session = args.session.strip().lstrip("@")
@@ -650,11 +688,9 @@ def cmd_room(args):
         
         matched_session["roomId"] = room_obj["id"]
         REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
-            json.dump(workspaces, f, indent=2)
+        write_json_atomic(REGISTRY_PATH, workspaces)
             
-        sys.stdout.write(f"\033]7502;to=@all;from=cli;type=session_assigned;msg={matched_session['id']}:{room_obj['id']}\007")
-        sys.stdout.flush()
+        # (no OSC 7502 echo: already persisted to room_messages.json; echoing it would duplicate the message in the app)
         print(f"\n{GREEN}✔ Assigned session '@{matched_session.get('name', target_session)}' to Room '{room_obj['name']}'.{RESET}\n")
     elif action == "remove":
         target_session = args.session.strip().lstrip("@")
@@ -669,11 +705,9 @@ def cmd_room(args):
             
         matched_session.pop("roomId", None)
         REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
-            json.dump(workspaces, f, indent=2)
+        write_json_atomic(REGISTRY_PATH, workspaces)
             
-        sys.stdout.write(f"\033]7502;to=@all;from=cli;type=session_removed;msg={matched_session['id']}\007")
-        sys.stdout.flush()
+        # (no OSC 7502 echo: already persisted to room_messages.json; echoing it would duplicate the message in the app)
         print(f"\n{GREEN}✔ Removed session '@{matched_session.get('name', target_session)}' from room.{RESET}\n")
     elif action == "list" or not action:
         rooms = load_local_rooms()
@@ -700,10 +734,9 @@ def cmd_room(args):
         msgs = []
         if ROOM_MESSAGES_PATH.exists():
             try:
-                with open(ROOM_MESSAGES_PATH, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        msgs = data
+                data = read_json_safe(ROOM_MESSAGES_PATH)
+                if isinstance(data, list):
+                    msgs = data
             except Exception:
                 pass
         if msgs:
@@ -738,8 +771,7 @@ def cmd_room(args):
                     w["agentRole"] = "worker"
             if found:
                 try:
-                    with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
-                        json.dump(workspaces, f, indent=2)
+                    write_json_atomic(REGISTRY_PATH, workspaces)
                 except Exception as e:
                     print(f"{RED}Error saving: {e}{RESET}")
                 print(f"\n{GREEN}✔ Promoted session '{target}' to 👑 LEAD Agent.{RESET}\n")

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
+import { THEMES_CONFIG } from '../theme/themes';
 import { Terminal, FolderOpen, Settings, Palette, Columns2, Trash2, X, Play } from 'lucide-react';
 
 interface CommandPaletteModalProps {
@@ -107,90 +108,19 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         onOpenSettings();
       },
     },
-    {
-      id: 'cmd-theme-zinc',
-      prefix: ':theme zinc',
-      title: ':theme zinc',
-      description: 'Switch IDE to Neutral Deep Zinc theme',
+    // Generated from the theme registry (previously 7 hand-written entries, 2 pointing at non-existent ids).
+    ...Object.values(THEMES_CONFIG).map((t): CommandItem => ({
+      id: `cmd-theme-${t.id}`,
+      prefix: `:theme ${t.id}`,
+      title: `:theme ${t.id}`,
+      description: `Switch IDE to ${t.name}`,
       icon: <Palette className="w-3.5 h-3.5 text-zinc-300" />,
       category: 'theme',
       action: () => {
-        setTheme('zinc');
+        setTheme(t.id);
         onClose();
       },
-    },
-    {
-      id: 'cmd-theme-slate',
-      prefix: ':theme slate',
-      title: ':theme slate',
-      description: 'Switch IDE to Cool High-Contrast Slate theme',
-      icon: <Palette className="w-3.5 h-3.5 text-zinc-300" />,
-      category: 'theme',
-      action: () => {
-        setTheme('slate');
-        onClose();
-      },
-    },
-    {
-      id: 'cmd-theme-midnight',
-      prefix: ':theme midnight',
-      title: ':theme midnight',
-      description: 'Switch IDE to Deep Navy Midnight theme',
-      icon: <Palette className="w-3.5 h-3.5 text-zinc-300" />,
-      category: 'theme',
-      action: () => {
-        setTheme('midnight');
-        onClose();
-      },
-    },
-    {
-      id: 'cmd-theme-amoled',
-      prefix: ':theme amoled',
-      title: ':theme amoled',
-      description: 'Switch IDE to Pure Black OLED Cinema theme',
-      icon: <Palette className="w-3.5 h-3.5 text-zinc-300" />,
-      category: 'theme',
-      action: () => {
-        setTheme('amoled');
-        onClose();
-      },
-    },
-    {
-      id: 'cmd-theme-catppuccin',
-      prefix: ':theme catppuccin',
-      title: ':theme catppuccin',
-      description: 'Switch IDE to Catppuccin Macchiato Warm Espresso theme',
-      icon: <Palette className="w-3.5 h-3.5 text-zinc-300" />,
-      category: 'theme',
-      action: () => {
-        setTheme('catppuccin');
-        onClose();
-      },
-    },
-    {
-      id: 'cmd-theme-transparent',
-      prefix: ':theme transparent',
-      title: ':theme transparent',
-      description: 'Switch IDE to Frosted Glass Translucent Acrylic theme',
-      icon: <Palette className="w-3.5 h-3.5 text-zinc-300" />,
-      category: 'theme',
-      action: () => {
-        setTheme('transparent');
-        onClose();
-      },
-    },
-    {
-      id: 'cmd-theme-nord',
-      prefix: ':theme nord',
-      title: ':theme nord',
-      description: 'Switch IDE to Nordic Arctic Ice & Polar Night theme',
-      icon: <Palette className="w-3.5 h-3.5 text-zinc-300" />,
-      category: 'theme',
-      action: () => {
-        setTheme('nord');
-        onClose();
-      },
-    },
+    })),
     {
       id: 'cmd-view-room',
       prefix: ':room',

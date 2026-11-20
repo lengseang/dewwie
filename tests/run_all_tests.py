@@ -2,12 +2,11 @@
 """
 SwarmHerd Master Verification Runner.
 
-Runs all test suites:
-  1. Git Worktree Lifecycle Suite (test_worktree.py)
-  2. OSC 7501 Escape Sequence Parser Suite (test_osc_parser.py)
-  3. TCP Port Broker & Collision Suite (test_port_broker.py)
-  4. JSON-RPC Protocol & Contract Alignment Suite (test_rpc_contract.py)
-  5. Mock Agent Execution Verification (mock_agent.py --scenario quick)
+Runs every suite in SUITES below, starting with the ones that exercise shipped code:
+  - Electron Boot Smoke Test (smoke_electron.py): the app must actually boot (needs `npm run build`)
+  - Shipped JS Unit Tests: vitest over desktop-ui (electron/*.test.mjs + src store tests)
+  - Shared State File IO: the shipped CLI's read/write helpers
+  followed by the worktree, room-mesh, delegation and E2E scenario suites.
 
 Provides clean colorized table reporting and non-zero exit codes on failure.
 """
@@ -28,10 +27,13 @@ RESET = "\033[0m"
 
 from pathlib import Path
 TESTS_DIR = Path(__file__).resolve().parent
+UI_DIR = TESTS_DIR.parent / "desktop-ui"
 
 SUITES = [
-    ("OSC 7501 Parser Suite", ["python", str(TESTS_DIR / "test_osc_parser.py")]),
-    ("TCP Port Broker Suite", ["python", str(TESTS_DIR / "test_port_broker.py")]),
+    # Shipped code first. These replaced test_osc_parser.py / test_port_broker.py, which tested Python
+    # re-implementations that nothing in the product used (the app could crash on boot with all suites green).
+    ("Electron Boot Smoke Test (sandboxed)", ["python", str(TESTS_DIR / "smoke_electron.py")]),
+    ("Shipped JS Unit Tests (vitest)", ["node", str(UI_DIR / "node_modules" / "vitest" / "vitest.mjs"), "run", "--root", str(UI_DIR)]),
     ("RPC & Protocol Contract Suite", ["python", str(TESTS_DIR / "test_rpc_contract.py")]),
     ("Mock Agent Simulation", ["python", str(TESTS_DIR / "mock_agent.py"), "--scenario", "quick"]),
     ("Git Worktree Lifecycle Suite", ["python", str(TESTS_DIR / "test_worktree.py")]),
@@ -42,6 +44,7 @@ SUITES = [
     ("Desktop Launcher Health & Reliability", ["python", str(TESTS_DIR / "test_launcher_health.py")]),
     ("Multi-Agent Mesh Protocol & Skill Sync", ["python", str(TESTS_DIR / "test_multiagent_mesh.py")]),
     ("Comprehensive E2E Scenarios (A-E)", ["python", str(TESTS_DIR / "e2e_scenarios.py")]),
+    ("Shared State File IO (shipped CLI)", ["python", str(TESTS_DIR / "test_state_io.py")]),
 ]
 
 def run_suite(name: str, cmd: List[str]) -> Tuple[bool, float, str]:

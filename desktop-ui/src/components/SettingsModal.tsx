@@ -1,24 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { X, FolderOpen, Palette, Check, Save, Zap, Radio } from 'lucide-react';
+import { THEMES_CONFIG } from '../theme/themes';
+import { version as APP_VERSION } from '../../package.json';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const THEMES = [
-  { id: 'zinc', name: 'Zinc Dark', desc: 'Linear & Charcoal', bg: '#09090b', border: '#27272a' },
-  { id: 'oled', name: 'OLED Black', desc: 'Pitch Black', bg: '#000000', border: '#18181b' },
-  { id: 'slate', name: 'Slate Navy', desc: 'Cool Slate', bg: '#0b0f19', border: '#1e293b' },
-  { id: 'light-clean', name: 'Clean Light', desc: 'Swiss Minimal Paper', bg: '#ffffff', border: '#e2e8f0' },
-  { id: 'light-nord', name: 'Nord Day', desc: 'Arctic Light Frost', bg: '#f4f6f9', border: '#d8dee9' },
-  { id: 'nord', name: 'Nordic Dark', desc: 'Polar Night Frost', bg: '#242933', border: '#434c5e' },
-  { id: 'catppuccin', name: 'Catppuccin', desc: 'Warm Pastel', bg: '#181926', border: '#363a4f' },
-  { id: 'transparent', name: 'Frosted Glass', desc: 'Acrylic Blur', bg: 'rgba(20, 24, 34, 0.72)', border: 'rgba(255, 255, 255, 0.15)' },
-  { id: 'tokyo', name: 'Tokyo Night', desc: 'Japanese Indigo', bg: '#1a1b26', border: '#2f354a' },
-  { id: 'monokai', name: 'Monokai Pro', desc: 'Classic Dark', bg: '#19181a', border: '#2d2a2e' },
-];
+// Derived from the single theme registry so names, colours and count never drift.
+const THEMES = Object.values(THEMES_CONFIG).map((t) => ({ id: t.id, name: t.name, desc: t.desc, bg: t.bg, border: t.border }));
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const {
@@ -39,10 +31,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   const currentProject = activeProjectId ? projects[activeProjectId] : Object.values(projects)[0];
 
+  // Escape closes the dialog (capture phase so a focused xterm can't swallow it).
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs font-mono select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 font-mono select-none" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div
         style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)' }}
         className="w-full max-w-lg max-h-[85vh] border rounded-lg shadow-2xl overflow-hidden flex flex-col"
@@ -131,6 +131,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </div>
                 <button
                   type="button"
+                  role="switch"
+                  aria-checked={restoreSessionsOnStartup}
+                  aria-label="Restore Sessions"
                   onClick={() => setRestoreSessionsOnStartup(!restoreSessionsOnStartup)}
                   className={`w-8 h-4 flex items-center rounded-full p-0.5 transition-colors cursor-pointer shrink-0 ${
                     restoreSessionsOnStartup ? 'bg-emerald-500 justify-end' : 'bg-zinc-700 justify-start'
@@ -152,6 +155,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </div>
                 <button
                   type="button"
+                  role="switch"
+                  aria-checked={restoreScrollback}
+                  aria-label="Save Scrollback"
                   onClick={() => setRestoreScrollback(!restoreScrollback)}
                   className={`w-8 h-4 flex items-center rounded-full p-0.5 transition-colors cursor-pointer shrink-0 ${
                     restoreScrollback ? 'bg-emerald-500 justify-end' : 'bg-zinc-700 justify-start'
@@ -173,6 +179,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </div>
                 <button
                   type="button"
+                  role="switch"
+                  aria-checked={persistActiveMesh}
+                  aria-label="Save Mesh Rooms"
                   onClick={() => setPersistActiveMesh(!persistActiveMesh)}
                   className={`w-8 h-4 flex items-center rounded-full p-0.5 transition-colors cursor-pointer shrink-0 ${
                     persistActiveMesh ? 'bg-emerald-500 justify-end' : 'bg-zinc-700 justify-start'
@@ -272,7 +281,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         >
           <div className="flex items-center gap-1.5 text-[10px] font-mono" style={{ color: 'var(--app-text-muted)' }}>
             <Radio className="w-2.5 h-2.5 text-emerald-400" />
-            <span>Dewwie v0.1.17</span>
+            <span>Dewwie v{APP_VERSION}</span>
           </div>
           <button
             onClick={onClose}

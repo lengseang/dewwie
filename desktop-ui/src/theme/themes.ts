@@ -53,7 +53,7 @@ export const THEMES_CONFIG: Record<string, ThemeDefinition> = {
     borderSubtle: '#18181b',
     text: '#f4f4f5',
     textMuted: '#a1a1aa',
-    accent: '#e4e4e7',
+    accent: '#d9a441',
     terminal: {
       background: '#09090b',
       foreground: '#f4f4f5',
@@ -88,8 +88,8 @@ export const THEMES_CONFIG: Record<string, ThemeDefinition> = {
     border: '#1c1c1f',
     borderSubtle: '#121214',
     text: '#ffffff',
-    textMuted: '#888888',
-    accent: '#ffffff',
+    textMuted: '#8e8e93',
+    accent: '#d9a441',
     terminal: {
       background: '#000000',
       foreground: '#ffffff',
@@ -152,7 +152,7 @@ export const THEMES_CONFIG: Record<string, ThemeDefinition> = {
   tokyo: {
     id: 'tokyo',
     name: 'Tokyo Night',
-    desc: 'Modern Japanese Indigo & Purple Glow',
+    desc: 'Night-city navy with soft blue highlights',
     bg: '#1a1b26',
     surface: '#16161e',
     surfaceElevated: '#24283b',
@@ -160,8 +160,8 @@ export const THEMES_CONFIG: Record<string, ThemeDefinition> = {
     border: '#2f354a',
     borderSubtle: '#1f2335',
     text: '#c0caf5',
-    textMuted: '#7aa2f7',
-    accent: '#bb9af7',
+    textMuted: '#9aa5ce',
+    accent: '#7aa2f7',
     terminal: {
       background: '#1a1b26',
       foreground: '#c0caf5',
@@ -387,11 +387,11 @@ export const THEMES_CONFIG: Record<string, ThemeDefinition> = {
       selectionBackground: 'rgba(94, 129, 172, 0.2)',
       black: '#2e3440',
       red: '#bf616a',
-      green: '#a3be8c',
-      yellow: '#d08770',
+      green: '#4f7a3a',
+      yellow: '#9a5f1f',
       blue: '#5e81ac',
-      magenta: '#b48ead',
-      cyan: '#88c0d0',
+      magenta: '#8a5f86',
+      cyan: '#2f7385',
       white: '#eceff4',
       brightBlack: '#4c566a',
       brightRed: '#bf616a',
@@ -409,9 +409,14 @@ export const isLightTheme = (themeId: string): boolean => {
   return THEMES_CONFIG[themeId]?.isLight === true;
 };
 
+// Toggle dark <-> light while remembering the last theme used on each side (e.g. Nord stays Nord).
 export const getOppositeModeTheme = (currentTheme: string): string => {
-  if (isLightTheme(currentTheme)) {
-    return 'zinc';
-  }
-  return 'light-clean';
+  const light = isLightTheme(currentTheme);
+  let remembered: string | null = null;
+  try {
+    localStorage.setItem(light ? 'dewwie:lastLightTheme' : 'dewwie:lastDarkTheme', currentTheme);
+    remembered = localStorage.getItem(light ? 'dewwie:lastDarkTheme' : 'dewwie:lastLightTheme');
+  } catch (_) {}
+  if (remembered && THEMES_CONFIG[remembered] && isLightTheme(remembered) !== light) return remembered;
+  return light ? 'zinc' : 'light-clean';
 };

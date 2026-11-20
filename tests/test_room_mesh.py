@@ -11,16 +11,31 @@ import os
 import sys
 import json
 import time
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
-# Paths
-SWARMHERD_DIR = Path.home() / ".swarmherd"
+# Paths: an isolated sandbox. These tests used to write straight into the user's live
+# ~/.swarmherd (overwriting workspace_state.json and promoting a lead in workspaces.json).
+SWARMHERD_DIR = Path(tempfile.mkdtemp(prefix="dewwie_room_test_"))
 ROOM_MESSAGES_FILE = SWARMHERD_DIR / "room_messages.json"
 WORKSPACE_STATE_FILE = SWARMHERD_DIR / "workspace_state.json"
 WORKSPACES_FILE = SWARMHERD_DIR / "workspaces.json"
 
 class TestRoomMeshAndPersistence(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Deterministic fixture for the lead-promotion test (previously depended on real user sessions).
+        WORKSPACES_FILE.write_text(json.dumps([
+            {"id": "ws-local-proj-a", "name": "Local Main Shell", "agentRole": "worker"},
+            {"id": "ws-branch-feat-x", "name": "feat/x", "agentRole": "lead"},
+        ], indent=2), encoding="utf-8")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(SWARMHERD_DIR, ignore_errors=True)
+
     def setUp(self):
         SWARMHERD_DIR.mkdir(parents=True, exist_ok=True)
 

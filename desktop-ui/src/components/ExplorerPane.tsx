@@ -81,7 +81,7 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
   const [copied, setCopied] = useState(false);
 
   const activeWs = activeWorkspaceId ? workspaces[activeWorkspaceId] : null;
-  const basePath = activeWs ? activeWs.worktreePath : 'D:\\1111-Works\\exbytelab';
+  const basePath = activeWs?.worktreePath; // undefined -> main process uses the default project
 
   // Load real workspace tree from native backend
   const refreshTree = useCallback(async () => {
@@ -199,8 +199,8 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
         className="w-full h-full flex flex-col font-mono select-none overflow-hidden"
       >
         {/* Explorer Header */}
-        <div className="h-9 px-3 border-b border-zinc-800/80 flex items-center justify-between gap-2 shrink-0">
-          <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider truncate">
+        <div style={{ borderColor: 'var(--app-border)' }} className="h-9 px-3 border-b flex items-center justify-between gap-2 shrink-0">
+          <span className="text-[11px] font-semibold uppercase tracking-wider truncate" style={{ color: 'var(--app-text-muted)' }}>
             EXPLORER
           </span>
 
@@ -208,14 +208,14 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
             <button
               onClick={refreshTree}
               title="Refresh tree"
-              className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900"
+              className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
             >
               <RefreshCw className="w-3 h-3" />
             </button>
             <button
               onClick={() => launchEditor('cursor')}
               title="Open in Cursor IDE"
-              className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900"
+              className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
             >
               <ExternalLink className="w-3 h-3" />
             </button>
@@ -223,7 +223,7 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
               <button
                 onClick={onClose}
                 title="Close Explorer Panel"
-                className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 ml-0.5"
+                className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/60 ml-0.5"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -431,7 +431,7 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
             <button
               onClick={() => launchEditor('cursor')}
               title="Edit in Cursor"
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-zinc-900 text-zinc-300 hover:text-white border border-zinc-800 transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-zinc-900 text-zinc-300 hover:text-zinc-50 border border-zinc-800 transition-colors"
             >
               <span>Edit</span>
               <ExternalLink className="w-2.5 h-2.5 text-zinc-500" />
@@ -440,7 +440,7 @@ export const ExplorerPane: React.FC<{ sidebarOnly?: boolean; onClose?: () => voi
         </div>
 
         {/* Code Content Container */}
-        <div className="flex-1 overflow-auto p-4 bg-[#09090b] font-mono text-xs text-zinc-300 leading-relaxed">
+        <div className="flex-1 overflow-auto p-4 bg-zinc-950 font-mono text-xs text-zinc-300 leading-relaxed">
           {isLoadingFile ? (
             <div className="flex items-center justify-center h-full text-zinc-500">
               Loading file...

@@ -79,25 +79,27 @@ export const DualTerminalPane: React.FC = () => {
     if (typeof window !== 'undefined' && window.swarmherdNative?.attachTerminal) {
       try {
         const initialScrollback = await window.swarmherdNative.attachTerminal(workspaceId);
+        // Size xterm to its container and the PTY to xterm BEFORE replaying history; replaying first laid
+        // the history out at xterm's default 80x24 and then reflowed it (mid-token wraps, broken TUI frames).
+        try {
+          fit.fit();
+        } catch (_) {}
+        if (term.cols > 0 && term.rows > 0) {
+          window.swarmherdNative?.resizeTerminal?.(workspaceId, term.cols, term.rows);
+        }
         if (initialScrollback) {
           term.write(initialScrollback);
         }
-        setTimeout(() => {
-          try {
-            fit.fit();
-            term.focus();
-          } catch (_) {}
-          if (term.cols > 0 && term.rows > 0) {
-            window.swarmherdNative?.resizeTerminal?.(workspaceId, term.cols, term.rows);
-          }
-        }, 30);
+        try {
+          term.focus();
+        } catch (_) {}
       } catch (err) {
         console.error(`[PTY IPC] Failed to attach workspace ${workspaceId}:`, err);
       }
     } else {
       // Browser fallback simulation if running outside Electron
       const currentWs = workspacesRef.current[workspaceId];
-      const workingDir = currentWs?.worktreePath || 'D:\\1111-Works\\Dewwie';
+      const workingDir = currentWs?.worktreePath || '~';
       term.writeln('\x1b[38;5;244m[Dewwie Web Mode] PTY shell simulation ready • ' + workingDir + '\x1b[0m');
       term.writeln('\x1b[38;5;248mPowerShell 7.5.0\x1b[0m');
       term.write(`\r\n\x1b[38;5;39mPS ${workingDir}>\x1b[0m `);
@@ -105,7 +107,7 @@ export const DualTerminalPane: React.FC = () => {
 
     let inputBuf = '';
     const currentWs = workspacesRef.current[workspaceId];
-    const workingDir = currentWs?.worktreePath || 'D:\\1111-Works\\Dewwie';
+    const workingDir = currentWs?.worktreePath || '~';
 
     // Forward raw keyboard data to real PTY stdin via direct in-memory IPC
     term.onData((data) => {
@@ -321,10 +323,11 @@ export const DualTerminalPane: React.FC = () => {
       <div
         onClick={() => leftTermRef.current?.focus()}
         style={{
-          width: isSplitView && secondaryWs ? `${splitRatio}%` : '100%',
+          flex: isSplitView && secondaryWs ? `${splitRatio} 1 0%` : '1 1 0%',
+          minWidth: 160,
           backgroundColor: 'var(--app-bg)',
         }}
-        className="h-full relative overflow-hidden cursor-text shrink-0"
+        className="h-full relative overflow-hidden cursor-text"
       >
         <div ref={leftContainerRef} className="w-full h-full" />
       </div>
@@ -354,10 +357,11 @@ export const DualTerminalPane: React.FC = () => {
         <div
           onClick={() => rightTermRef.current?.focus()}
           style={{
-            width: `${100 - splitRatio}%`,
+            flex: `${100 - splitRatio} 1 0%`,
+            minWidth: 160,
             backgroundColor: 'var(--app-bg)',
           }}
-          className="h-full relative overflow-hidden cursor-text shrink-0"
+          className="h-full relative overflow-hidden cursor-text"
         >
           <div ref={rightContainerRef} className="w-full h-full" />
         </div>

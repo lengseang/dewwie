@@ -523,28 +523,29 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
                     key={msg.id || idx}
                     onClick={() => msg.fromSessionId && handleFocusSession(msg.fromSessionId)}
                     title="Click to redirect left terminal to this session"
-                    className="p-2.5 rounded-lg border border-zinc-800/80 bg-zinc-950/60 hover:bg-zinc-900/50 hover:border-zinc-700 transition-colors cursor-pointer"
+                    style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)' }}
+                    className="p-2.5 rounded-lg border hover:opacity-95 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center justify-between text-[10px] mb-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-semibold text-zinc-200">
+                        <span className="font-semibold" style={{ color: 'var(--app-text)' }}>
                           @{msg.fromSessionName || senderWs?.name || 'agent'}
                         </span>
                         {msg.target && msg.target !== '@all' && (
-                          <span className="text-zinc-500 font-mono text-[9px] flex items-center gap-1">
+                          <span className="font-mono text-[9px] flex items-center gap-1" style={{ color: 'var(--app-text-muted)' }}>
                             <span>➔</span>
-                            <span className="text-zinc-300 font-semibold">{msg.target}</span>
+                            <span className="font-semibold" style={{ color: 'var(--app-text)' }}>{msg.target}</span>
                           </span>
                         )}
                         <span className={`px-1.5 py-0.5 rounded border text-[8.5px] font-semibold tracking-wider ${tagColor}`}>
                           {tag}
                         </span>
                       </div>
-                      <span className="text-[9px] text-zinc-500 font-mono">
+                      <span className="text-[9px] font-mono" style={{ color: 'var(--app-text-muted)' }}>
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
                     </div>
-                    <div className="text-[11px] text-zinc-300 break-words leading-relaxed font-mono">
+                    <div className="text-[11px] break-words leading-relaxed font-mono" style={{ color: 'var(--app-text)' }}>
                       {msg.content}
                     </div>
                   </div>
@@ -561,7 +562,11 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
         className="border-t flex flex-col shrink-0 text-[10px] font-mono"
       >
         {/* CLI Command / Chat Input Bar */}
-        <form onSubmit={handleCommandSubmit} className="flex items-center gap-1.5 px-2 py-1.5 border-b border-zinc-800/80 bg-zinc-950/90">
+        <form
+          onSubmit={handleCommandSubmit}
+          style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)' }}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 border-b"
+        >
           <div className="flex items-center gap-1 text-[10px] text-amber-400 font-bold shrink-0">
             <span>#{currentRoom.name.toLowerCase().replace(/\s+/g, '-')}&gt;</span>
           </div>
@@ -570,11 +575,13 @@ export const AgentRoomPane: React.FC<AgentRoomPaneProps> = ({ onOpenDelegateModa
             placeholder="Type /assign @name, /remove @name, /create <room>, or broadcast..."
             value={commandInput}
             onChange={(e) => setCommandInput(e.target.value)}
-            className="flex-1 bg-transparent text-[11px] font-mono text-zinc-100 placeholder-zinc-600 focus:outline-none"
+            style={{ color: 'var(--app-text)' }}
+            className="flex-1 bg-transparent text-[11px] font-mono placeholder-zinc-500 focus:outline-none"
           />
           <button
             type="submit"
-            className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-[10px] font-semibold flex items-center gap-1 transition-colors shrink-0"
+            style={{ backgroundColor: 'var(--app-surface)', borderColor: 'var(--app-border)', color: 'var(--app-text)' }}
+            className="px-2.5 py-1 rounded border text-[10px] font-semibold flex items-center gap-1 transition-colors shrink-0 hover:opacity-80"
           >
             <Send className="w-2.5 h-2.5" />
             <span>Send</span>

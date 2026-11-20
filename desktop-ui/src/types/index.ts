@@ -206,6 +206,10 @@ export interface WorkspacePersistedState {
   rightPanelView?: 'room' | 'files' | 'changes';
   leadSessionId?: string | null;
   theme?: string;
+  // Settings > Session Persistence (enforced by the main process)
+  restoreSessionsOnStartup?: boolean;
+  restoreScrollback?: boolean;
+  persistActiveMesh?: boolean;
   windowWidth?: number;
   windowHeight?: number;
   isMaximized?: boolean;

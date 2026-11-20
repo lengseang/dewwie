@@ -10,6 +10,8 @@ Verifies:
 import sys
 import json
 import time
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -31,8 +33,10 @@ class TestDelegationLoop(unittest.TestCase):
 
     def test_02_task_delegate_broadcast(self):
         """Verify room_messages.json receives task_delegate message properly formatted."""
-        room_path = Path.home() / ".swarmherd" / "room_messages.json"
-        room_path.parent.mkdir(parents=True, exist_ok=True)
+        # Isolated sandbox: never write into the user's live ~/.swarmherd room.
+        sandbox = Path(tempfile.mkdtemp(prefix="dewwie_delegation_test_"))
+        self.addCleanup(shutil.rmtree, sandbox, ignore_errors=True)
+        room_path = sandbox / "room_messages.json"
 
         task_desc = "Implement high-speed ratatui viewport"
         target_branch = "feat/ratatui-viewport"

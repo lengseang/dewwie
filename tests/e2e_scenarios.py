@@ -971,7 +971,10 @@ class SwarmHerdE2EScenarios:
         all_passed = (failed == 0)
 
         # Write results to JSON
-        report_path = os.path.join(os.path.dirname(__file__), "e2e_report.json")
+        # Gitignored output dir: writing the tracked tests/e2e_report.json dirtied the repo on every run.
+        out_dir = os.path.join(os.path.dirname(__file__), ".out")
+        os.makedirs(out_dir, exist_ok=True)
+        report_path = os.path.join(out_dir, "e2e_report.json")
         try:
             with open(report_path, "w", encoding="utf-8") as f:
                 json.dump({

@@ -1,7 +1,28 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { WorkspaceState } from '../types';
 import { useWorkspaceStore } from '../store/workspaceStore';
-import { isLightTheme } from '../theme/themes';
+import { THEMES_CONFIG } from '../theme/themes';
+
+// Theme-derived deck palette. Mutated in place on theme change so module-level tables (LIFECYCLE, AGENT_COLORS)
+// and the render loop always read current colors. Only 5 roles: neutrals, one accent, ok / warn / err.
+const P = { bg: '', surface: '', elevated: '', border: '', text: '', muted: '', accent: '', ok: '', warn: '', err: '' };
+const applyDeckPalette = (themeId: string) => {
+  const t = THEMES_CONFIG[themeId] || THEMES_CONFIG.zinc;
+  const solid = (c: string, fallback: string) => (c.startsWith('rgba') ? fallback : c);
+  Object.assign(P, {
+    bg: solid(t.bg, t.terminal.background), surface: solid(t.surface, t.terminal.black), elevated: solid(t.surfaceElevated, t.terminal.black),
+    border: solid(t.border, t.terminal.brightBlack), text: t.text, muted: t.textMuted, accent: t.accent,
+    ok: t.terminal.green, warn: t.terminal.yellow, err: t.terminal.red,
+  });
+};
+applyDeckPalette('zinc');
+// Hex -> rgba with alpha (palette values are hex; rgba inputs keep their channels).
+const alpha = (c: string, a: number) => {
+  const m = c.match(/^#([0-9a-f]{6})$/i);
+  if (!m) return c.replace(/rgba?\(([^,]+),([^,]+),([^,)]+)(?:,[^)]+)?\)/, `rgba($1,$2,$3, ${a})`);
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+};
 
 export type LifecycleState =
   | 'CODING'
@@ -19,16 +40,16 @@ export const LIFECYCLE: Record<
   LifecycleState,
   { badge: string; color: string; label: string; zone: 'desk' | 'holo' | 'pod' }
 > = {
-  CODING: { badge: 'EDIT', color: '#34D399', label: 'Coding', zone: 'desk' },
-  PLANNING: { badge: 'PLAN', color: '#A78BFA', label: 'Planning', zone: 'holo' },
-  TESTING: { badge: 'TEST', color: '#2DD4BF', label: 'Testing', zone: 'desk' },
-  NEEDS_REVIEW: { badge: 'REVIEW!', color: '#D4AF37', label: 'Needs Review', zone: 'holo' },
-  REPORTING: { badge: 'REPORT', color: '#38BDF8', label: 'Reporting', zone: 'desk' },
-  NEEDS_INPUT: { badge: 'INPUT!', color: '#FB7185', label: 'Needs Input', zone: 'desk' },
-  OUT_OF_TOKENS: { badge: '0 TOKENS', color: '#EF4444', label: 'Out of Tokens', zone: 'desk' },
-  EXHAUSTED: { badge: '429 RATE', color: '#F97316', label: '429 Rate Limit', zone: 'pod' },
-  COMPACTING: { badge: 'COMPACT', color: '#94A3B8', label: 'Compacting', zone: 'desk' },
-  IDLE: { badge: 'IDLE', color: '#64748B', label: 'Idle', zone: 'pod' },
+  CODING: { badge: 'EDIT', get color() { return P.ok; }, label: 'Coding', zone: 'desk' },
+  PLANNING: { badge: 'PLAN', get color() { return P.accent; }, label: 'Planning', zone: 'holo' },
+  TESTING: { badge: 'TEST', get color() { return P.ok; }, label: 'Testing', zone: 'desk' },
+  NEEDS_REVIEW: { badge: 'REVIEW!', get color() { return P.accent; }, label: 'Needs Review', zone: 'holo' },
+  REPORTING: { badge: 'REPORT', get color() { return P.muted; }, label: 'Reporting', zone: 'desk' },
+  NEEDS_INPUT: { badge: 'INPUT!', get color() { return P.err; }, label: 'Needs Input', zone: 'desk' },
+  OUT_OF_TOKENS: { badge: '0 TOKENS', get color() { return P.err; }, label: 'Out of Tokens', zone: 'desk' },
+  EXHAUSTED: { badge: '429 RATE', get color() { return P.warn; }, label: '429 Rate Limit', zone: 'pod' },
+  COMPACTING: { badge: 'COMPACT', get color() { return P.muted; }, label: 'Compacting', zone: 'desk' },
+  IDLE: { badge: 'IDLE', get color() { return P.muted; }, label: 'Idle', zone: 'pod' },
 };
 
 export interface OrbitalAgent {
@@ -67,14 +88,14 @@ interface OrbitalCanvasDeckProps {
 }
 
 const AGENT_COLORS: Record<string, { accent: string; visor: string }> = {
-  'claude-code': { accent: '#D4AF37', visor: '#FDE047' },
-  claude: { accent: '#D4AF37', visor: '#FDE047' },
-  antigravity: { accent: '#38BDF8', visor: '#38BDF8' },
-  agy: { accent: '#38BDF8', visor: '#38BDF8' },
-  gemini: { accent: '#34D399', visor: '#34D399' },
-  codex: { accent: '#A78BFA', visor: '#C4B5FD' },
-  hermes: { accent: '#FB7185', visor: '#FB7185' },
-  terminal: { accent: '#94A3B8', visor: '#CBD5E1' },
+  'claude-code': { get accent() { return P.accent; }, get visor() { return P.accent; } },
+  claude: { get accent() { return P.accent; }, get visor() { return P.accent; } },
+  antigravity: { get accent() { return P.muted; }, get visor() { return P.muted; } },
+  agy: { get accent() { return P.muted; }, get visor() { return P.muted; } },
+  gemini: { get accent() { return P.ok; }, get visor() { return P.ok; } },
+  codex: { get accent() { return P.accent; }, get visor() { return P.text; } },
+  hermes: { get accent() { return P.err; }, get visor() { return P.err; } },
+  terminal: { get accent() { return P.muted; }, get visor() { return P.text; } },
 };
 
 export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
@@ -89,7 +110,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
   handoffTriggerKey,
 }) => {
   const { theme } = useWorkspaceStore();
-  const isLight = isLightTheme(theme);
+  applyDeckPalette(theme);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -240,7 +261,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
     });
 
     agentsRef.current = updated;
-  }, [workspaces, leadSessionId]);
+  }, [workspaces, leadSessionId, theme]); // theme: agent colours are copied from the palette at sync time
 
   useEffect(() => {
     syncAgentsFromWorkspaces();
@@ -351,27 +372,25 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
     for (let y = geo.wallH; y < H; y += tile) {
       for (let x = 0; x < W; x += tile) {
         const alt = ((x / tile) + (y / tile)) % 2 === 0;
-        bgCtx.fillStyle = isLight
-          ? (alt ? '#f8fafc' : '#f1f5f9')
-          : (alt ? '#121521' : '#151927');
+        bgCtx.fillStyle = alt ? P.bg : P.surface;
         bgCtx.fillRect(x, y, tile, tile);
-        bgCtx.fillStyle = isLight ? 'rgba(15, 23, 42, 0.05)' : 'rgba(148, 163, 184, 0.12)';
+        bgCtx.fillStyle = alpha(P.muted, 0.12);
         bgCtx.fillRect(x + 1, y + 1, 1, 1);
       }
     }
 
     // Power conduits
     const cx = Math.round(W / 2);
-    bgCtx.fillStyle = isLight ? 'rgba(2, 132, 199, 0.25)' : 'rgba(56, 189, 248, 0.22)';
+    bgCtx.fillStyle = alpha(P.border, 0.9);
     bgCtx.fillRect(cx - 28, geo.wallH + 2, 1, geo.podY - geo.wallH - 4);
     bgCtx.fillRect(cx + 28, geo.wallH + 2, 1, geo.podY - geo.wallH - 4);
-    bgCtx.fillStyle = isLight ? 'rgba(217, 119, 6, 0.3)' : 'rgba(212, 175, 55, 0.3)';
+    bgCtx.fillStyle = alpha(P.accent, 0.3);
     bgCtx.fillRect(6, geo.podY - 4, W - 12, 1);
 
     // 2. North bulkhead wall
-    bgCtx.fillStyle = isLight ? '#e2e8f0' : '#0B0D15';
+    bgCtx.fillStyle = P.surface;
     bgCtx.fillRect(0, 0, W, geo.wallH);
-    bgCtx.fillStyle = isLight ? '#0284c7' : '#D4AF37';
+    bgCtx.fillStyle = P.accent;
     bgCtx.fillRect(0, geo.wallH - 2, W, 2);
 
     // Panoramic Space Viewport spanning across the bulkhead
@@ -379,43 +398,43 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
     const winW = W - 12;
     const panelH = Math.max(14, geo.wallH - 6);
 
-    bgCtx.fillStyle = '#05070E';
+    bgCtx.fillStyle = P.bg;
     bgCtx.fillRect(winX, 2, winW, panelH);
-    bgCtx.strokeStyle = '#2B2F42';
+    bgCtx.strokeStyle = P.border;
     bgCtx.strokeRect(winX + 0.5, 2.5, winW - 1, panelH - 1);
-    bgCtx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+    bgCtx.fillStyle = alpha(P.muted, 0.08);
     bgCtx.fillRect(winX + 4, 4, Math.round(winW * 0.55), Math.round(panelH * 0.45));
 
     // Exoplanet in space
     const planetX = winX + Math.max(12, winW - 24);
     const planetY = 4;
-    bgCtx.fillStyle = '#38BDF8';
+    bgCtx.fillStyle = P.muted;
     bgCtx.fillRect(planetX, planetY, 7, 7);
-    bgCtx.fillStyle = '#0284C7';
+    bgCtx.fillStyle = P.border;
     bgCtx.fillRect(planetX + 1, planetY + 1, 4, 4);
 
     // Subtle Structural Mullions
-    bgCtx.fillStyle = '#1E2233';
+    bgCtx.fillStyle = P.border;
     bgCtx.fillRect(winX + Math.round(winW * 0.33), 2, 1, panelH);
     bgCtx.fillRect(winX + Math.round(winW * 0.67), 2, 1, panelH);
 
     // 3. Command Table
     const hc = geo.holoCenter;
     bgCtx.save();
-    bgCtx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    bgCtx.fillStyle = alpha(P.bg, 0.45);
     bgCtx.beginPath();
     bgCtx.ellipse(hc.x, hc.y + 3, 24, 10, 0, 0, Math.PI * 2);
     bgCtx.fill();
 
-    bgCtx.fillStyle = '#1C1E2A';
+    bgCtx.fillStyle = P.elevated;
     bgCtx.beginPath();
     bgCtx.ellipse(hc.x, hc.y, 22, 9, 0, 0, Math.PI * 2);
     bgCtx.fill();
-    bgCtx.strokeStyle = '#D4AF37';
+    bgCtx.strokeStyle = P.accent;
     bgCtx.lineWidth = 1;
     bgCtx.stroke();
 
-    bgCtx.fillStyle = 'rgba(56, 189, 248, 0.22)';
+    bgCtx.fillStyle = alpha(P.muted, 0.22);
     bgCtx.beginPath();
     bgCtx.ellipse(hc.x, hc.y, 14, 5.5, 0, 0, Math.PI * 2);
     bgCtx.fill();
@@ -428,40 +447,40 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
       const dx = slot.x - 22;
       const dy = slot.y - 13;
 
-      bgCtx.fillStyle = 'rgba(0,0,0,0.4)';
+      bgCtx.fillStyle = alpha(P.bg, 0.4);
       bgCtx.fillRect(dx + 2, dy + 11, 40, 10);
-      bgCtx.fillStyle = '#262938';
+      bgCtx.fillStyle = P.elevated;
       bgCtx.fillRect(dx, dy + 9, 44, 9);
-      bgCtx.fillStyle = '#D4AF37';
+      bgCtx.fillStyle = P.accent;
       bgCtx.fillRect(dx, dy + 9, 44, 1);
-      bgCtx.fillStyle = '#141724';
+      bgCtx.fillStyle = P.surface;
       bgCtx.fillRect(dx + 2, dy + 18, 2, 5);
       bgCtx.fillRect(dx + 40, dy + 18, 2, 5);
 
-      bgCtx.fillStyle = '#090B12';
+      bgCtx.fillStyle = P.bg;
       bgCtx.fillRect(dx + 5, dy, 15, 9);
-      bgCtx.fillStyle = '#101524';
+      bgCtx.fillStyle = P.surface;
       bgCtx.fillRect(dx + 6, dy + 1, 13, 7);
-      bgCtx.fillStyle = '#090B12';
+      bgCtx.fillStyle = P.bg;
       bgCtx.fillRect(dx + 24, dy, 15, 9);
-      bgCtx.fillStyle = '#101524';
+      bgCtx.fillStyle = P.surface;
       bgCtx.fillRect(dx + 25, dy + 1, 13, 7);
 
-      bgCtx.fillStyle = '#0F172A';
+      bgCtx.fillStyle = P.surface;
       bgCtx.fillRect(dx + 15, dy + 12, 14, 2);
-      bgCtx.fillStyle = '#38BDF8';
+      bgCtx.fillStyle = P.muted;
       bgCtx.fillRect(dx + 2, dy + 6, 2, 3);
     }
 
     // 5. Recharge Pods
     geo.pods.forEach((pod) => {
-      bgCtx.fillStyle = '#161926';
+      bgCtx.fillStyle = P.surface;
       bgCtx.fillRect(pod.x, pod.y, pod.w, pod.h);
-      bgCtx.strokeStyle = '#2B2F42';
+      bgCtx.strokeStyle = P.border;
       bgCtx.strokeRect(pod.x + 0.5, pod.y + 0.5, pod.w - 1, pod.h - 1);
-      bgCtx.fillStyle = '#38BDF8';
+      bgCtx.fillStyle = P.muted;
       bgCtx.fillRect(pod.x + 2, pod.y + 1, pod.w - 4, 1);
-      bgCtx.fillStyle = '#0E1019';
+      bgCtx.fillStyle = P.bg;
       bgCtx.fillRect(pod.x + 3, pod.y + 4, pod.w - 6, pod.h - 8);
     });
   };
@@ -508,7 +527,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
             const deskPairs = Math.max(1, Math.min(3, Math.ceil(occupants.length / 2)));
             const visibleDesks = deskPairs * 2;
 
-            const cacheKey = `${LW}x${LH}|${visibleDesks}|${isLight ? 'light' : 'dark'}`;
+            const cacheKey = `${LW}x${LH}|${visibleDesks}|${theme}`;
             if (cacheKey !== lastBgKeyRef.current) {
               lastBgKeyRef.current = cacheKey;
               bakeStaticDeck(LW, LH, visibleDesks);
@@ -527,21 +546,21 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
               const sx = winX + 4 + ((i * 19) % Math.max(8, winW - 8));
               const sy = 4 + ((i * 7) % Math.max(6, panelH - 4));
               const bright = (tick + i * 7) % 28 < 20;
-              ctx.fillStyle = bright ? '#F8FAFC' : '#475569';
+              ctx.fillStyle = bright ? P.text : P.muted;
               ctx.fillRect(sx, sy, 1, 1);
             }
             const shuttleX = winX + 4 + ((tick * 0.3) % Math.max(12, winW - 12));
             const shuttleY = 5 + Math.round(Math.sin(tick * 0.06) * 1.5);
-            ctx.fillStyle = '#E2E8F0';
+            ctx.fillStyle = P.text;
             ctx.fillRect(shuttleX, shuttleY, 5, 2);
-            ctx.fillStyle = '#38BDF8';
+            ctx.fillStyle = P.muted;
             ctx.fillRect(shuttleX - 2, shuttleY, 2, 1);
 
             // Command table hologram wireframe
             const bob = Math.round(Math.sin(tick * 0.08) * 2);
-            ctx.strokeStyle = '#38BDF8';
+            ctx.strokeStyle = P.muted;
             ctx.strokeRect(geo.holoCenter.x - 5, geo.holoCenter.y - 14 + bob, 10, 7);
-            ctx.strokeStyle = '#D4AF37';
+            ctx.strokeStyle = P.accent;
             ctx.strokeRect(geo.holoCenter.x - 3, geo.holoCenter.y - 12 + bob, 6, 3);
 
             // Monitors & Battery bars
@@ -554,11 +573,11 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
               const meta = LIFECYCLE[ag.state] || LIFECYCLE.CODING;
 
               // Battery bar
-              ctx.fillStyle = '#090B12';
+              ctx.fillStyle = P.bg;
               ctx.fillRect(dx + 24, dy - 3, 15, 2);
               if (ag.tokenPct > 0) {
                 const bw = Math.max(1, Math.round((ag.tokenPct / 100) * 15));
-                ctx.fillStyle = ag.tokenPct < 35 ? '#F97316' : '#34D399';
+                ctx.fillStyle = ag.tokenPct < 35 ? P.warn : P.ok;
                 ctx.fillRect(dx + 24, dy - 3, bw, 2);
               }
 
@@ -568,7 +587,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
                 const ly = dy + 2 + ((l + shift) % 3) * 2;
                 ctx.fillStyle = meta.color;
                 ctx.fillRect(dx + 7, ly, 6 + ((l * 3) % 5), 1);
-                ctx.fillStyle = l === 1 ? '#F8FAFC' : meta.color;
+                ctx.fillStyle = l === 1 ? P.text : meta.color;
                 ctx.fillRect(dx + 26, ly, 6 + ((l * 4) % 5), 1);
               }
             }
@@ -586,7 +605,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
               ctx.quadraticCurveTo((b.x1 + b.x2) / 2, Math.min(b.y1, b.y2) - 16, cx, cy);
               ctx.stroke();
               ctx.restore();
-              ctx.fillStyle = '#F8FAFC';
+              ctx.fillStyle = P.text;
               ctx.fillRect(cx - 1.5, cy - 1.5, 3, 3);
             });
 
@@ -628,7 +647,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
               // Selection ring
               if (isFocused || isHovered) {
                 ctx.save();
-                ctx.strokeStyle = isFocused ? '#D4AF37' : '#38BDF8';
+                ctx.strokeStyle = isFocused ? P.accent : P.muted;
                 ctx.lineWidth = 1.2;
                 ctx.beginPath();
                 ctx.ellipse(x, y + 4, 10, 4.2, 0, 0, Math.PI * 2);
@@ -637,44 +656,44 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
               }
 
               // Shadow
-              ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+              ctx.fillStyle = alpha(P.bg, 0.5);
               ctx.beginPath();
               ctx.ellipse(x, y + 4, 6, 2.5, 0, 0, Math.PI * 2);
               ctx.fill();
 
               const by = y - bob;
               const stride = moving ? Math.round(Math.sin(tick * 0.45) * 2) : 0;
-              ctx.fillStyle = '#0B0C12';
+              ctx.fillStyle = P.bg;
               ctx.fillRect(x - 4, by + 1 + stride, 3, 3);
               ctx.fillRect(x + 1, by + 1 - stride, 3, 3);
 
               // Torso
-              ctx.fillStyle = '#334155';
+              ctx.fillStyle = P.border;
               ctx.fillRect(x - 4, by - 5, 8, 6);
-              ctx.fillStyle = '#94A3B8';
+              ctx.fillStyle = P.muted;
               ctx.fillRect(x - 3, by - 5, 6, 5);
               ctx.fillStyle = ag.accent;
               ctx.fillRect(x - 1, by - 4, 2, 3);
 
               // Arms
               const armShift = typing ? (Math.floor(tick / 4) % 2 === 0 ? -2 : 1) : 0;
-              ctx.fillStyle = '#CBD5E1';
+              ctx.fillStyle = P.text;
               ctx.fillRect(x - 6, by - 4 + armShift, 2, 4);
               ctx.fillRect(x + 4, by - 4 - armShift, 2, 4);
 
               // Head
-              ctx.fillStyle = '#475569';
+              ctx.fillStyle = P.muted;
               ctx.fillRect(x - 6, by - 13, 12, 8);
-              ctx.fillStyle = '#CBD5E1';
+              ctx.fillStyle = P.text;
               ctx.fillRect(x - 5, by - 13, 10, 7);
-              ctx.fillStyle = '#F8FAFC';
+              ctx.fillStyle = P.text;
               ctx.fillRect(x - 5, by - 13, 10, 2);
 
               // Crown or Crest
               if (ag.crown) {
-                ctx.fillStyle = '#D4AF37';
+                ctx.fillStyle = P.accent;
                 ctx.fillRect(x - 4, by - 16, 8, 3);
-                ctx.fillStyle = '#FDE047';
+                ctx.fillStyle = P.accent;
                 ctx.fillRect(x - 4, by - 17, 2, 1);
                 ctx.fillRect(x - 1, by - 17, 2, 1);
                 ctx.fillRect(x + 2, by - 17, 2, 1);
@@ -684,7 +703,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
               }
 
               // Visor
-              ctx.fillStyle = '#0B0C12';
+              ctx.fillStyle = P.bg;
               ctx.fillRect(x - 4, by - 10, 8, 2);
               ctx.fillStyle = ag.visor;
               ctx.fillRect(x - 3, by - 10, 6, 2);
@@ -702,15 +721,15 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
                 const bx = x - bw / 2;
                 const byy = inPod ? y - 22 : y + 6;
 
-                ctx.fillStyle = 'rgba(11, 12, 18, 0.94)';
+                ctx.fillStyle = alpha(P.bg, 0.94);
                 ctx.beginPath();
                 ctx.roundRect(bx, byy, bw, bh, 2);
                 ctx.fill();
-                ctx.strokeStyle = isFocused ? '#D4AF37' : '#38BDF8';
+                ctx.strokeStyle = isFocused ? P.accent : P.muted;
                 ctx.lineWidth = 1;
                 ctx.stroke();
 
-                ctx.fillStyle = isFocused ? '#FDE047' : '#F8FAFC';
+                ctx.fillStyle = isFocused ? P.accent : P.text;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(labelText, bx + bw / 2, byy + bh / 2 + 0.5);
@@ -718,7 +737,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
               } else if (!inPod) {
                 // At desk / walking: draw subtle clean label
                 ctx.font = '600 6.5px monospace';
-                ctx.fillStyle = '#94A3B8';
+                ctx.fillStyle = P.muted;
                 ctx.textAlign = 'center';
                 ctx.fillText(ag.shortName.slice(0, 6), x, y + 9.5);
               }
@@ -733,15 +752,15 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
                 const bx = Math.max(4, Math.min(LW - bw - 4, x - bw / 2));
                 const byy = Math.max(geo.wallH + 2, y - 24);
 
-                ctx.fillStyle = 'rgba(11, 12, 18, 0.94)';
+                ctx.fillStyle = alpha(P.bg, 0.94);
                 ctx.beginPath();
                 ctx.roundRect(bx, byy, bw, bh, 3);
                 ctx.fill();
-                ctx.strokeStyle = ag.speechColor || '#D4AF37';
+                ctx.strokeStyle = ag.speechColor || P.accent;
                 ctx.lineWidth = 1;
                 ctx.stroke();
 
-                ctx.fillStyle = '#F8FAFC';
+                ctx.fillStyle = P.text;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(ag.speech, bx + bw / 2, byy + bh / 2 + 0.5);
@@ -783,7 +802,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
       cancelAnimationFrame(animId);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [activeRoomId, focusedSessionId, ecoModeFps]);
+  }, [activeRoomId, focusedSessionId, ecoModeFps, theme]); // theme: re-bake deck with the new palette
 
   // ResizeObserver for canvas dimensions
   useEffect(() => {
@@ -863,7 +882,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
           ag.x = Math.max(12, Math.min(dimsRef.current.LW - 12, lx));
           ag.y = Math.max(geoRef.current.wallH + 14, Math.min(dimsRef.current.LH - 10, ly));
           ag.speech = 'MOVE';
-          ag.speechColor = '#D4AF37';
+          ag.speechColor = P.accent;
           ag.speechTimer = 25;
         }
         setTooltipData({ visible: false, agent: null, x: 0, y: 0 });
@@ -929,13 +948,13 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
 
     onFocusSession(hit.id);
     hit.speech = 'OVERDRIVE!';
-    hit.speechColor = '#FDE047';
+    hit.speechColor = P.accent;
     hit.speechTimer = 90;
     popupsRef.current.push({
       x: hit.x,
       y: hit.y - 20,
       text: 'OVERDRIVE!',
-      color: '#FDE047',
+      color: P.accent,
       life: 1,
     });
   };
@@ -976,7 +995,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
         x: receiver.x,
         y: receiver.y - 20,
         text: 'SYNCED ✓',
-        color: '#34D399',
+        color: P.ok,
         life: 1,
       });
       sender.walkingHandoff = false;
@@ -1013,7 +1032,7 @@ export const OrbitalCanvasDeck: React.FC<OrbitalCanvasDeckProps> = ({
               {tooltipData.agent.shortName}
             </span>
             <span
-              style={{ color: LIFECYCLE[tooltipData.agent.state]?.color || '#38BDF8' }}
+              style={{ color: LIFECYCLE[tooltipData.agent.state]?.color || P.muted }}
               className="text-[9px] font-bold"
             >
               {LIFECYCLE[tooltipData.agent.state]?.badge} · {tooltipData.agent.tokenPct}%

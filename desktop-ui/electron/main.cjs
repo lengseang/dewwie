@@ -5,6 +5,11 @@ const os = require('os');
 const { spawn } = require('child_process');
 const http = require('http');
 const pty = require('node-pty');
+const { createOscParser, createRateLimiter } = require('./osc.cjs');
+const { readJsonSafe, writeJsonAtomic } = require('./jsonstore.cjs');
+const { resolveInsideRoots } = require('./pathguard.cjs');
+const { cutAtSafeBoundary, trimScrollback } = require('./scrollback.cjs');
+const { allocatePort, registryPorts } = require('./ports.cjs');
 
 // Configuration
 const SWARMHERD_DIR = path.join(os.homedir(), '.swarmherd');
@@ -61,14 +66,14 @@ app.on('second-instance', () => {
 // In-Memory Master Cache to prevent async race condition wipes
 let workspacesCache = null;
 
-// Active PTY sessions map: workspaceId -> { ptyProcess, scrollbackFile, subscribers: Set }
+// Active PTY sessions map: workspaceId -> { ptyProcess, scrollbackPath, cwd, isAttached, getBuffer, appendDisplay }
 const activePtys = new Map();
 
 // Helper: Resolve dynamic fallback root for portable execution on any machine
+// First registered project that exists on disk, else the folder the app runs from (portable).
 function defaultFallbackDir() {
-  if (fs.existsSync('D:\\1111-Works\\Dewwie')) return 'D:\\1111-Works\\Dewwie';
-  if (fs.existsSync('D:\\1111-Works\\exbytelab')) return 'D:\\1111-Works\\exbytelab';
-  return path.resolve(__dirname, '../..');
+  const first = getProjects().find((p) => p.rootPath && fs.existsSync(p.rootPath));
+  return first ? first.rootPath : path.resolve(__dirname, '../..');
 }
 
 // -------------------------------------------------------------
@@ -76,131 +81,16 @@ function defaultFallbackDir() {
 // -------------------------------------------------------------
 function execGit(args, cwd) {
   return new Promise((resolve) => {
-    const proc = spawn('git', args, { cwd: cwd || defaultFallbackDir(), shell: true });
+    // No shell: args go to git verbatim. With shell:true, cmd.exe re-parsed them, so `&`/`|` in a
+    // branch name ran extra commands and multi-word commit messages were split (merge always failed).
+    const proc = spawn('git', args, { cwd: cwd || defaultFallbackDir(), windowsHide: true });
     let stdout = '';
     let stderr = '';
     proc.stdout.on('data', d => stdout += d);
     proc.stderr.on('data', d => stderr += d);
+    proc.on('error', err => resolve({ code: -1, stdout, stderr: stderr + err.message }));
     proc.on('close', code => resolve({ code, stdout, stderr }));
   });
-}
-
-// -------------------------------------------------------------
-// Auto-Sync Dewwie Room Protocol & Skills by Default
-// -------------------------------------------------------------
-function ensureMeshProtocol(projectDir) {
-  if (!projectDir || !fs.existsSync(projectDir)) return;
-  try {
-    const dewwieDir = path.join(projectDir, '.dewwie');
-    const skillsDir = path.join(dewwieDir, 'skills', 'dewwie-mesh');
-    const geminiRulesDir = path.join(projectDir, '.gemini', 'rules');
-
-    fs.mkdirSync(dewwieDir, { recursive: true });
-    fs.mkdirSync(skillsDir, { recursive: true });
-    fs.mkdirSync(geminiRulesDir, { recursive: true });
-
-    const protocolDoc = `# Dewwie Multi-Agent Room Protocol
-
-This repository is running inside the **Dewwie Multi-Agent IDE & Terminal Workspace**.
-You collaborate with other AI agents (Claude Code, Google Antigravity, Terminal Shells) and the human developer in real-time through the Dewwie Room Mesh.
-
-## Core Commands (Available in your Shell & CLI)
-1. **Broadcast to Room**:
-   dewwie room send "Your message" --target @all
-   dewwie room send "Review request for PR" --target @lead --type review
-   dewwie room send "Please run e2e verification" --target @antigravity --type delegate
-
-2. **Report Live Progress (OSC 7501)**:
-   Report your state so the Dewwie IDE Process Tray animates your session status:
-   - While working: \`dewwie status working "Refactoring authentication handler"\`
-   - If blocked: \`dewwie status blocked "Needs confirmation on schema changes"\`
-   - When finished: \`dewwie status done "All tests passed and code committed"\`
-
-3. **Inspect Peer Agents**:
-   - \`dewwie room list\`   (views the last 10 messages from peer agents)
-   - \`dewwie room agents\` (lists active agents in the room and who is LEAD)
-
-4. **Multi-Agent Collaboration Rules**:
-   - Always broadcast when you finish a task, introduce a breaking change, or need a peer review.
-   - Tag peers by name: \`@lead\`, \`@antigravity\`, \`@claude\`, or \`@all\`.
-`;
-
-    const skillDoc = `---
-name: dewwie-mesh
-description: Broadcast and collaborate with peer AI agents across Dewwie IDE workspaces and Git worktrees.
----
-
-# Dewwie Mesh Skill
-
-Use this skill to communicate with other agents running in the Dewwie IDE room.
-
-## Instructions
-1. When you start a task, inform the room:
-   \`dewwie room send "Starting work on <task>" --target @all\`
-   \`dewwie status working "<task summary>"\`
-
-2. When you finish, hand off to peer agents or request lead review:
-   \`dewwie room send "Completed <task>. Diffs are ready for review." --target @lead --type review\`
-   \`dewwie status done "Completed <task>"\`
-
-3. When you encounter a block:
-   \`dewwie room send "Blocked on: <reason>" --target @lead --type signal\`
-   \`dewwie status blocked "<reason>"\`
-`;
-
-    const ps1Doc = `# Dewwie PowerShell Collaboration Profile
-function broadcast($msg, $target = "@all") {
-    dewwie.exe room send "$msg" --target $target
-}
-function ask-lead($msg) {
-    dewwie.exe room send "$msg" --target "@lead" --type "review"
-}
-function delegate-task($target, $msg) {
-    dewwie.exe room send "$msg" --target $target --type "delegate"
-}
-function status-report($state, $msg) {
-    dewwie.exe status "$state" "$msg"
-}
-function mesh-status {
-    dewwie.exe room agents
-}
-function mesh-listen {
-    dewwie.exe room list
-}
-`;
-
-    const roomProtocolPath = path.join(dewwieDir, 'ROOM_PROTOCOL.md');
-    if (!fs.existsSync(roomProtocolPath)) {
-      fs.writeFileSync(roomProtocolPath, protocolDoc, 'utf-8');
-    }
-
-    const claudeMdPath = path.join(projectDir, 'CLAUDE.md');
-    if (!fs.existsSync(claudeMdPath)) {
-      fs.writeFileSync(claudeMdPath, protocolDoc, 'utf-8');
-    } else {
-      const existing = fs.readFileSync(claudeMdPath, 'utf-8');
-      if (!existing.includes('Dewwie Multi-Agent Room Protocol')) {
-        fs.writeFileSync(claudeMdPath, existing + '\n\n' + protocolDoc, 'utf-8');
-      }
-    }
-
-    const geminiPath = path.join(geminiRulesDir, 'dewwie_mesh.md');
-    if (!fs.existsSync(geminiPath)) {
-      fs.writeFileSync(geminiPath, protocolDoc, 'utf-8');
-    }
-
-    const skillPath = path.join(skillsDir, 'SKILL.md');
-    if (!fs.existsSync(skillPath)) {
-      fs.writeFileSync(skillPath, skillDoc, 'utf-8');
-    }
-
-    const envPath = path.join(dewwieDir, 'dewwie_env.ps1');
-    if (!fs.existsSync(envPath)) {
-      fs.writeFileSync(envPath, ps1Doc, 'utf-8');
-    }
-  } catch (err) {
-    console.error('[Dewwie] Failed to ensure mesh protocol for ' + projectDir, err);
-  }
 }
 
 // -------------------------------------------------------------
@@ -210,36 +100,8 @@ function getProjects() {
   let list = [];
   if (fs.existsSync(PROJECTS_FILE)) {
     try {
-      list = JSON.parse(fs.readFileSync(PROJECTS_FILE, 'utf-8'));
+      list = readJsonSafe(PROJECTS_FILE, list);
     } catch (_) {}
-  }
-
-  // Ensure Dewwie project exists
-  const dewwieRoot = 'D:\\1111-Works\\Dewwie';
-  const hasDewwie = list.some(p => p.rootPath.toLowerCase() === dewwieRoot.toLowerCase());
-  if (!hasDewwie && fs.existsSync(dewwieRoot)) {
-    list.unshift({
-      id: 'proj-dewwie',
-      name: 'Dewwie',
-      rootPath: dewwieRoot,
-      isGitRepo: fs.existsSync(path.join(dewwieRoot, '.git')),
-      createdAt: new Date().toISOString()
-    });
-    saveProjects(list);
-  }
-
-  // Ensure default root project exists
-  const defaultRoot = 'D:\\1111-Works\\exbytelab';
-  const hasRoot = list.some(p => p.rootPath.toLowerCase() === defaultRoot.toLowerCase());
-  if (!hasRoot && fs.existsSync(defaultRoot)) {
-    list.push({
-      id: 'proj-exbytelab',
-      name: 'exbytelab',
-      rootPath: defaultRoot,
-      isGitRepo: fs.existsSync(path.join(defaultRoot, '.git')),
-      createdAt: new Date().toISOString()
-    });
-    saveProjects(list);
   }
 
   // Ensure portable fallback project exists for other users
@@ -257,18 +119,13 @@ function getProjects() {
     saveProjects(list);
   }
 
-  // Auto-sync mesh protocol documents and skills by default across all projects
-  for (const p of list) {
-    if (p.rootPath && fs.existsSync(p.rootPath)) {
-      ensureMeshProtocol(p.rootPath);
-    }
-  }
-
+  // Repos are never modified implicitly. Protocol files are written only by the explicit
+  // mesh:syncSkills action (user clicks Sync in the Agent Mesh panel).
   return list;
 }
 
 function saveProjects(list) {
-  fs.writeFileSync(PROJECTS_FILE, JSON.stringify(list, null, 2), 'utf-8');
+  writeJsonAtomic(PROJECTS_FILE, list);
 }
 
 function addProject({ path: folderPath, name }) {
@@ -279,7 +136,6 @@ function addProject({ path: folderPath, name }) {
   const list = getProjects();
   const existing = list.find(p => p.rootPath.toLowerCase() === cleanPath.toLowerCase());
   if (existing) {
-    ensureMeshProtocol(cleanPath);
     return existing;
   }
 
@@ -293,7 +149,6 @@ function addProject({ path: folderPath, name }) {
   };
   list.push(newProj);
   saveProjects(list);
-  ensureMeshProtocol(cleanPath);
   return newProj;
 }
 
@@ -309,7 +164,7 @@ function removeProject(id) {
 function getRooms() {
   if (fs.existsSync(ROOMS_FILE)) {
     try {
-      const data = JSON.parse(fs.readFileSync(ROOMS_FILE, 'utf-8'));
+      const data = readJsonSafe(ROOMS_FILE, null);
       if (Array.isArray(data) && data.length > 0) return data;
     } catch (_) {}
   }
@@ -318,14 +173,14 @@ function getRooms() {
     { id: 'room-2', name: 'Core Engine', createdAt: new Date().toISOString() }
   ];
   try {
-    fs.writeFileSync(ROOMS_FILE, JSON.stringify(defaultRooms, null, 2), 'utf-8');
+    writeJsonAtomic(ROOMS_FILE, defaultRooms);
   } catch (_) {}
   return defaultRooms;
 }
 
 function saveRooms(rooms) {
   try {
-    fs.writeFileSync(ROOMS_FILE, JSON.stringify(rooms, null, 2), 'utf-8');
+    writeJsonAtomic(ROOMS_FILE, rooms);
   } catch (err) {
     console.error('[Dewwie] Failed to save rooms:', err);
   }
@@ -353,10 +208,28 @@ function removeRoom(id) {
 // -------------------------------------------------------------
 // Sessions & Workspaces Management (Local vs Branch)
 // -------------------------------------------------------------
+// Trailing 500 ms debounce for high-frequency updates (agent status). Cache updates immediately.
+let saveWorkspacesTimer = null;
+function saveWorkspacesSoon(list) {
+  workspacesCache = list;
+  if (saveWorkspacesTimer) clearTimeout(saveWorkspacesTimer);
+  saveWorkspacesTimer = setTimeout(() => { saveWorkspacesTimer = null; saveWorkspaces(workspacesCache); }, 500);
+}
+
+// Settings > Session Persistence. Default on; the renderer sends them via workspace:saveState.
+let persistFlagsCache = null;
+function persistFlags() {
+  if (!persistFlagsCache) {
+    const s = getWorkspaceState();
+    persistFlagsCache = { restoreScrollback: s.restoreScrollback !== false, persistActiveMesh: s.persistActiveMesh !== false };
+  }
+  return persistFlagsCache;
+}
+
 function saveWorkspaces(list) {
   workspacesCache = list;
   try {
-    fs.writeFileSync(WORKSPACES_FILE, JSON.stringify(list, null, 2), 'utf-8');
+    writeJsonAtomic(WORKSPACES_FILE, list);
   } catch (err) {
     console.error('[Dewwie] Failed to save workspaces:', err);
   }
@@ -366,14 +239,24 @@ async function getWorkspaces(forceRefresh = false) {
   if (workspacesCache && !forceRefresh) {
     return workspacesCache;
   }
+  // Flush a pending debounced save first, so a reload from disk never resurrects older state
+  // (e.g. an agent status set <500 ms ago was reverted to idle by an fs.watch-triggered reload).
+  if (saveWorkspacesTimer && workspacesCache) {
+    clearTimeout(saveWorkspacesTimer);
+    saveWorkspacesTimer = null;
+    saveWorkspaces(workspacesCache);
+  }
 
   const projects = getProjects();
   let saved = [];
   if (fs.existsSync(WORKSPACES_FILE)) {
     try {
-      saved = JSON.parse(fs.readFileSync(WORKSPACES_FILE, 'utf-8'));
+      saved = readJsonSafe(WORKSPACES_FILE, saved);
     } catch (_) {}
   }
+  // "Save Mesh Rooms" off: room assignments are not restored across launches (first load only;
+  // runtime reloads keep them so the file watcher doesn't wipe live assignments).
+  if (!workspacesCache && !persistFlags().persistActiveMesh && Array.isArray(saved)) saved = saved.map(({ roomId, ...rest }) => rest);
 
   // Preserve in-memory created sessions so they are never lost
   if (workspacesCache && Array.isArray(workspacesCache)) {
@@ -385,7 +268,7 @@ async function getWorkspaces(forceRefresh = false) {
   }
 
   const allSessions = [];
-  let portCounter = 5174;
+  const usedPorts = registryPorts(saved);
 
   for (const proj of projects) {
     // 1. Ensure at least one primary Local session for this project
@@ -517,7 +400,7 @@ async function getWorkspaces(forceRefresh = false) {
                 timestamp: Date.now(),
               },
               metrics: existing?.metrics || { cpuPercent: 0.6, memoryMb: 75 },
-              ports: existing?.ports || [{ service: 'App Dev', port: portCounter++, status: 'active', url: `http://localhost:${portCounter - 1}` }],
+              ports: existing?.ports || await (async () => { const p = await allocatePort(usedPorts); return [{ service: 'App Dev', port: p, status: 'active', url: `http://localhost:${p}` }]; })(),
               diffSummary,
               createdAt: existing?.createdAt || new Date().toISOString(),
               lastActivity: 'Just now',
@@ -533,7 +416,14 @@ async function getWorkspaces(forceRefresh = false) {
 
     // 3. Include any additional saved local sessions for this project
     const otherSavedSessions = saved.filter(s => s.projectId === proj.id && s.id !== defaultLocalId && !s.id.startsWith('ws-branch-'));
+    const samePath = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
     for (const other of otherSavedSessions) {
+      // One identity per worktree: skip a saved branch record when the worktree scan already listed it
+      // (its name/role/room/ports were carried over above). Local sessions legitimately share the project
+      // folder (extra terminals), so they are never deduped by path.
+      const scannedTwin = other.sessionMode === 'branch' && allSessions.some((a) => a.sessionMode === 'branch' &&
+        (samePath(a.worktreePath, other.worktreePath) || (a.branch && a.branch === other.branch)));
+      if (scannedTwin) continue;
       if (!allSessions.some(a => a.id === other.id)) {
         allSessions.push(other);
       }
@@ -551,7 +441,7 @@ function getRoomMessages(roomId) {
   let list = [];
   if (fs.existsSync(ROOM_MESSAGES_FILE)) {
     try {
-      list = JSON.parse(fs.readFileSync(ROOM_MESSAGES_FILE, 'utf-8'));
+      list = readJsonSafe(ROOM_MESSAGES_FILE, list);
     } catch (_) {}
   }
   if (!roomId || roomId === 'all') return list;
@@ -562,79 +452,47 @@ function saveRoomMessage(message) {
   const list = getRoomMessages();
   list.push(message);
   if (list.length > 1000) list.splice(0, list.length - 1000);
-  fs.writeFileSync(ROOM_MESSAGES_FILE, JSON.stringify(list, null, 2), 'utf-8');
+  writeJsonAtomic(ROOM_MESSAGES_FILE, list);
 
   // Broadcast to Electron window
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('room:message', message);
   }
 
-  // Also broadcast to connected WebSocket clients as JSON frame
-  const frame = JSON.stringify({ type: 'room:message', data: message });
-  for (const session of activePtys.values()) {
-    for (const ws of session.subscribers) {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(frame);
-      }
-    }
-  }
+  // (Removed: leftover WebSocket fan-out from the pre-IPC port servers. Sessions have no `subscribers`
+  // and `WebSocket` is not defined here, so it threw on every room message while any terminal was open.)
 
   return message;
 }
 
-// Helper: Parse OSC escape sequences:
-// OSC 7501: \x1b]7501;state=<state>;msg=<msg>\x07
-// OSC 7502: \x1b]7502;to=<target>;from=<sender>;type=<type>;msg=<content>\x07
+// OSC 7501 (status) / 7502 (room message) from PTY output, via the tested pure parser in osc.cjs.
+// Output is untrusted (any `cat`-ed file can contain these bytes), so: sender = the emitting session,
+// role = that session's stored agentRole, 7502 rate-limited per session, split chunks reassembled.
+const oscParsers = new Map();   // workspaceId -> feed(chunk)
+const oscLimiters = new Map();  // workspaceId -> allow()
 function parseOsc(chunk, workspaceId) {
-  // 1. Status: OSC 7501
-  const osc7501Regex = /\x1b\]7501;([^\x07\x1b]+)(?:\x07|\x1b\\)/g;
-  let match7501;
-  while ((match7501 = osc7501Regex.exec(chunk)) !== null) {
-    const params = match7501[1];
-    let state = 'idle';
-    let msg = '';
-    for (const part of params.split(';')) {
-      const [k, v] = part.split('=');
-      if (k === 'state') state = v;
-      if (k === 'msg') msg = v || '';
-    }
-    broadcastAgentStatus(workspaceId, state, msg);
+  if (!oscParsers.has(workspaceId)) {
+    oscParsers.set(workspaceId, createOscParser());
+    oscLimiters.set(workspaceId, createRateLimiter(5, 10000));
   }
-
-  // 2. Inter-Agent Communication: OSC 7502
-  const osc7502Regex = /\x1b\]7502;([^\x07\x1b]+)(?:\x07|\x1b\\)/g;
-  let match7502;
-  while ((match7502 = osc7502Regex.exec(chunk)) !== null) {
-    const params = match7502[1];
-    let to = '@all';
-    let from = workspaceId;
-    let type = 'chat';
-    let msg = '';
-    for (const part of params.split(';')) {
-      const idx = part.indexOf('=');
-      if (idx > -1) {
-        const k = part.substring(0, idx);
-        const v = part.substring(idx + 1);
-        if (k === 'to') to = v || '@all';
-        if (k === 'from') from = v || workspaceId;
-        if (k === 'type') type = v || 'chat';
-        if (k === 'msg') msg = v || '';
-      }
+  for (const ev of oscParsers.get(workspaceId)(chunk)) {
+    if (ev.kind === 'status') {
+      broadcastAgentStatus(workspaceId, ev.state, ev.msg);
+      continue;
     }
-
-    const newMsg = {
+    if (!oscLimiters.get(workspaceId)()) continue;
+    const ws = (workspacesCache || []).find((w) => w.id === workspaceId);
+    saveRoomMessage({
       id: `msg-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
       roomId: 'general',
       fromSessionId: workspaceId,
-      fromSessionName: from,
-      fromRole: workspaceId.includes('main') || workspaceId.includes('lead') ? 'lead' : 'worker',
-      target: to,
-      type: type,
-      content: msg,
+      fromSessionName: ws?.name || workspaceId,
+      fromRole: ws?.agentRole === 'lead' ? 'lead' : 'worker',
+      target: ev.to,
+      type: ev.type,
+      content: ev.msg,
       timestamp: Date.now(),
-    };
-
-    saveRoomMessage(newMsg);
+    });
   }
 }
 
@@ -647,7 +505,7 @@ async function broadcastAgentStatus(workspaceId, state, message) {
       message: message || '',
       timestamp: Date.now()
     };
-    saveWorkspaces(list);
+    saveWorkspacesSoon(list); // debounced: this runs from the PTY data path
   }
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('agent:status', { workspaceId, state, message });
@@ -684,7 +542,9 @@ function getOrCreatePty(workspaceId, cwd) {
     cols: 120,
     rows: 32,
     cwd: workDir,
-    useConpty: false, // Rock-solid WinPTY on Windows
+    // ConPTY: WinPTY scrapes the console screen buffer and drops OSC sequences, so `dewwie status` (OSC 7501)
+    // and OSC 7502 never reached the app on Windows. Verified on Windows 11 22631: ConPTY passes both through.
+    useConpty: true,
     env: {
       ...process.env,
       PATH: `${agentBinPath};${process.env.PATH || ''}`,
@@ -698,7 +558,7 @@ function getOrCreatePty(workspaceId, cwd) {
 
   // Pre-load and cap historical scrollback into memory buffer (max 128KB, keeps app fast and lightweight)
   let inMemoryBuffer = Buffer.alloc(0);
-  if (fs.existsSync(scrollbackPath)) {
+  if (persistFlags().restoreScrollback && fs.existsSync(scrollbackPath)) {
     try {
       const stats = fs.statSync(scrollbackPath);
       if (stats.size > 131072) {
@@ -706,15 +566,16 @@ function getOrCreatePty(workspaceId, cwd) {
         const tempBuf = Buffer.alloc(65536);
         fs.readSync(fd, tempBuf, 0, 65536, stats.size - 65536);
         fs.closeSync(fd);
-        fs.writeFileSync(scrollbackPath, tempBuf);
-        inMemoryBuffer = tempBuf;
+        const safe = cutAtSafeBoundary(tempBuf, 0);
+        fs.writeFileSync(scrollbackPath, safe);
+        inMemoryBuffer = safe;
       } else {
         inMemoryBuffer = fs.readFileSync(scrollbackPath);
       }
     } catch (_) {}
   }
 
-  const scrollbackStream = fs.createWriteStream(scrollbackPath, { flags: 'a' });
+  let scrollbackStream = null; // opened lazily, only while "Save Scrollback" is on
 
   const sessionObj = {
     ptyProcess,
@@ -722,15 +583,22 @@ function getOrCreatePty(workspaceId, cwd) {
     cwd: workDir,
     isAttached: false,
     getBuffer: () => inMemoryBuffer,
+    // Display-only text (e.g. room banners): goes to the screen buffer, never to the shell's stdin.
+    appendDisplay: (text) => {
+      inMemoryBuffer = Buffer.concat([inMemoryBuffer, Buffer.from(text)]);
+    },
   };
 
   ptyProcess.onData((data) => {
     // 1. Write to append-only disk scrollback & in-memory rolling buffer
-    scrollbackStream.write(data);
+    if (persistFlags().restoreScrollback) {
+      if (!scrollbackStream) scrollbackStream = fs.createWriteStream(scrollbackPath, { flags: 'a' });
+      scrollbackStream.write(data);
+    }
     const dataBuf = Buffer.isBuffer(data) ? data : Buffer.from(data);
     inMemoryBuffer = Buffer.concat([inMemoryBuffer, dataBuf]);
     if (inMemoryBuffer.length > 131072) {
-      inMemoryBuffer = inMemoryBuffer.subarray(inMemoryBuffer.length - 65536);
+      inMemoryBuffer = trimScrollback(inMemoryBuffer, 65536);
     }
 
     // 2. Intercept OSC 7501
@@ -745,6 +613,8 @@ function getOrCreatePty(workspaceId, cwd) {
   ptyProcess.onExit(({ exitCode }) => {
     console.log(`[PTY] Shell for ${workspaceId} exited with code ${exitCode}`);
     activePtys.delete(workspaceId);
+    oscParsers.delete(workspaceId);
+    oscLimiters.delete(workspaceId);
   });
 
   activePtys.set(workspaceId, sessionObj);
@@ -765,29 +635,13 @@ ipcMain.handle('terminal:attach', async (_, { workspaceId }) => {
   const memBuf = session.getBuffer ? session.getBuffer() : null;
   if (memBuf && memBuf.length > 0) {
     return memBuf.toString('utf-8');
-  } else if (fs.existsSync(session.scrollbackPath)) {
+  } else if (persistFlags().restoreScrollback && fs.existsSync(session.scrollbackPath)) {
     try {
-      const history = fs.readFileSync(session.scrollbackPath, 'utf-8');
+      const history = trimScrollback(fs.readFileSync(session.scrollbackPath), 65536).toString('utf-8');
       if (history.length === 0) {
         return `\x1b[38;5;244mDewwie Native PTY [${matched?.agentType || 'shell'}] • ${cwd}\x1b[0m\r\n`;
       }
-      return history.slice(Math.max(0, history.length - 65536));
-    } catch (_) {}
-  }
-  return '';
-});
-  const session = getOrCreatePty(workspaceId, cwd);
-
-  const memBuf = session.getBuffer ? session.getBuffer() : null;
-  if (memBuf && memBuf.length > 0) {
-    return memBuf.toString('utf-8');
-  } else if (fs.existsSync(session.scrollbackPath)) {
-    try {
-      const history = fs.readFileSync(session.scrollbackPath, 'utf-8');
-      if (history.length === 0) {
-        return `\x1b[38;5;244mDewwie Native PTY [${matched?.agentType || 'shell'}] • ${cwd}\x1b[0m\r\n`;
-      }
-      return history.slice(Math.max(0, history.length - 65536));
+      return history;
     } catch (_) {}
   }
   return '';
@@ -867,6 +721,18 @@ function createWindow() {
       mainWindow.webContents.send('window:maximizedChange', mainWindow.isMaximized());
     }
   });
+
+  // Smoke test hook (tests/smoke_electron.py): prove the app actually boots and React renders, then exit.
+  if (process.env.DEWWIE_SMOKE_TEST === '1') {
+    mainWindow.webContents.once('did-finish-load', async () => {
+      await new Promise((r) => setTimeout(r, 1500));
+      const rendered = await mainWindow.webContents
+        .executeJavaScript('document.getElementById("root")?.childElementCount || 0')
+        .catch(() => 0);
+      console.log(`DEWWIE_SMOKE ${rendered > 0 ? 'OK' : 'EMPTY'} root_children=${rendered}`);
+      app.exit(rendered > 0 ? 0 : 3);
+    });
+  }
 
   mainWindow.on('close', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -953,15 +819,21 @@ function scanDir(dirPath, relativeRoot = '', maxDepth = 3, currentDepth = 0) {
 }
 
 // IPC Handlers
-ipcMain.handle('fs:tree', (_, { targetPath }) => {
-  const root = (targetPath && fs.existsSync(targetPath)) ? targetPath : defaultFallbackDir();
-  return scanDir(root);
+// Renderer-supplied paths are confined to registered project roots and known session worktrees.
+function allowedFsRoots() {
+  const roots = getProjects().map((p) => p.rootPath);
+  for (const w of workspacesCache || []) if (w.worktreePath) roots.push(w.worktreePath);
+  return roots;
+}
+
+ipcMain.handle('fs:tree', (_, { targetPath } = {}) => {
+  const root = resolveInsideRoots(allowedFsRoots(), targetPath || defaultFallbackDir());
+  return root && fs.existsSync(root) ? scanDir(root) : [];
 });
 
-ipcMain.handle('fs:read', (_, { filePath, basePath }) => {
-  const root = (basePath && fs.existsSync(basePath)) ? basePath : defaultFallbackDir();
-  const full = path.resolve(root, filePath);
-  if (!full.startsWith(root) || !fs.existsSync(full)) {
+ipcMain.handle('fs:read', (_, { filePath, basePath } = {}) => {
+  const full = resolveInsideRoots(allowedFsRoots(), basePath || defaultFallbackDir(), filePath);
+  if (!full || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
     return { error: 'File not found or outside workspace' };
   }
   try {
@@ -1018,12 +890,7 @@ ipcMain.handle('sessions:create', async (_, { projectId, name, sessionMode, bran
   const projects = getProjects();
   let proj = projects.find(p => p.id === projectId);
   if (!proj) {
-    proj = projects[0] || {
-      id: 'proj-dewwie',
-      name: 'Dewwie',
-      rootPath: 'D:\\1111-Works\\Dewwie',
-      isGitRepo: true
-    };
+    proj = projects[0]; // getProjects() always yields at least the portable fallback project
   }
   const rootDir = proj.rootPath;
   const mode = sessionMode || (branch ? 'branch' : 'local');
@@ -1032,7 +899,6 @@ ipcMain.handle('sessions:create', async (_, { projectId, name, sessionMode, bran
   let targetPath = rootDir;
   let allocatedPort = 5173;
   const list = await getWorkspaces();
-  const nextPort = 5174 + list.length;
 
   if (mode === 'branch' && branch) {
     const safeFolder = branch.replace(/[\/\\]/g, '-');
@@ -1040,7 +906,7 @@ ipcMain.handle('sessions:create', async (_, { projectId, name, sessionMode, bran
     const gitRes = await execGit(['worktree', 'add', '-b', branch, targetPath, baseBranch || 'main'], rootDir);
     console.log('[GIT WORKTREE]', gitRes.stdout, gitRes.stderr);
 
-    allocatedPort = nextPort;
+    allocatedPort = await allocatePort(registryPorts(list));
     const envContent = `PORT=${allocatedPort}\nAPI_PORT=${allocatedPort + 3000}\n`;
     try {
       fs.writeFileSync(path.join(targetPath, '.env.local'), envContent, 'utf-8');
@@ -1048,7 +914,7 @@ ipcMain.handle('sessions:create', async (_, { projectId, name, sessionMode, bran
   }
 
   const newSession = {
-    id: `ws-${Date.now().toString(36)}`,
+    id: mode === 'branch' && branch ? `ws-branch-${String(branch).replace(/[\/\\]/g, '-')}` : `ws-${Date.now().toString(36)}`,
     projectId: proj.id,
     projectName: proj.name,
     repository: proj.name,
@@ -1165,14 +1031,14 @@ ipcMain.handle('workspaces:create', async (_, { name, branch, baseBranch, reposi
 
   // Allocate dynamic port
   const list = await getWorkspaces();
-  const nextPort = 5174 + list.length;
+  const nextPort = await allocatePort(registryPorts(list));
   const envContent = `PORT=${nextPort}\nAPI_PORT=${nextPort + 3000}\n`;
   try {
     fs.writeFileSync(path.join(worktreePath, '.env.local'), envContent, 'utf-8');
   } catch (_) {}
 
   const newWs = {
-    id: `ws-${Date.now().toString(36)}`,
+    id: `ws-branch-${String(branch).replace(/[\/\\]/g, '-')}`,
     repository: repository || path.basename(baseDir),
     name: name || branch,
     sessionMode: 'branch',
@@ -1211,7 +1077,11 @@ ipcMain.handle('git:merge', async (_, { worktreePath, branch, baseBranch, commit
   const baseDir = (repo && getProjects().find(p => p.name === repo)?.rootPath) || 
     (worktreePath && path.dirname(path.dirname(worktreePath))) || 
     defaultFallbackDir();
-  await execGit(['checkout', baseBranch || 'main'], baseDir);
+  const checkoutRes = await execGit(['checkout', baseBranch || 'main'], baseDir);
+  if (checkoutRes.code !== 0) {
+    // Never merge into whatever branch happens to be checked out (e.g. dirty working tree).
+    return { success: false, message: `Could not check out ${baseBranch || 'main'}: ${checkoutRes.stderr || checkoutRes.stdout}`.trim() };
+  }
   const mergeRes = await execGit(['merge', '--no-ff', branch, '-m', commitMsg || `Merge ${branch}`], baseDir);
   if (mergeRes.code === 0 && worktreePath && fs.existsSync(worktreePath)) {
     try {
@@ -1224,7 +1094,10 @@ ipcMain.handle('git:merge', async (_, { worktreePath, branch, baseBranch, commit
 ipcMain.handle('ide:open', (_, { ide, targetPath }) => {
   const bin = ide === 'cursor' ? 'cursor' : ide === 'zed' ? 'zed' : 'code';
   const p = targetPath || defaultFallbackDir();
-  spawn('cmd', ['/C', bin, p], { detached: true, stdio: 'ignore' });
+  if (!fs.existsSync(p)) return false;
+  // IDE launchers are .cmd shims, so cmd.exe is required; quote the path so `&` etc. in folder
+  // names stay literal (Windows paths cannot contain `"`). `bin` comes from the fixed list above.
+  spawn('cmd.exe', ['/d', '/s', '/c', `"${bin} "${p}""`], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true, windowsHide: true });
   return true;
 });
 
@@ -1260,8 +1133,14 @@ ipcMain.handle('room:postMessage', async (_, data) => {
     );
     if (targetWs && activePtys.has(targetWs.id)) {
       const ptySess = activePtys.get(targetWs.id);
-      const banner = `\r\n\x1b[36m[Dewwie Room Message from ${msgObj.fromSessionName} (${msgObj.fromRole})]:\x1b[0m ${msgObj.content}\r\n`;
-      ptySess.ptyProcess.write(banner);
+      // Display-only. ptyProcess.write() is the shell's stdin, so the banner used to be submitted as
+      // input to the target agent/shell. Control chars are stripped so content can't inject escapes.
+      const clean = (s) => String(s).replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
+      const banner = `\r\n\x1b[36m[Dewwie Room Message from ${clean(msgObj.fromSessionName)} (${clean(msgObj.fromRole)})]:\x1b[0m ${clean(msgObj.content)}\r\n`;
+      ptySess.appendDisplay?.(banner);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('terminal:data', { workspaceId: targetWs.id, data: banner });
+      }
     }
   }
 
@@ -1274,7 +1153,8 @@ ipcMain.handle('room:postMessage', async (_, data) => {
 function getWorkspaceState() {
   if (fs.existsSync(WORKSPACE_STATE_FILE)) {
     try {
-      return JSON.parse(fs.readFileSync(WORKSPACE_STATE_FILE, 'utf-8'));
+      const s = readJsonSafe(WORKSPACE_STATE_FILE, null);
+      if (s) return s;
     } catch (_) {}
   }
   return {
@@ -1297,7 +1177,8 @@ function saveWorkspaceState(state) {
   try {
     const current = getWorkspaceState();
     const updated = { ...current, ...state, lastSaved: Date.now() };
-    fs.writeFileSync(WORKSPACE_STATE_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+    writeJsonAtomic(WORKSPACE_STATE_FILE, updated);
+    persistFlagsCache = null;
     return updated;
   } catch (err) {
     console.error('Error saving workspace state:', err);
@@ -1341,7 +1222,7 @@ ipcMain.handle('task:delegate', async (_, { task, agent, repo, baseBranch }) => 
 
   // 2. Allocate dynamic port
   const list = await getWorkspaces();
-  const assignedPort = 5174 + list.length;
+  const assignedPort = await allocatePort(registryPorts(list));
   try {
     fs.mkdirSync(worktreePath, { recursive: true });
     fs.writeFileSync(path.join(worktreePath, '.env.local'), `PORT=${assignedPort}\nAPI_PORT=${assignedPort + 3000}\n`, 'utf-8');
@@ -1359,7 +1240,7 @@ ipcMain.handle('task:delegate', async (_, { task, agent, repo, baseBranch }) => 
 
   // 4. Register new workspace
   const newWs = {
-    id: `ws-${Date.now().toString(36)}`,
+    id: `ws-branch-${String(branch).replace(/[\/\\]/g, '-')}`,
     repository,
     name: branch,
     sessionMode: 'branch',
@@ -1409,8 +1290,10 @@ ipcMain.handle('worktree:runTests', async (_, { worktreePath, repo }) => {
   const targetDir = worktreePath || (repo && getProjects().find(p => p.name === repo)?.rootPath) || defaultFallbackDir();
   return new Promise((resolve) => {
     // Check whether tests/run_all_tests.py, package.json test, or cargo test applies
-    let cmd = 'npm';
-    let args = ['test', '--', '--run'];
+    // No shell for user-influenced values: targetDir is only ever a cwd or a single argv entry.
+    // npm is a .cmd shim on Windows, so it goes through cmd.exe with a fixed command string.
+    let cmd = process.platform === 'win32' ? 'cmd.exe' : 'npm';
+    let args = process.platform === 'win32' ? ['/d', '/s', '/c', 'npm test -- --run'] : ['test', '--', '--run'];
     if (fs.existsSync(path.join(targetDir, 'tests', 'run_all_tests.py'))) {
       cmd = 'python';
       args = [path.join(targetDir, 'tests', 'run_all_tests.py')];
@@ -1419,7 +1302,7 @@ ipcMain.handle('worktree:runTests', async (_, { worktreePath, repo }) => {
       args = ['test'];
     }
 
-    const testProc = spawn(cmd, args, { cwd: targetDir, shell: true });
+    const testProc = spawn(cmd, args, { cwd: targetDir, windowsHide: true });
     let stdout = '';
     let stderr = '';
 

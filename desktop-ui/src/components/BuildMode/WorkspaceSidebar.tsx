@@ -150,7 +150,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         {!isNarrow ? (
           <>
             <div className="flex items-center gap-2 min-w-0">
-              <img src="/logo.png" alt="Dewwie" className="w-4 h-4 rounded object-contain shrink-0" />
+              <img src="./logo.png" alt="Dewwie" className="w-4 h-4 rounded object-contain shrink-0" />
               <span className="text-xs font-bold tracking-wider uppercase truncate" style={{ color: 'var(--app-text)' }}>
                 DEWWIE
               </span>
@@ -175,7 +175,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           </>
         ) : (
           <div className="flex flex-col items-center py-1">
-            <img src="/logo.png" alt="Dewwie" className="w-4 h-4 rounded object-contain" />
+            <img src="./logo.png" alt="Dewwie" className="w-4 h-4 rounded object-contain" />
           </div>
         )}
       </div>
@@ -207,20 +207,26 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
               {/* Flat Tree Project Header with Numbered Badge (1, 2, 3...) */}
               <div
                 onClick={() => handleSelectProject(proj.id)}
+                style={isProjectActive ? {
+                  backgroundColor: 'var(--app-surface-elevated)',
+                  color: 'var(--app-text)',
+                } : {
+                  color: 'var(--app-text-muted)',
+                }}
                 className={`group flex items-center rounded-md transition-colors cursor-pointer select-none ${
                   isNarrow
-                    ? 'justify-center p-1.5 hover:bg-zinc-900/60'
-                    : 'justify-between px-2 py-1 text-xs hover:bg-zinc-900/60'
+                    ? 'justify-center p-1.5'
+                    : 'justify-between px-2 py-1 text-xs'
                 } ${
                   isProjectActive
-                    ? 'text-zinc-100 font-semibold'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'font-semibold shadow-xs'
+                    : 'hover:opacity-90'
                 }`}
                 title={`${proj.name} (${proj.rootPath}) • Click to activate project workspace`}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className={`w-3.5 text-center text-[10px] font-mono font-bold shrink-0 ${
-                    isProjectActive ? 'text-zinc-200' : 'text-zinc-500'
+                    isProjectActive ? 'text-amber-400' : 'text-zinc-500'
                   }`}>
                     {projIdx + 1}
                   </span>
@@ -239,15 +245,18 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                     )}
                   </button>
 
-                  <Folder className={`w-3.5 h-3.5 shrink-0 ${isProjectActive ? 'text-zinc-300' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
+                  <Folder className={`w-3.5 h-3.5 shrink-0 ${isProjectActive ? 'text-amber-400' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
                   
                   {!isNarrow && (
-                    <span className="truncate text-xs font-medium tracking-tight">{proj.name}</span>
+                    <span className="truncate text-xs font-medium tracking-tight" style={{ color: isProjectActive ? 'var(--app-text)' : 'inherit' }}>{proj.name}</span>
                   )}
                 </div>
 
                 {!isNarrow && (
-                  <span className="text-[10px] font-mono text-zinc-500 shrink-0 px-1 py-0.2 rounded bg-zinc-900/50">
+                  <span
+                    style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)', color: 'var(--app-text-muted)' }}
+                    className="text-[10px] font-mono shrink-0 px-1 py-0.2 rounded border"
+                  >
                     {projectSessions.length}
                   </span>
                 )}
@@ -262,14 +271,20 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                       key={rootSession.id}
                       onClick={() => handleSelectSession(rootSession.id)}
                       title={`${rootSession.name} • Project Root Terminal Workspace`}
+                      style={activeWorkspaceId === rootSession.id ? {
+                        backgroundColor: 'var(--app-surface-elevated)',
+                        color: 'var(--app-text)',
+                      } : {
+                        color: 'var(--app-text-muted)',
+                      }}
                       className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer text-xs font-mono transition-all ${
                         activeWorkspaceId === rootSession.id
-                          ? 'bg-zinc-800/80 text-white font-medium'
-                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
+                          ? 'font-medium shadow-xs'
+                          : 'hover:opacity-90'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <Terminal className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <Terminal className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--app-text-muted)' }} />
                         {!isNarrow && (
                           <span className="truncate text-[11px]">
                             {rootSession.name}
@@ -277,7 +292,10 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                         )}
                       </div>
                       {!isNarrow && (
-                        <span className="text-[8.5px] px-1 rounded bg-zinc-800/60 text-zinc-400 font-mono">
+                        <span
+                          style={{ backgroundColor: 'var(--app-surface-elevated)', borderColor: 'var(--app-border)', color: 'var(--app-text-muted)' }}
+                          className="text-[8.5px] px-1 rounded border font-mono"
+                        >
                           ROOT
                         </span>
                       )}
@@ -294,10 +312,16 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                         key={ws.id}
                         onClick={() => handleSelectSession(ws.id)}
                         title={`${ws.name} (${ws.agentType || 'shell'})\nWorktree: ${ws.worktreePath}`}
+                        style={isActive ? {
+                          backgroundColor: 'var(--app-surface-elevated)',
+                          color: 'var(--app-text)',
+                        } : {
+                          color: 'var(--app-text-muted)',
+                        }}
                         className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer text-xs font-mono transition-all ${
                           isActive
-                            ? 'bg-zinc-800/80 text-white font-medium'
-                            : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40'
+                            ? 'font-medium shadow-xs'
+                            : 'hover:opacity-90'
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
@@ -402,10 +426,15 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 key={s.id}
                 onClick={() => handleSelectSession(s.id)}
                 title={`[${idx + 1}] ${s.name}\nState: ${state || 'idle'}\n${s.agentStatus?.message || ''}`}
+                style={isActive ? {
+                  backgroundColor: 'var(--app-surface-elevated)',
+                  borderColor: 'var(--app-border)',
+                  color: 'var(--app-text)',
+                } : {
+                  color: 'var(--app-text-muted)',
+                }}
                 className={`flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
-                  isActive
-                    ? 'bg-zinc-800 text-zinc-100 font-semibold'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
+                  isActive ? 'font-semibold border shadow-xs' : 'hover:opacity-80'
                 }`}
               >
                 <span className="font-bold">{idx + 1}</span>
@@ -422,7 +451,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                   <span className="text-emerald-400 font-black">✓</span>
                 )}
                 {!isWorking && !isError && !isBlocked && !isDone && (
-                  <span className="text-zinc-600 font-mono">~</span>
+                  <span className="text-zinc-500 font-mono">~</span>
                 )}
               </button>
             );
@@ -430,7 +459,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         </div>
       </div>
 
-      {/* 4. Bottom Utility Bar: Add Repository, Command Palette, and Settings (Flat, unboxed developer aesthetic) */}
+      {/* 4. Bottom Utility Bar: Add Repository, Command Palette, and Settings */}
       <div
         style={{
           backgroundColor: 'var(--app-surface)',
@@ -441,16 +470,17 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         {/* Open Directory / Add Repository */}
         <button
           onClick={handlePickFolder}
-          title="Open Any Directory from your PC (Ctrl+O)"
-          className={`rounded hover:bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 text-xs font-mono transition-colors flex items-center ${
+          title="Open Directory (Ctrl+O)"
+          style={{ color: 'var(--app-text-muted)' }}
+          className={`rounded text-xs font-mono transition-colors flex items-center hover:opacity-80 ${
             isNarrow ? 'p-1.5 justify-center' : 'w-full px-2 py-1 justify-between'
           }`}
         >
           <div className="flex items-center gap-1.5">
-            <FolderPlus className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-            {!isNarrow && <span className="font-medium text-[11px]">Open Directory</span>}
+            <FolderPlus className="w-3.5 h-3.5 shrink-0" />
+            {!isNarrow && <span className="font-medium text-[11px]" style={{ color: 'var(--app-text)' }}>Open Directory</span>}
           </div>
-          {!isNarrow && <span className="text-[9px] text-zinc-600">Ctrl+O</span>}
+          {!isNarrow && <span className="text-[9px]">Ctrl+O</span>}
         </button>
 
         {/* Command Palette Button */}
@@ -458,33 +488,35 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           <button
             onClick={onOpenCommandPalette}
             title="Command Palette (Ctrl+P / :)"
-            className={`rounded hover:bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 text-xs font-mono transition-colors flex items-center ${
+            style={{ color: 'var(--app-text-muted)' }}
+            className={`rounded text-xs font-mono transition-colors flex items-center hover:opacity-80 ${
               isNarrow ? 'p-1.5 justify-center' : 'w-full px-2 py-1 justify-between'
             }`}
           >
             <div className="flex items-center gap-1.5">
-              <Command className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+              <Command className="w-3.5 h-3.5 shrink-0" />
               {!isNarrow && <span className="text-[11px]">Commands</span>}
             </div>
-            {!isNarrow && <span className="text-[9px] text-zinc-600">Ctrl+P</span>}
+            {!isNarrow && <span className="text-[9px]">Ctrl+P</span>}
           </button>
         )}
 
-        {/* Settings Button (Moved to the Below, as requested!) */}
+        {/* Settings Button */}
         {onOpenSettings && (
           <button
             onClick={onOpenSettings}
             title="Settings & Themes (Ctrl+,)"
-            className={`rounded hover:bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 text-xs font-mono transition-colors flex items-center ${
+            style={{ color: 'var(--app-text-muted)' }}
+            className={`rounded text-xs font-mono transition-colors flex items-center hover:opacity-80 ${
               isNarrow ? 'p-1.5 justify-center' : 'w-full px-2 py-1 justify-between'
             }`}
           >
             <div className="flex items-center gap-1.5">
-              <Settings className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+              <Settings className="w-3.5 h-3.5 shrink-0" />
               {!isNarrow && <span className="text-[11px]">Settings</span>}
             </div>
             {!isNarrow && (
-              <span className="text-[9px] text-zinc-500 font-mono capitalize">
+              <span className="text-[9px] font-mono capitalize" style={{ color: 'var(--app-text-muted)' }}>
                 {theme}
               </span>
             )}
@@ -519,7 +551,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                     required
                     value={newFolderPath}
                     onChange={(e) => setNewFolderPath(e.target.value)}
-                    placeholder="e.g. D:\1111-Works\ThinkFolio"
+                    placeholder="e.g. C:\Projects\my-app"
                     className="flex-1 px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-700"
                   />
                   <button
@@ -556,7 +588,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 <button
                   type="submit"
                   disabled={!newFolderPath.trim()}
-                  className="px-3 py-1 rounded text-xs bg-zinc-100 hover:bg-white text-zinc-950 font-semibold disabled:opacity-40"
+                  className="px-3 py-1 rounded text-xs bg-zinc-100 hover:bg-zinc-50 text-zinc-950 font-semibold disabled:opacity-40"
                 >
                   Add Project
                 </button>
@@ -742,7 +774,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 <button
                   type="submit"
                   disabled={isCreating || !sessionName.trim() || (sessionMode === 'branch' && !branchName.trim())}
-                  className="px-3 py-1 rounded text-xs bg-zinc-100 hover:bg-white text-zinc-950 font-semibold disabled:opacity-40"
+                  className="px-3 py-1 rounded text-xs bg-zinc-100 hover:bg-zinc-50 text-zinc-950 font-semibold disabled:opacity-40"
                 >
                   {isCreating ? 'Creating...' : 'Start Session'}
                 </button>

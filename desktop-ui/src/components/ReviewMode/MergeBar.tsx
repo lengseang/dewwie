@@ -168,7 +168,7 @@ export const MergeBar: React.FC = () => {
         <button
           onClick={handleMerge}
           disabled={isMerging || !commitMessage.trim()}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-zinc-100 hover:bg-white text-zinc-950 font-medium text-xs transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-zinc-100 hover:bg-zinc-50 text-zinc-950 font-medium text-xs transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isMerging ? (
             <>

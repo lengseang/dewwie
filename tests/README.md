@@ -10,10 +10,11 @@ This directory contains the automated test suites, contract alignment verificati
 | `mock_agent.sh` | Bash equivalent of the mock agent simulator for Linux/macOS environments. | `bash swarmherd/tests/mock_agent.sh` |
 | `test_worktree.py` | End-to-end Git worktree lifecycle test: base repo creation, branch worktree add, filesystem isolation verification, diff calculation (`--stat`, `--numstat`, untracked), clean merge, and teardown/prune. | `python swarmherd/tests/test_worktree.py` |
 | `test_worktree.ps1` | Native Windows PowerShell script verifying the Git worktree lifecycle. | `powershell -ExecutionPolicy Bypass -File swarmherd/tests/test_worktree.ps1` |
-| `test_osc_parser.py` | Unit tests for OSC 7501 sequence parsing with BEL (`\x07`) and ST (`\x1b\`), partial multi-chunk stream buffering, non-7501 passthrough, and malformed sequence tolerance. | `python swarmherd/tests/test_osc_parser.py` |
-| `test_port_broker.py` | Unit tests for PortBroker slot allocation, collision avoidance on already-bound TCP sockets, and `.env.local` injection formatting. | `python swarmherd/tests/test_port_broker.py` |
+| `smoke_electron.py` | Boot smoke test of the shipped app: `node --check` on every `electron/*.cjs`, then launches Electron against `dist/` in a sandboxed HOME/APPDATA and requires `DEWWIE_SMOKE OK` (window loaded, React rendered). Needs `npm run build` first. | `python tests/smoke_electron.py` |
+| `desktop-ui/electron/*.test.mjs` | Vitest unit tests of the shipped main-process modules (OSC parser, port allocator, state-file IO, path guard, scrollback trim). Run via `run_all_tests.py` or `npx vitest run` in `desktop-ui`. | `npx vitest run` |
+| `test_state_io.py` | Shared state file IO of the shipped CLI (`read_json_safe` / `write_json_atomic`) in a temp dir. | `python tests/test_state_io.py` |
 | `test_rpc_contract.py` | Verifies JSON-RPC 2.0 schema alignment, method name consistency, enum matching (`AgentStatus`, `UIMode`), and port allocation keys between Rust daemon and React UI. | `python swarmherd/tests/test_rpc_contract.py` |
-| `run_all_tests.py` | Master test runner executing all 5 suites in sequence, displaying formatted execution tables, and providing exit codes for CI/CD gates. | `python swarmherd/tests/run_all_tests.py` |
+| `run_all_tests.py` | Master test runner executing every suite in sequence (boot smoke + shipped JS first), displaying formatted execution tables, and providing exit codes for CI/CD gates. | `python swarmherd/tests/run_all_tests.py` |
 
 ## Quick Start
 

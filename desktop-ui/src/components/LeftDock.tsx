@@ -29,7 +29,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
   const blockedCount = allWorkspaces.filter((w) => w.agentStatus.state === 'blocked').length;
 
   return (
-    <aside className="w-11 h-full bg-[#09090b] border-r border-zinc-800/80 flex flex-col items-center justify-between py-2.5 shrink-0 select-none z-30">
+    <aside className="w-11 h-full bg-zinc-950 border-r border-zinc-800/80 flex flex-col items-center justify-between py-2.5 shrink-0 select-none z-30">
       {/* Top: Space & Project Switcher */}
       <div className="flex flex-col items-center gap-2 w-full">
         {/* Toggle Sidebar */}

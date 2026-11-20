@@ -119,14 +119,7 @@ const INITIAL_PROJECTS: Record<string, ProjectState> = {
   'proj-dewwie': {
     id: 'proj-dewwie',
     name: 'Dewwie',
-    rootPath: 'D:\\1111-Works\\Dewwie',
-    isGitRepo: true,
-    createdAt: new Date().toISOString(),
-  },
-  'proj-exbytelab': {
-    id: 'proj-exbytelab',
-    name: 'exbytelab',
-    rootPath: 'D:\\1111-Works\\exbytelab',
+    rootPath: '', // placeholder until the native bridge loads the real projects
     isGitRepo: true,
     createdAt: new Date().toISOString(),
   },
@@ -144,7 +137,7 @@ const INITIAL_WORKSPACES: Record<string, WorkspaceState> = {
     baseBranch: 'main',
     repository: 'Dewwie',
     agentType: 'terminal',
-    worktreePath: 'D:\\1111-Works\\Dewwie',
+    worktreePath: '',
     agentStatus: {
       state: 'idle',
       message: 'Active PowerShell terminal ready',
@@ -212,16 +205,19 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   setRestoreSessionsOnStartup: (enable) => {
     if (typeof window !== 'undefined') localStorage.setItem('dewwie_restore_sessions', String(enable));
     set({ restoreSessionsOnStartup: enable });
+    get().persistState(); // main process reads the persistence flags from workspace_state.json
   },
   restoreScrollback: typeof window === 'undefined' || localStorage.getItem('dewwie_restore_scrollback') !== 'false',
   setRestoreScrollback: (enable) => {
     if (typeof window !== 'undefined') localStorage.setItem('dewwie_restore_scrollback', String(enable));
     set({ restoreScrollback: enable });
+    get().persistState();
   },
   persistActiveMesh: typeof window === 'undefined' || localStorage.getItem('dewwie_persist_mesh') !== 'false',
   setPersistActiveMesh: (enable) => {
     if (typeof window !== 'undefined') localStorage.setItem('dewwie_persist_mesh', String(enable));
     set({ persistActiveMesh: enable });
+    get().persistState();
   },
   ecoModeFps: (typeof window !== 'undefined' && localStorage.getItem('dewwie_eco_fps') === '60') ? 60 : 15,
   setEcoModeFps: (fps) => {
@@ -329,6 +325,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         rightPanelView: s.rightPanelView,
         leadSessionId: s.leadSessionId,
         theme: s.theme,
+        restoreSessionsOnStartup: s.restoreSessionsOnStartup,
+        restoreScrollback: s.restoreScrollback,
+        persistActiveMesh: s.persistActiveMesh,
       });
     }
   },
@@ -456,9 +455,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
                 ? savedState.activeWorkspaceId
                 : state.activeWorkspaceId;
 
-              const validTabs = Array.isArray(savedState.openTabIds) && savedState.openTabIds.length > 0
-                ? savedState.openTabIds.filter((id: string) => state.workspaces[id])
-                : state.openTabIds;
+              // "Restore Sessions" off: reopen only the active session's tab, not last run's tab set.
+              const validTabs = !state.restoreSessionsOnStartup
+                ? [validWs].filter((id): id is string => !!id && !!state.workspaces[id])
+                : Array.isArray(savedState.openTabIds) && savedState.openTabIds.length > 0
+                  ? savedState.openTabIds.filter((id: string) => state.workspaces[id])
+                  : state.openTabIds;
 
               return {
                 activeProjectId: validProject,
@@ -476,6 +478,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
               };
             });
           }
+          // Sync the Session Persistence flags (kept in localStorage) to the main process, which enforces them.
+          get().persistState();
         }
 
         // 5. Register live listeners
@@ -571,7 +575,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     if (typeof window !== 'undefined' && window.swarmherdNative?.createSession) {
       try {
         const realSession = await window.swarmherdNative.createSession({
-          projectId: projectId || get().activeProjectId || 'proj-exbytelab',
+          projectId: projectId || get().activeProjectId || undefined, // main falls back to the first project
           name,
           sessionMode,
           branch,
@@ -599,7 +603,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
     const newId = `ws-${Date.now().toString(36)}`;
     const targetProj = projectId ? get().projects[projectId] : Object.values(get().projects)[0];
-    const rootPath = targetProj ? targetProj.rootPath : 'D:\\1111-Works\\exbytelab';
+    const rootPath = targetProj ? targetProj.rootPath : '';
     const isBranch = sessionMode === 'branch' && !!branch;
     const worktreePath = isBranch
       ? `${rootPath}\\.worktrees\\${branch!.replace(/[\/\\]/g, '-')}`
@@ -763,7 +767,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     const newId = `ws-${Date.now().toString(36)}`;
     const sanitizedBranch = branch.replace(/\s+/g, '-');
     const safeName = name.trim() || sanitizedBranch;
-    const worktreePath = `D:\\1111-Works\\exbytelab\\.worktrees\\${sanitizedBranch.replace(/\//g, '-')}`;
+    // Under the active project (was always hard-coded to one developer's exbytelab folder).
+    const activeRoot = (get().projects[get().activeProjectId || ''] || Object.values(get().projects)[0])?.rootPath || '';
+    const worktreePath = `${activeRoot}\\.worktrees\\${sanitizedBranch.replace(/\//g, '-')}`;
 
     // If running in native desktop app, execute real Git worktree creation!
     if (typeof window !== 'undefined' && window.swarmherdNative?.createWorktree) {
@@ -1091,7 +1097,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   launchEditor: async (editor: ExternalEditor, workspaceId?: string) => {
     const targetWsId = workspaceId || get().activeWorkspaceId;
     const ws = targetWsId ? get().workspaces[targetWsId] : null;
-    const targetPath = ws ? ws.worktreePath : 'D:\\1111-Works\\exbytelab';
+    const targetPath = ws?.worktreePath; // undefined -> main process uses the default project
 
     const editorNames = {
       cursor: 'Cursor',

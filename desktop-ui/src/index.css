@@ -1,127 +1,100 @@
 @import "tailwindcss";
 
+/*
+ * Theme tokens are set at runtime on <html> by App.tsx from src/theme/themes.ts (single source of truth).
+ * The :root values below are only the pre-hydration fallback (Zinc Dark).
+ *
+ * Every hard-coded Tailwind palette class in the components is re-pointed at those tokens here, so
+ * components stay untouched while all themes (including light ones) stay coherent:
+ *   zinc-*                     -> neutral ramp mixed between --app-bg and --app-text (light themes invert automatically)
+ *   amber/cyan/sky/blue/indigo -> the single theme accent (--app-accent)
+ *   emerald / rose             -> semantic success / danger, from the theme's own terminal green / red
+ */
+:root {
+  --app-bg: #09090b;
+  --app-surface: #111113;
+  --app-surface-elevated: #18181b;
+  --app-nav-bg: #09090b;
+  --app-border: #27272a;
+  --app-border-subtle: #18181b;
+  --app-text: #f4f4f5;
+  --app-text-muted: #a1a1aa;
+  --app-accent: #d9a441;
+  --app-ok: #10b981;
+  --app-err: #f43f5e;
+}
+
+@theme {
+  /* Neutral ramp. 600/500/400 are lifted vs stock zinc so secondary text clears WCAG AA on --app-bg. */
+  --color-zinc-50: var(--app-text);
+  --color-zinc-100: color-mix(in oklab, var(--app-text) 96%, var(--app-bg));
+  --color-zinc-200: color-mix(in oklab, var(--app-text) 90%, var(--app-bg));
+  --color-zinc-300: color-mix(in oklab, var(--app-text) 82%, var(--app-bg));
+  --color-zinc-400: color-mix(in oklab, var(--app-text) 72%, var(--app-bg));
+  --color-zinc-500: color-mix(in oklab, var(--app-text) 62%, var(--app-bg));
+  --color-zinc-600: color-mix(in oklab, var(--app-text) 52%, var(--app-bg));
+  --color-zinc-700: color-mix(in oklab, var(--app-text) 22%, var(--app-bg));
+  --color-zinc-800: color-mix(in oklab, var(--app-text) 12%, var(--app-bg));
+  --color-zinc-900: color-mix(in oklab, var(--app-text) 6%, var(--app-bg));
+  --color-zinc-950: var(--app-bg);
+
+  /* Single accent ramp (dark steps tint toward bg, light steps toward text). */
+  --color-accent-950: color-mix(in oklab, var(--app-accent) 12%, var(--app-bg));
+  --color-accent-900: color-mix(in oklab, var(--app-accent) 20%, var(--app-bg));
+  --color-accent-800: color-mix(in oklab, var(--app-accent) 38%, var(--app-bg));
+  --color-accent-700: color-mix(in oklab, var(--app-accent) 60%, var(--app-bg));
+  --color-accent-600: color-mix(in oklab, var(--app-accent) 82%, var(--app-bg));
+  --color-accent-500: var(--app-accent);
+  --color-accent-400: var(--app-accent);
+  --color-accent-300: color-mix(in oklab, var(--app-accent) 82%, var(--app-text));
+  --color-accent-200: color-mix(in oklab, var(--app-accent) 62%, var(--app-text));
+  --color-accent-100: color-mix(in oklab, var(--app-accent) 40%, var(--app-text));
+  --color-accent: var(--app-accent);
+
+  --color-amber-950: var(--color-accent-950);
+  --color-amber-900: var(--color-accent-900);
+  --color-amber-800: var(--color-accent-800);
+  --color-amber-700: var(--color-accent-700);
+  --color-amber-600: var(--color-accent-600);
+  --color-amber-500: var(--color-accent-500);
+  --color-amber-400: var(--color-accent-400);
+  --color-amber-300: var(--color-accent-300);
+  --color-amber-200: var(--color-accent-200);
+  --color-cyan-950: var(--color-accent-950);
+  --color-cyan-800: var(--color-accent-800);
+  --color-cyan-700: var(--color-accent-700);
+  --color-cyan-500: var(--color-accent-500);
+  --color-cyan-400: var(--color-accent-400);
+  --color-cyan-300: var(--color-accent-300);
+  --color-sky-950: var(--color-accent-950);
+  --color-sky-600: var(--color-accent-600);
+  --color-sky-400: var(--color-accent-400);
+  --color-sky-300: var(--color-accent-300);
+  --color-blue-400: var(--color-accent-400);
+  --color-indigo-400: var(--color-accent-400);
+
+  /* Semantic success / danger. */
+  --color-emerald-950: color-mix(in oklab, var(--app-ok) 12%, var(--app-bg));
+  --color-emerald-900: color-mix(in oklab, var(--app-ok) 20%, var(--app-bg));
+  --color-emerald-800: color-mix(in oklab, var(--app-ok) 38%, var(--app-bg));
+  --color-emerald-700: color-mix(in oklab, var(--app-ok) 60%, var(--app-bg));
+  --color-emerald-600: color-mix(in oklab, var(--app-ok) 82%, var(--app-bg));
+  --color-emerald-500: var(--app-ok);
+  --color-emerald-400: var(--app-ok);
+  --color-emerald-300: color-mix(in oklab, var(--app-ok) 80%, var(--app-text));
+  --color-emerald-200: color-mix(in oklab, var(--app-ok) 60%, var(--app-text));
+  --color-rose-950: color-mix(in oklab, var(--app-err) 12%, var(--app-bg));
+  --color-rose-900: color-mix(in oklab, var(--app-err) 20%, var(--app-bg));
+  --color-rose-800: color-mix(in oklab, var(--app-err) 38%, var(--app-bg));
+  --color-rose-700: color-mix(in oklab, var(--app-err) 60%, var(--app-bg));
+  --color-rose-600: color-mix(in oklab, var(--app-err) 82%, var(--app-bg));
+  --color-rose-500: var(--app-err);
+  --color-rose-400: var(--app-err);
+  --color-rose-300: color-mix(in oklab, var(--app-err) 80%, var(--app-text));
+  --color-rose-200: color-mix(in oklab, var(--app-err) 60%, var(--app-text));
+}
+
 @layer base {
-  :root, [data-theme="zinc"] {
-    --app-bg: #09090b;
-    --app-surface: #111113;
-    --app-surface-elevated: #18181b;
-    --app-nav-bg: #09090b;
-    --app-border: #27272a;
-    --app-border-subtle: #18181b;
-    --app-text: #f4f4f5;
-    --app-text-muted: #a1a1aa;
-    --app-accent: #e4e4e7;
-  }
-
-  [data-theme="oled"] {
-    --app-bg: #000000;
-    --app-surface: #050505;
-    --app-surface-elevated: #0a0a0a;
-    --app-nav-bg: #000000;
-    --app-border: #1c1c1f;
-    --app-border-subtle: #121214;
-    --app-text: #ffffff;
-    --app-text-muted: #888888;
-    --app-accent: #ffffff;
-  }
-
-  [data-theme="slate"] {
-    --app-bg: #0b0f19;
-    --app-surface: #0f172a;
-    --app-surface-elevated: #1e293b;
-    --app-nav-bg: #080d17;
-    --app-border: #1e293b;
-    --app-border-subtle: #131d31;
-    --app-text: #f8fafc;
-    --app-text-muted: #94a3b8;
-    --app-accent: #38bdf8;
-  }
-
-  [data-theme="tokyo"] {
-    --app-bg: #1a1b26;
-    --app-surface: #16161e;
-    --app-surface-elevated: #24283b;
-    --app-nav-bg: #13141c;
-    --app-border: #2f354a;
-    --app-border-subtle: #1f2335;
-    --app-text: #c0caf5;
-    --app-text-muted: #7aa2f7;
-    --app-accent: #bb9af7;
-  }
-
-  [data-theme="monokai"] {
-    --app-bg: #19181a;
-    --app-surface: #221f22;
-    --app-surface-elevated: #2d2a2e;
-    --app-nav-bg: #151416;
-    --app-border: #363337;
-    --app-border-subtle: #262327;
-    --app-text: #fcfcfa;
-    --app-text-muted: #939293;
-    --app-accent: #ffd866;
-  }
-
-  [data-theme="catppuccin"] {
-    --app-bg: #181926;
-    --app-surface: #1e2030;
-    --app-surface-elevated: #24273a;
-    --app-nav-bg: #141522;
-    --app-border: #363a4f;
-    --app-border-subtle: #24273a;
-    --app-text: #cad3f5;
-    --app-text-muted: #8087a2;
-    --app-accent: #8aadf4;
-  }
-
-  [data-theme="nord"] {
-    --app-bg: #242933;
-    --app-surface: #2e3440;
-    --app-surface-elevated: #3b4252;
-    --app-nav-bg: #1f232c;
-    --app-border: #434c5e;
-    --app-border-subtle: #3b4252;
-    --app-text: #eceff4;
-    --app-text-muted: #8892b0;
-    --app-accent: #88c0d0;
-  }
-
-  [data-theme="transparent"] {
-    --app-bg: rgba(12, 14, 20, 0.85);
-    --app-surface: rgba(20, 24, 34, 0.72);
-    --app-surface-elevated: rgba(30, 36, 50, 0.82);
-    --app-nav-bg: rgba(10, 12, 18, 0.88);
-    --app-border: rgba(255, 255, 255, 0.12);
-    --app-border-subtle: rgba(255, 255, 255, 0.06);
-    --app-text: #f1f5f9;
-    --app-text-muted: #94a3b8;
-    --app-accent: #38bdf8;
-  }
-
-  /* Full-Fledged Light Mode Presets */
-  [data-theme="light-clean"] {
-    --app-bg: #ffffff;
-    --app-surface: #f8fafc;
-    --app-surface-elevated: #f1f5f9;
-    --app-nav-bg: #ffffff;
-    --app-border: #e2e8f0;
-    --app-border-subtle: #f1f5f9;
-    --app-text: #0f172a;
-    --app-text-muted: #64748b;
-    --app-accent: #0284c7;
-  }
-
-  [data-theme="light-nord"] {
-    --app-bg: #f4f6f9;
-    --app-surface: #e5e9f0;
-    --app-surface-elevated: #eceff4;
-    --app-nav-bg: #eceff4;
-    --app-border: #d8dee9;
-    --app-border-subtle: #e5e9f0;
-    --app-text: #2e3440;
-    --app-text-muted: #4c566a;
-    --app-accent: #5e81ac;
-  }
-
   body {
     background-color: var(--app-bg);
     color: var(--app-text);
@@ -148,7 +121,20 @@
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--app-border-subtle);
+    background: var(--app-text-muted);
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--app-accent);
+    outline-offset: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
   }
 }
 
